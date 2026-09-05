@@ -12,7 +12,7 @@ describe("dispatchVirtualCellWillRebind", () => {
 	it("returns without dispatching for a cell with no transient state", () => {
 		const cell = document.createElement("div");
 		const interaction = document.createElement("button");
-		interaction.dataset.cclInteractionId = "item:first";
+		interaction.dataset.cclInteractionHandle = "item:first";
 		cell.append(interaction);
 		document.body.append(cell);
 		const listener = vi.fn();
@@ -24,7 +24,7 @@ describe("dispatchVirtualCellWillRebind", () => {
 		});
 
 		expect(listener).not.toHaveBeenCalled();
-		expect(interaction.dataset.cclInteractionId).toBe("item:first");
+		expect(interaction.dataset.cclInteractionHandle).toBe("item:first");
 	});
 
 	it("clears transient state and dispatches one event", () => {

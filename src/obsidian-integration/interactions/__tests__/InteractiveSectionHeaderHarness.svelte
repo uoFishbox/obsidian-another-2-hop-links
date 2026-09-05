@@ -8,17 +8,10 @@
 		registry: InteractionRegistry;
 		title?: string;
 		count?: number;
-		interactionId?: string;
 		descriptor?: SectionHeaderInteractionDescriptor;
 	}
 
-	let {
-		registry,
-		title = "Header",
-		count = 1,
-		interactionId = "section:test",
-		descriptor,
-	}: Props = $props();
+	let { registry, title = "Header", count = 1, descriptor }: Props = $props();
 
 	setInteractionRegistryContext(registry);
 </script>
@@ -27,7 +20,6 @@
 	{title}
 	{count}
 	className=""
-	{interactionId}
 	interactionDescriptor={descriptor}
 >
 	{#snippet icon()}{/snippet}

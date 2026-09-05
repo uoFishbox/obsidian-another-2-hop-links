@@ -35,7 +35,6 @@
 		resolveNavigationTarget={list.resolveNavigationTarget}
 		resolveSequentialNavigationTarget={list.resolveSequentialNavigationTarget}
 		flushVirtualScrollMeasurement={list.flushVirtualScrollMeasurement}
-		interactionDescriptorScopeId="virtual-grid-card-slots"
 		interactionDescriptorResolverProvider={list.interactionDescriptorResolverProvider}
 	>
 		{#snippet renderCell({ mountedCell, scrollContainerEl })}

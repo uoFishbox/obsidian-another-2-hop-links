@@ -2,7 +2,10 @@
 	import type { Snippet } from "svelte";
 	import ClickableHeader from "shared/ui/primitives/ClickableHeader.svelte";
 	import { useInteractionRegistry } from "cards/interactions/interactionRegistry";
-	import type { SectionHeaderInteractionDescriptor } from "cards/interactions/interactionTypes";
+	import {
+		createInteractionHandle,
+		type SectionHeaderInteractionDescriptor,
+	} from "cards/interactions/interactionTypes";
 	import type { CardSectionVariant } from "cards/components/cardPresentation";
 
 	export interface Props {
@@ -11,7 +14,6 @@
 		icon: Snippet;
 		className?: string;
 		draggable?: boolean;
-		interactionId: string;
 		interactionDescriptor?: SectionHeaderInteractionDescriptor;
 		onClick?: () => void;
 		sectionVariant?: CardSectionVariant;
@@ -23,15 +25,15 @@
 		icon,
 		className = "",
 		draggable = false,
-		interactionId,
 		interactionDescriptor,
 		onClick,
 		sectionVariant,
 	}: Props = $props();
 
 	const interactionRegistry = useInteractionRegistry();
+	const interactionHandle = createInteractionHandle("h");
 	const dataAttributes = $derived({
-		"data-ccl-interaction-id": interactionId,
+		"data-ccl-interaction-handle": interactionHandle,
 		"data-ccl-section-variant": sectionVariant,
 	});
 
@@ -39,7 +41,7 @@
 		const descriptor = interactionDescriptor;
 		if (!interactionRegistry || !descriptor) return;
 
-		return interactionRegistry.register(descriptor);
+		return interactionRegistry.register(interactionHandle, descriptor);
 	}
 
 	$effect(() => registerInteractionDescriptor());

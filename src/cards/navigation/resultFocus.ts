@@ -11,7 +11,7 @@ import {
 export type ResultFocusDirection = "up" | "down";
 export type ResultNavigationDirection = ResultFocusDirection | "left" | "right";
 
-export const CARD_SELECTOR = ".cosense-card-links__box[data-ccl-interaction-id]";
+export const CARD_SELECTOR = ".cosense-card-links__box[data-ccl-interaction-handle]";
 export const LOAD_MORE_SELECTOR =
 	"button.cosense-card-links__load-more-button.cosense-card-links__box";
 export const RESULT_FOCUS_SELECTOR = `${CARD_SELECTOR}, ${LOAD_MORE_SELECTOR}`;
@@ -79,7 +79,7 @@ function collectResultSections(container: HTMLElement | null): HTMLElement[] {
 }
 
 function getTargetIdentity(element: HTMLElement): string | null {
-	return element.dataset.cclInteractionId ?? null;
+	return element.dataset.cclInteractionHandle ?? null;
 }
 
 function parseStyleNumber(value: string | null | undefined): number | null {

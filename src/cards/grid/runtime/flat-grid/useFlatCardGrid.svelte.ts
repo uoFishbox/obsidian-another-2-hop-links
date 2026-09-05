@@ -32,7 +32,10 @@ import {
 } from "cards/grid/layout/flatGridMeasurement";
 import { DISABLED_PREVIEW_SURFACE } from "card-preview/runtime/previewRuntime";
 import type { CardPreviewRequest } from "card-preview/pipeline/cardPreviewRequest";
-import type { ItemInteractionDescriptor } from "cards/interactions/interactionTypes";
+import type {
+	InteractionHandle,
+	ItemInteractionDescriptor,
+} from "cards/interactions/interactionTypes";
 import { createVirtualCardInteractionController } from "cards/interactions/virtualCardInteractionController";
 import { useAppContext } from "cards/context/linkContext";
 import type { VirtualFrameCoordinator } from "shared/ui/scheduling/frameCoordinator";
@@ -55,6 +58,7 @@ export interface FlatCardGridItemRenderArgs<T> {
 	rowIndex: number;
 	activationCandidateId: string;
 	readonly previewKey: string;
+	readonly interactionHandle: InteractionHandle;
 }
 
 type FlatCardGridApplicationSettings = CardLayoutSettings;
@@ -445,6 +449,9 @@ export function useFlatCardGrid<T>(
 			rowIndex: mountedCell.rowIndex,
 			activationCandidateId: mountedCell.key,
 			previewKey: String(mountedCell.key),
+			interactionHandle: interactionController.getInteractionHandle(
+				String(mountedCell.physicalCellSlot),
+			),
 		};
 	};
 

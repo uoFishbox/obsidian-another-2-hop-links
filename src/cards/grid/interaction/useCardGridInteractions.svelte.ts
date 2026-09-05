@@ -1,4 +1,4 @@
-import { onDestroy, tick } from "svelte";
+import { tick } from "svelte";
 import { Platform } from "obsidian";
 import { createDelegatedInteractionDispatcher } from "cards/interactions/delegatedDispatcher";
 import {
@@ -26,7 +26,6 @@ export interface CardSurfaceInteractionParams {
 	setShadowRoot(shadowRoot: ShadowRoot | null): void;
 	getObserverRoot(): HTMLElement | null;
 	getRowHeight(): number;
-	getInteractionDescriptorScopeId(): string | undefined;
 	getInteractionDescriptorResolverProvider():
 		| InteractionDescriptorResolverProvider
 		| undefined;
@@ -56,7 +55,6 @@ export function createCardSurfaceInteractions({
 	setShadowRoot,
 	getObserverRoot,
 	getRowHeight,
-	getInteractionDescriptorScopeId,
 	getInteractionDescriptorResolverProvider,
 	resolveNavigationTarget,
 	resolveSequentialNavigationTarget,
@@ -154,36 +152,14 @@ export function createCardSurfaceInteractions({
 		});
 	});
 
-	let syncedInteractionDescriptorScopeId: string | undefined;
-
 	$effect(() => {
-		const interactionDescriptorScopeId = getInteractionDescriptorScopeId();
 		const interactionDescriptorResolverProvider =
 			getInteractionDescriptorResolverProvider();
-		if (
-			syncedInteractionDescriptorScopeId &&
-			syncedInteractionDescriptorScopeId !== interactionDescriptorScopeId
-		) {
-			interactionRegistry.syncInteractionDescriptorResolverProvider(
-				syncedInteractionDescriptorScopeId,
-				undefined,
-			);
-		}
-		syncedInteractionDescriptorScopeId = interactionDescriptorScopeId;
-
-		if (!interactionDescriptorScopeId) return;
-		interactionRegistry.syncInteractionDescriptorResolverProvider(
-			interactionDescriptorScopeId,
+		interactionRegistry.setInteractionDescriptorResolverProvider(
 			interactionDescriptorResolverProvider,
 		);
-	});
-
-	onDestroy(() => {
-		if (!syncedInteractionDescriptorScopeId) return;
-		interactionRegistry.syncInteractionDescriptorResolverProvider(
-			syncedInteractionDescriptorScopeId,
-			undefined,
-		);
+		return () =>
+			interactionRegistry.setInteractionDescriptorResolverProvider(undefined);
 	});
 
 	return {

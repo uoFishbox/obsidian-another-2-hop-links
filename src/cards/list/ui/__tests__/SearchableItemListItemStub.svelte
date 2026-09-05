@@ -28,7 +28,7 @@
 	class="cosense-card-links__box"
 	data-testid="searchable-item"
 	data-label={label}
-	data-ccl-interaction-id={label}
+	data-ccl-interaction-handle={label}
 	tabindex="0"
 >
 	{label}

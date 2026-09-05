@@ -9,6 +9,7 @@
 	import type { CardItem } from "cards/CardItem";
 	import type { CardRenderModel } from "cards/rendering/cardRenderModel";
 	import { createCardRenderModel } from "cards/rendering/cardRenderModel";
+	import { createInteractionHandle } from "cards/interactions/interactionTypes";
 
 	interface Props {
 		item: CardItem | undefined;
@@ -64,6 +65,7 @@
 					})
 				: undefined),
 	);
+	const interactionHandle = createInteractionHandle("t");
 </script>
 
-<ViewItemCard model={effectiveModel} />
+<ViewItemCard model={effectiveModel} {interactionHandle} />

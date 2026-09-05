@@ -12,7 +12,7 @@ import {
 	consumeInteractionLongPressed,
 	dispatchSyntheticMouseOver,
 	getInteractionElement,
-	getInteractionIdFromElement,
+	getInteractionHandleFromElement,
 	getInteractionLastTouchAt,
 	isPromiseLike,
 	isSyntheticInteractionHoverEvent,
@@ -60,12 +60,12 @@ function resolveInteractionDescriptor(
 	registry: InteractionRegistry,
 	element: HTMLElement,
 ): InteractionDescriptor | null {
-	const interactionId = getInteractionIdFromElement(element);
-	if (!interactionId) {
+	const interactionHandle = getInteractionHandleFromElement(element);
+	if (!interactionHandle) {
 		return null;
 	}
 
-	return registry.resolve(interactionId) ?? null;
+	return registry.resolve(interactionHandle) ?? null;
 }
 
 function isRelatedTargetWithinElement(
@@ -357,7 +357,9 @@ export function createDelegatedInteractionDispatcher({
 			}
 
 			const relatedElement = getInteractionElement(event.relatedTarget);
-			const relatedInteractionId = getInteractionIdFromElement(relatedElement);
+			const relatedInteractionId = relatedElement
+				? resolveInteractionDescriptor(registry, relatedElement)?.interactionId
+				: null;
 			if (
 				relatedInteractionId &&
 				relatedInteractionId === descriptor.interactionId
@@ -398,7 +400,9 @@ export function createDelegatedInteractionDispatcher({
 			}
 
 			const relatedElement = getInteractionElement(event.relatedTarget);
-			const relatedInteractionId = getInteractionIdFromElement(relatedElement);
+			const relatedInteractionId = relatedElement
+				? resolveInteractionDescriptor(registry, relatedElement)?.interactionId
+				: null;
 			if (
 				relatedInteractionId &&
 				relatedInteractionId === descriptor.interactionId

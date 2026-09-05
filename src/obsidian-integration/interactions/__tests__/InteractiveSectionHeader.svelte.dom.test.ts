@@ -3,7 +3,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import InteractiveSectionHeaderHarness from "./InteractiveSectionHeaderHarness.svelte";
 import InteractiveSectionHeaderSwapHarness from "./InteractiveSectionHeaderSwapHarness.svelte";
 import { createInteractionRegistry } from "cards/interactions/interactionRegistry";
-import type { SectionHeaderInteractionDescriptor } from "cards/interactions/interactionTypes";
+import {
+	getInteractionHandleFromElement,
+	type SectionHeaderInteractionDescriptor,
+} from "cards/interactions/interactionTypes";
 
 vi.mock("obsidian", async () => {
 	const actual = await vi.importActual<typeof import("obsidian")>("obsidian");
@@ -52,36 +55,30 @@ describe("InteractiveSectionHeader", () => {
 		const view = render(InteractiveSectionHeaderHarness, {
 			props: {
 				registry,
-				interactionId: initialDescriptor.interactionId,
 				descriptor: initialDescriptor,
 			},
 		});
 
-		expect(registry.resolve(initialDescriptor.interactionId)).toStrictEqual(
-			initialDescriptor,
+		const header = view.container.querySelector<HTMLElement>(
+			".cosense-card-links__box",
 		);
-		const header = view.container.querySelector(".cosense-card-links__box");
-		expect(header).toHaveAttribute(
-			"data-ccl-interaction-id",
-			initialDescriptor.interactionId,
-		);
+		const interactionHandle = getInteractionHandleFromElement(header);
+		expect(interactionHandle).not.toBeNull();
+		expect(registry.resolve(interactionHandle!)).toStrictEqual(initialDescriptor);
+		expect(header).toHaveAttribute("data-ccl-interaction-handle");
 		expect(header).not.toHaveAttribute("data-ccl-interaction-kind");
 		expect(header).not.toHaveAttribute("data-directory");
 
 		await view.rerender({
 			registry,
-			interactionId: nextDescriptor.interactionId,
 			descriptor: nextDescriptor,
 		});
 
-		expect(registry.resolve(initialDescriptor.interactionId)).toBeUndefined();
-		expect(registry.resolve(nextDescriptor.interactionId)).toStrictEqual(
-			nextDescriptor,
-		);
+		expect(registry.resolve(interactionHandle!)).toStrictEqual(nextDescriptor);
 
 		view.unmount();
 
-		expect(registry.resolve(nextDescriptor.interactionId)).toBeUndefined();
+		expect(registry.resolve(interactionHandle!)).toBeUndefined();
 	});
 
 	it("releases the previous descriptor when the prop transitions to undefined on rebind", async () => {
@@ -94,22 +91,23 @@ describe("InteractiveSectionHeader", () => {
 		const view = render(InteractiveSectionHeaderHarness, {
 			props: {
 				registry,
-				interactionId: initialDescriptor.interactionId,
 				descriptor: initialDescriptor,
 			},
 		});
 
-		expect(registry.resolve(initialDescriptor.interactionId)).toStrictEqual(
-			initialDescriptor,
+		const header = view.container.querySelector<HTMLElement>(
+			".cosense-card-links__box",
 		);
+		const interactionHandle = getInteractionHandleFromElement(header);
+		expect(interactionHandle).not.toBeNull();
+		expect(registry.resolve(interactionHandle!)).toStrictEqual(initialDescriptor);
 
 		await view.rerender({
 			registry,
-			interactionId: "section:header-rebound-placeholder",
 			descriptor: undefined,
 		});
 
-		expect(registry.resolve(initialDescriptor.interactionId)).toBeUndefined();
+		expect(registry.resolve(interactionHandle!)).toBeUndefined();
 	});
 
 	it.each([
@@ -144,8 +142,16 @@ describe("InteractiveSectionHeader", () => {
 				descriptors: resolveDescriptors(reorderedIds),
 			});
 
+			const registeredDescriptors = Array.from(
+				view.container.querySelectorAll<HTMLElement>(
+					"[data-ccl-interaction-handle]",
+				),
+			).map((element) => {
+				const handle = getInteractionHandleFromElement(element);
+				return handle ? registry.resolve(handle) : undefined;
+			});
 			for (const descriptor of descriptors.values()) {
-				expect(registry.resolve(descriptor.interactionId)).toBe(descriptor);
+				expect(registeredDescriptors).toContain(descriptor);
 			}
 		},
 	);

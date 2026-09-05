@@ -110,7 +110,11 @@ export function createTwoHopRowModel(
 	};
 
 	const isSequentiallyFocusableCell = (cell: TwoHopVirtualCell): boolean =>
-		cell.kind !== "header" || Boolean(cell.section.header.props.interactionId);
+		cell.kind !== "header" ||
+		Boolean(
+			cell.section.header.props.interactionDescriptor ||
+			cell.section.header.props.onClick,
+		);
 
 	const getRow = (rowIndex: number): VirtualRow<TwoHopVirtualCell> | null => {
 		const row = geometry.resolveRow(rowIndex);
@@ -361,7 +365,9 @@ function resolveTwoHopCell(
 
 function isFocusableCell(cell: TwoHopVirtualCell): boolean {
 	return (
-		cell.kind !== "header" || cell.section.header.props.interactionId !== undefined
+		cell.kind !== "header" ||
+		cell.section.header.props.interactionDescriptor !== undefined ||
+		cell.section.header.props.onClick !== undefined
 	);
 }
 

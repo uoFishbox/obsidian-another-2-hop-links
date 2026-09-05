@@ -60,7 +60,6 @@ function createInteractiveBranchSection(
 		kind: "two-hop-branch",
 		title: sectionId,
 		headerProps: {
-			interactionId,
 			interactionDescriptor: descriptor,
 		},
 		items: [],
@@ -162,6 +161,24 @@ function getRows(root: HTMLElement): HTMLElement[] {
 	);
 }
 
+function findCardByTitle(root: HTMLElement, title: string): HTMLElement | null {
+	return (
+		Array.from(
+			root.shadowRoot?.querySelectorAll<HTMLElement>(
+				".cosense-card-links__box",
+			) ?? [],
+		).find(
+			(element) =>
+				element
+					.querySelector(".cosense-card-links__header-title")
+					?.textContent?.trim() === title ||
+				element
+					.querySelector(".cosense-card-links__box-title")
+					?.textContent?.trim() === title,
+		) ?? null
+	);
+}
+
 async function waitForStableRowCount(root: HTMLElement): Promise<number> {
 	let previousRowCount = -1;
 	for (let attempt = 0; attempt < 20; attempt += 1) {
@@ -235,12 +252,8 @@ describe("TwoHopVirtualGrid component", () => {
 		});
 		for (let index = 0; index < 4; index += 1) await flushFrames();
 
-		const firstHeader = root.shadowRoot?.querySelector<HTMLElement>(
-			"[data-ccl-interaction-id='h0']",
-		);
-		const secondHeader = root.shadowRoot?.querySelector<HTMLElement>(
-			"[data-ccl-interaction-id='h1']",
-		);
+		const firstHeader = findCardByTitle(root, "first");
+		const secondHeader = findCardByTitle(root, "second");
 		expect(firstHeader).not.toBeNull();
 		expect(secondHeader).not.toBeNull();
 		await fireEvent.click(firstHeader!);
@@ -299,9 +312,7 @@ describe("TwoHopVirtualGrid component", () => {
 
 		await vi.waitFor(() => expect(resolver).toHaveBeenCalled());
 		expect(resolver.mock.calls.length).toBeLessThan(40);
-		expect(
-			root.shadowRoot?.querySelector("[data-ccl-interaction-id='item:0']"),
-		).not.toBeNull();
+		expect(findCardByTitle(root, "item:0")).not.toBeNull();
 	});
 
 	it("retains valid hydrated models across filtered publications and invalidates precise changes", async () => {

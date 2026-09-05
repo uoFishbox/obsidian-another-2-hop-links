@@ -43,8 +43,8 @@
 		resolveItemPreviewRequest={(model) => model.previewRequest}
 		resolveItemInteractionDescriptor={(model) => model.interactionDescriptor}
 	>
-		{#snippet item({ item, previewKey })}
-			<ViewItemCard model={item} {previewKey} />
+		{#snippet item({ item, previewKey, interactionHandle })}
+			<ViewItemCard model={item} {previewKey} {interactionHandle} />
 		{/snippet}
 	</FlatCardGrid>
 </div>

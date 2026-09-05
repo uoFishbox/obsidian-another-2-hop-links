@@ -12,7 +12,6 @@ export interface SectionConfig<T> {
 export interface ClickableHeaderExtraProps {
 	className?: string;
 	draggable?: boolean;
-	interactionId?: string;
 	interactionDescriptor?: SectionHeaderInteractionDescriptor;
 	onClick?: () => void;
 }

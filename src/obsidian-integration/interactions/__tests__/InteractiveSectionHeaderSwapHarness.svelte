@@ -18,7 +18,6 @@
 		title={descriptor.interactionId}
 		count={1}
 		className=""
-		interactionId={descriptor.interactionId}
 		interactionDescriptor={descriptor}
 	>
 		{#snippet icon()}{/snippet}

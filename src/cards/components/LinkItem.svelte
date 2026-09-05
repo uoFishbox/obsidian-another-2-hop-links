@@ -7,6 +7,7 @@
 	import { type Snippet } from "svelte";
 	import { useAppContext } from "cards/context/linkContext";
 	import { highlightTextForSearch } from "card-preview/text/searchHighlighter";
+	import type { InteractionHandle } from "cards/interactions/interactionTypes";
 
 	const AUDIO_EXTENSIONS = new Set([
 		"mp3",
@@ -23,7 +24,7 @@
 	interface Props {
 		title: string;
 		ariaLabel: string;
-		interactionId: string;
+		interactionHandle: InteractionHandle;
 		interactive?: boolean;
 		draggable?: boolean;
 		children?: Snippet;
@@ -36,7 +37,7 @@
 	let {
 		title,
 		ariaLabel,
-		interactionId,
+		interactionHandle,
 		interactive = true,
 		draggable = true,
 		children,
@@ -97,7 +98,7 @@
 	tabindex={interactive ? 0 : undefined}
 	aria-label={interactive ? ariaLabel : undefined}
 	aria-hidden={interactive ? undefined : "true"}
-	data-ccl-interaction-id={interactive ? interactionId : undefined}
+	data-ccl-interaction-handle={interactive ? interactionHandle : undefined}
 	draggable={interactive && draggable ? true : undefined}
 >
 	<div class="cosense-card-links__box-title-wrapper">

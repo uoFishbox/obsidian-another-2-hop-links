@@ -5,7 +5,7 @@ import { DEFAULT_SETTINGS } from "settings/model";
 import type { TaggedNote, IndexedLink } from "indexing/model";
 import type { TwoHopLinkBranch } from "two-hop/model";
 import { createTwoHopSectionPublicationMemo } from "two-hop/ui/section-descriptors/cache";
-import { createTwoHopInteractionTokenAllocator } from "two-hop/ui/section-descriptors/descriptors";
+import { createTwoHopInteractionIdentity } from "two-hop/ui/section-descriptors/descriptors";
 import { buildScopedSectionId } from "cards/components/listPagination";
 
 const sourceFile = { path: "source.md" } as TFile;
@@ -102,7 +102,7 @@ function createHarness(defaultVisibleLimit = 20, loadMoreIncrement = 20) {
 		getSortedTagGroupItems: (items: readonly TaggedNote[]) =>
 			applicationStore.getSortedTagGroupItems(items),
 		getVisibleCount: createVisibleCountResolver(),
-		interactionTokens: createTwoHopInteractionTokenAllocator(),
+		interactionIdentity: createTwoHopInteractionIdentity(),
 		onTagClick: vi.fn(),
 	};
 	return {

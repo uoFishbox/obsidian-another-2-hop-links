@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/svelte";
+import { cleanup, render } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { TFile } from "obsidian";
 import { createMockTFile } from "testing/__mocks__/testHelpers";
@@ -71,9 +71,10 @@ describe("ViewItemCard", () => {
 			},
 		});
 
-		const card = screen.getByLabelText("Compiled aria label");
+		const card = document.querySelector<HTMLElement>(".cosense-card-links__box")!;
 		expect(card).toHaveTextContent("Compiled title");
 		expect(card).toHaveClass("compiled-card");
+		expect(card).toHaveAttribute("aria-hidden", "true");
 		expect(linkContext.fileToLinktext).not.toHaveBeenCalled();
 		expect(linkContext.getMetadata).not.toHaveBeenCalled();
 	});

@@ -43,6 +43,10 @@
 	});
 </script>
 
-<div data-testid="probe-cell" data-key={key} data-ccl-interaction-id={interactionId}>
+<div
+	data-testid="probe-cell"
+	data-key={key}
+	data-ccl-interaction-handle={interactionId}
+>
 	{key}
 </div>

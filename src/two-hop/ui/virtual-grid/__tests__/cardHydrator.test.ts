@@ -158,7 +158,7 @@ describe("createTwoHopCardHydrator", () => {
 		hydrator.dispose();
 	});
 
-	it("bounds retained models and keeps interactions only for foreground cards", () => {
+	it("bounds retained models and keeps interactions for all demanded cards", () => {
 		const items = Array.from({ length: 70 }, (_, index) => createItem(index));
 		const section = createTwoHopSectionModel({
 			id: "section",
@@ -186,6 +186,8 @@ describe("createTwoHopCardHydrator", () => {
 		const secondKey = "item:section:item:1";
 		const firstConsumer = vi.fn();
 		hydrator.registerConsumer(firstKey, firstConsumer);
+		const firstHandle = hydrator.getInteractionHandle(firstKey);
+		const secondHandle = hydrator.getInteractionHandle(secondKey);
 
 		hydrator.setDemand({
 			foreground: collectItemCells(rowModel, 1, 2),
@@ -197,14 +199,31 @@ describe("createTwoHopCardHydrator", () => {
 		expect(hydrator.getModel(secondKey)).toBeDefined();
 		expect(
 			hydrator.interactionDescriptorResolverProvider.resolveInteractionDescriptor(
-				"interaction:0",
+				firstHandle,
 			),
 		).not.toBeNull();
 		expect(
 			hydrator.interactionDescriptorResolverProvider.resolveInteractionDescriptor(
-				"interaction:1",
+				secondHandle,
 			),
-		).toBeNull();
+		).not.toBeNull();
+
+		hydrator.setDemand({
+			foreground: [],
+			background: collectItemCells(rowModel, 1, 3),
+		});
+		frames.drain();
+
+		expect(
+			hydrator.interactionDescriptorResolverProvider.resolveInteractionDescriptor(
+				firstHandle,
+			),
+		).not.toBeNull();
+		expect(
+			hydrator.interactionDescriptorResolverProvider.resolveInteractionDescriptor(
+				secondHandle,
+			),
+		).not.toBeNull();
 
 		hydrator.setDemand({
 			foreground: collectItemCells(rowModel, 2, 3),
@@ -216,24 +235,29 @@ describe("createTwoHopCardHydrator", () => {
 		expect(hydrator.getModel(secondKey)).toBeDefined();
 		expect(
 			hydrator.interactionDescriptorResolverProvider.resolveInteractionDescriptor(
-				"interaction:0",
+				firstHandle,
 			),
 		).toBeNull();
 		expect(
 			hydrator.interactionDescriptorResolverProvider.resolveInteractionDescriptor(
-				"interaction:1",
+				secondHandle,
 			),
 		).not.toBeNull();
 
 		const resolverCallsBeforeReturn = resolver.mock.calls.length;
 		hydrator.setDemand({
-			foreground: collectItemCells(rowModel, 1, 2),
-			background: [],
+			foreground: [],
+			background: collectItemCells(rowModel, 1, 2),
 		});
 		frames.drain();
 
 		expect(hydrator.getModel(firstKey)).toBeDefined();
 		expect(resolver.mock.calls.length).toBe(resolverCallsBeforeReturn);
+		expect(
+			hydrator.interactionDescriptorResolverProvider.resolveInteractionDescriptor(
+				hydrator.getInteractionHandle(firstKey),
+			),
+		).not.toBeNull();
 
 		for (let rowIndex = 3; rowIndex < rowModel.rowCount; rowIndex += 1) {
 			hydrator.setDemand({

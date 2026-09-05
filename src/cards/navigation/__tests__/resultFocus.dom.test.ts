@@ -77,7 +77,7 @@ function createVirtualResult({
 	const cell = createVirtualCell({ left, top, width, height });
 	const card = document.createElement("div");
 	card.className = "cosense-card-links__box";
-	card.dataset.cclInteractionId = id;
+	card.dataset.cclInteractionHandle = id;
 	card.tabIndex = -1;
 	makeVisibleButUnmeasured(card);
 	Object.defineProperty(card, "focus", {
@@ -116,10 +116,10 @@ describe("moveFocusBetweenResults", () => {
 		document.body.append(root);
 
 		const current = currentCell.querySelector<HTMLElement>(
-			'[data-ccl-interaction-id="current"]',
+			'[data-ccl-interaction-handle="current"]',
 		);
 		const next = nextCell.querySelector<HTMLElement>(
-			'[data-ccl-interaction-id="next"]',
+			'[data-ccl-interaction-handle="next"]',
 		);
 		const nextFocusSpy = vi.spyOn(next!, "focus");
 		const nextScrollSpy = vi.spyOn(next!, "scrollIntoView");
@@ -170,12 +170,12 @@ describe("moveFocusBetweenResults", () => {
 			root.append(currentCell, firstCell, secondCell);
 			document.body.append(root);
 			const current = currentCell.querySelector<HTMLElement>(
-				'[data-ccl-interaction-id="current"]',
+				'[data-ccl-interaction-handle="current"]',
 			);
 
 			const result = moveFocusBetweenResults(root, current, "right");
 
-			expect(result?.dataset.cclInteractionId).toBe(expected);
+			expect(result?.dataset.cclInteractionHandle).toBe(expected);
 		},
 	);
 
@@ -192,7 +192,7 @@ describe("moveFocusBetweenResults", () => {
 
 		const card = frameDocument.createElement("div");
 		card.className = "cosense-card-links__box";
-		card.dataset.cclInteractionId = "foreign-card";
+		card.dataset.cclInteractionHandle = "foreign-card";
 		frameDocument.body.append(card);
 
 		const event = new (
@@ -221,7 +221,7 @@ describe("moveFocusBetweenResults", () => {
 		root.append(later, first);
 		document.body.append(root);
 		const firstCard = first.querySelector<HTMLElement>(
-			'[data-ccl-interaction-id="first"]',
+			'[data-ccl-interaction-handle="first"]',
 		)!;
 		const focusSpy = vi.spyOn(firstCard, "focus");
 

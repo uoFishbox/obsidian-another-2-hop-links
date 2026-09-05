@@ -1,10 +1,11 @@
-import type { CardRenderModel, CardShellModel } from "cards/rendering/cardRenderModel";
+import type { CardRenderModel } from "cards/rendering/cardRenderModel";
 import type { TwoHopItemModel } from "two-hop/ui/twoHopSectionModel";
 import type { TwoHopVirtualCell } from "./rowModel";
 import type { VirtualFrameCoordinator } from "shared/ui/scheduling/frameCoordinator";
 import { createVirtualCardInteractionController } from "cards/interactions/virtualCardInteractionController";
+import type { InteractionHandle } from "cards/interactions/interactionTypes";
 
-type CardModelConsumer = (model: CardShellModel | undefined) => void;
+type CardModelConsumer = (model: CardRenderModel | undefined) => void;
 type HydrationPriority = "foreground" | "background";
 
 /** Item-cell payload published by the resident two-hop virtual grid. */
@@ -34,6 +35,7 @@ interface HydrationQueue {
 /**
  * Resident item cells to hydrate, split by scheduling priority.
  * Foreground wins when a logical key appears in both collections.
+ * Priority controls scheduling only; every demanded cell remains interactive.
  */
 export interface TwoHopCardDemand {
 	readonly foreground: readonly TwoHopCardHydrationCell[];
@@ -61,6 +63,7 @@ export interface TwoHopCardHydrator {
 	setDemand(demand: TwoHopCardDemand): void;
 	refreshDemand(): void;
 	getModel(logicalKey: string): CardRenderModel | undefined;
+	getInteractionHandle(logicalKey: string): InteractionHandle;
 	dispose(): void;
 }
 
@@ -86,7 +89,7 @@ export function createTwoHopCardHydrator(
 	let generation = 0;
 	let disposed = false;
 
-	function notify(logicalKey: string, model: CardShellModel | undefined): void {
+	function notify(logicalKey: string, model: CardRenderModel | undefined): void {
 		consumers.get(logicalKey)?.(model);
 	}
 
@@ -136,12 +139,8 @@ export function createTwoHopCardHydrator(
 		}
 
 		for (const logicalKey of entries.keys()) {
-			const demanded = demandByKey.get(logicalKey);
-			if (demanded) {
+			if (demandByKey.has(logicalKey)) {
 				retainedEntryCount += 1;
-				if (demanded.priority !== "foreground") {
-					interactionController.setCard(logicalKey, null);
-				}
 				continue;
 			}
 			interactionController.setCard(logicalKey, null);
@@ -193,14 +192,15 @@ export function createTwoHopCardHydrator(
 		revision: unknown,
 	): void {
 		const current = entries.get(cell.logicalKey);
-		const hasCurrent = current?.item === cell.item && current.revision === revision;
-		if (hasCurrent && !refreshExisting) {
-			if (priority === "foreground" && current) {
-				interactionController.setCard(
-					cell.logicalKey,
-					current.model.interactionDescriptor,
-				);
-			}
+		if (
+			current?.item === cell.item &&
+			current.revision === revision &&
+			!refreshExisting
+		) {
+			interactionController.setCard(
+				cell.logicalKey,
+				current.model.interactionDescriptor,
+			);
 			return;
 		}
 
@@ -287,13 +287,11 @@ export function createTwoHopCardHydrator(
 				revision,
 				model,
 			});
+			interactionController.setCard(
+				hydration.logicalKey,
+				model.interactionDescriptor,
+			);
 			notify(hydration.logicalKey, model);
-			if (priority === "foreground") {
-				interactionController.setCard(
-					hydration.logicalKey,
-					model.interactionDescriptor,
-				);
-			}
 			if (previewActive && previewRenderKeyChanged) previewChanged = true;
 		}
 		compactHydrationQueue(queue);
@@ -357,6 +355,7 @@ export function createTwoHopCardHydrator(
 		setDemand,
 		refreshDemand,
 		getModel,
+		getInteractionHandle: interactionController.getInteractionHandle,
 		dispose,
 	};
 }

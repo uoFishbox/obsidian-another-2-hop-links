@@ -20,7 +20,7 @@ import {
 	createPrimarySectionDescriptor,
 	createTagSectionDescriptor,
 	type PrimarySectionBuildInput,
-	type TwoHopInteractionTokenAllocator,
+	type TwoHopInteractionIdentity,
 } from "./descriptors";
 
 export interface ResolveTwoHopSectionsParams {
@@ -48,7 +48,7 @@ export interface ResolveTwoHopSectionsParams {
 	 * function when pagination inputs change so exact-hit memoization stays valid.
 	 */
 	readonly getVisibleCount: (sectionId: string, totalCount: number) => number;
-	readonly interactionTokens: TwoHopInteractionTokenAllocator;
+	readonly interactionIdentity: TwoHopInteractionIdentity;
 	readonly onTagClick: (tag: string) => void;
 }
 
@@ -81,7 +81,7 @@ interface ResolveSnapshot {
 	readonly getSortedTwoHopItems: ResolveTwoHopSectionsParams["getSortedTwoHopItems"];
 	readonly getSortedTagGroupItems: ResolveTwoHopSectionsParams["getSortedTagGroupItems"];
 	readonly getVisibleCount: ResolveTwoHopSectionsParams["getVisibleCount"];
-	readonly interactionTokens: TwoHopInteractionTokenAllocator;
+	readonly interactionIdentity: TwoHopInteractionIdentity;
 	readonly onTagClick: ResolveTwoHopSectionsParams["onTagClick"];
 	readonly mobileLongPressAction: PluginSettings["mobileLongPressAction"];
 	readonly highlightInPreviewOnHover: boolean;
@@ -187,8 +187,8 @@ function appendPrimarySections(
 	params: ResolveTwoHopSectionsParams,
 	append: AppendSection,
 ): void {
-	const createItemInteractionToken =
-		params.interactionTokens.createItemInteractionToken;
+	const resolveItemInteractionId =
+		params.interactionIdentity.resolveItemInteractionId;
 	const inputs: PrimarySectionBuildInput[] = params.useMergedLinks
 		? params.displayData.mergedItems.length > 0
 			? [{ kind: "merged", items: params.displayData.mergedItems }]
@@ -209,14 +209,14 @@ function appendPrimarySections(
 	for (const input of inputs) {
 		append(
 			input.kind,
-			[input.items, params.interactionTokens],
+			[input.items, params.interactionIdentity],
 			input.items.length,
 			(itemLimit, previousItems) =>
 				createPrimarySectionDescriptor({
 					input,
 					itemLimit,
 					previousItems,
-					createItemInteractionToken,
+					resolveItemInteractionId,
 				}),
 		);
 	}
@@ -254,7 +254,7 @@ function appendBranchSections(
 				params.currentSort,
 				params.sortContextVersion,
 				params.getSortedTwoHopItems,
-				params.interactionTokens,
+				params.interactionIdentity,
 				interactionSettings.mobileLongPressAction,
 				interactionSettings.highlightInPreviewOnHover,
 			],
@@ -271,7 +271,7 @@ function appendBranchSections(
 						itemLimit,
 						previousItems,
 					},
-					params.interactionTokens,
+					params.interactionIdentity,
 				),
 		);
 	}
@@ -294,7 +294,7 @@ function appendTagSections(
 				params.currentSort,
 				params.sortContextVersion,
 				params.getSortedTagGroupItems,
-				params.interactionTokens,
+				params.interactionIdentity,
 				params.onTagClick,
 			],
 			source.notes.length,
@@ -308,7 +308,7 @@ function appendTagSections(
 						previousItems,
 						onTagClick: params.onTagClick,
 					},
-					params.interactionTokens,
+					params.interactionIdentity,
 				),
 		);
 	}
@@ -322,15 +322,15 @@ function appendNewLinksSection(
 	if (items.length === 0) return;
 	append(
 		"new-links",
-		[items, params.interactionTokens],
+		[items, params.interactionIdentity],
 		items.length,
 		(itemLimit, previousItems) =>
 			createNewLinksSectionDescriptor({
 				items,
 				itemLimit,
 				previousItems,
-				createItemInteractionToken:
-					params.interactionTokens.createItemInteractionToken,
+				resolveItemInteractionId:
+					params.interactionIdentity.resolveItemInteractionId,
 			}),
 	);
 }
@@ -348,7 +348,7 @@ function createResolveSnapshot(params: ResolveTwoHopSectionsParams): ResolveSnap
 		getSortedTwoHopItems: params.getSortedTwoHopItems,
 		getSortedTagGroupItems: params.getSortedTagGroupItems,
 		getVisibleCount: params.getVisibleCount,
-		interactionTokens: params.interactionTokens,
+		interactionIdentity: params.interactionIdentity,
 		onTagClick: params.onTagClick,
 		mobileLongPressAction: params.currentSettings.mobileLongPressAction,
 		highlightInPreviewOnHover: params.currentSettings.highlightInPreviewOnHover,

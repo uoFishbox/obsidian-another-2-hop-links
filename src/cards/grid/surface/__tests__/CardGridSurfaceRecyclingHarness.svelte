@@ -49,7 +49,6 @@
 	{rowHeight}
 	{columns}
 	{slotBodyRevision}
-	interactionDescriptorScopeId={interactionId ? "recycling-test-items" : undefined}
 >
 	{#snippet renderCell({ mountedCell })}
 		<CardGridSurfaceRecyclingProbe

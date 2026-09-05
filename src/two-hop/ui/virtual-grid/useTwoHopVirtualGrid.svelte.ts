@@ -93,7 +93,7 @@ export function useTwoHopVirtualGrid(
 	let widthWasZero = false;
 	let disposed = false;
 	let pendingLayoutAnchor: TwoHopLayoutAnchor | null = null;
-	let anchorRestoreScheduled = false;
+	let postCommitMeasurementScheduled = false;
 	let previewVisibleRange: Readonly<RowRange> = EMPTY_RANGE;
 	let previewPrefetchRange: Readonly<RowRange> = EMPTY_RANGE;
 	const previewPrefetchRangeTracker = createPreviewPrefetchRangeTracker();
@@ -266,25 +266,34 @@ export function useTwoHopVirtualGrid(
 	}
 
 	function scheduleAnchorRestoration(): void {
-		if (!pendingLayoutAnchor || anchorRestoreScheduled) return;
-		anchorRestoreScheduled = true;
-		// The committed content height must reach the DOM before scrollTop can
-		// move beyond the previous height's limit. Coalesce intervening updates.
-		void tick().then(restorePendingLayoutAnchor);
+		if (!pendingLayoutAnchor) return;
+		schedulePostCommitMeasurement();
 	}
 
-	function restorePendingLayoutAnchor(): void {
-		anchorRestoreScheduled = false;
+	function schedulePostCommitMeasurement(): void {
+		if (postCommitMeasurementScheduled) return;
+		postCommitMeasurementScheduled = true;
+		// The committed content height must reach the DOM before scrollTop can
+		// reflect its new clamp. Coalesce intervening data and layout updates.
+		void tick().then(runPostCommitMeasurement);
+	}
+
+	function runPostCommitMeasurement(): void {
+		postCommitMeasurementScheduled = false;
 		if (disposed) return;
-		if (virtualList.getSnapshot()?.rowModel !== rowModel) return;
+		if (virtualList.getSnapshot()?.rowModel !== rowModel) {
+			virtualList.scheduleLayoutMeasurement();
+			return;
+		}
 		const anchor = pendingLayoutAnchor;
 		pendingLayoutAnchor = null;
-		if (!anchor) return;
-		const delta = restoreTwoHopLayoutAnchor(anchor, rootEl, rowModel);
-		if (delta !== 0) {
-			virtualList.suppressNextNativeScroll(anchor.scrollTop + delta);
+		if (anchor) {
+			const delta = restoreTwoHopLayoutAnchor(anchor, rootEl, rowModel);
+			if (delta !== 0) {
+				virtualList.suppressNextNativeScroll(anchor.scrollTop + delta);
+			}
 		}
-		// A shorter DOM can clamp scrolling even when the anchor cannot be restored.
+		// A shorter DOM can clamp scrolling even when no anchor can be captured.
 		virtualList.runScrollMeasurement(undefined, "data-change");
 	}
 
@@ -295,6 +304,7 @@ export function useTwoHopVirtualGrid(
 			layout,
 		});
 		rowModel = nextRowModel;
+		schedulePostCommitMeasurement();
 		if (nextRowModel.rowCount === 0) {
 			virtualList.setEmpty({ rowModel: nextRowModel });
 			return;
@@ -412,6 +422,7 @@ export function useTwoHopVirtualGrid(
 			);
 		},
 		registerCardModelConsumer: cardHydrator.registerConsumer,
+		getInteractionHandle: cardHydrator.getInteractionHandle,
 		resolveNavigationTarget,
 		resolveSequentialNavigationTarget,
 		flushVirtualScrollMeasurement,

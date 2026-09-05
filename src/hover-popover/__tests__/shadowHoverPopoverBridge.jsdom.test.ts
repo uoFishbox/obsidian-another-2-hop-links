@@ -321,7 +321,7 @@ describe("shadowHoverPopoverBridge", () => {
 				composed: true,
 			}),
 		);
-		interaction.dataset.cclInteractionId = "item:second";
+		interaction.dataset.cclInteractionHandle = "item:second";
 		interaction.dispatchEvent(
 			new MouseEvent("mouseover", {
 				bubbles: true,
@@ -358,7 +358,7 @@ describe("shadowHoverPopoverBridge", () => {
 			previousLogicalKey: "first",
 			nextLogicalKey: "second",
 		});
-		interaction.dataset.cclInteractionId = "item:second";
+		interaction.dataset.cclInteractionHandle = "item:second";
 
 		expect(interaction.dataset.cclHovered).toBeUndefined();
 		expect(subtreeQuery).toHaveBeenCalledTimes(1);
@@ -380,7 +380,7 @@ describe("shadowHoverPopoverBridge", () => {
 				composed: true,
 			}),
 		);
-		interaction.dataset.cclInteractionId = "item:second";
+		interaction.dataset.cclInteractionHandle = "item:second";
 		interaction.dispatchEvent(
 			new PointerEvent("pointermove", {
 				bubbles: true,
@@ -449,9 +449,8 @@ function createRegistryStub(
 	> = {},
 ): InteractionRegistry {
 	return {
-		createInteractionToken: vi.fn((semanticKey: string) => semanticKey),
 		register: vi.fn(() => () => {}),
-		syncInteractionDescriptorResolverProvider: vi.fn(),
+		setInteractionDescriptorResolverProvider: vi.fn(),
 		resolve: vi.fn(
 			(interactionId: string) =>
 				(descriptors[interactionId] ?? { interactionId }) as any,
@@ -465,7 +464,7 @@ function createInteractionElement(
 	doc: Document = document,
 ): HTMLDivElement {
 	const element = doc.createElement("div");
-	element.dataset.cclInteractionId = interactionId;
+	element.dataset.cclInteractionHandle = interactionId;
 	return element;
 }
 

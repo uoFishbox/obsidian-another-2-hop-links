@@ -27,8 +27,8 @@ export function describeHoverEventTarget(
 		? [
 				target.tagName.toLowerCase(),
 				target.id ? `#${target.id}` : "",
-				target.dataset.cclInteractionId
-					? `[${target.dataset.cclInteractionId}]`
+				target.dataset.cclInteractionHandle
+					? `[${target.dataset.cclInteractionHandle}]`
 					: "",
 			].join("")
 		: isShadowRootLike(target)
@@ -103,7 +103,7 @@ export function resolveHoverPreviewTargetElement(
 
 	const composedMatch = findMatchingElementInComposedPath(
 		event,
-		"[data-ccl-interaction-id]",
+		"[data-ccl-interaction-handle]",
 	);
 	if (composedMatch) {
 		return composedMatch;

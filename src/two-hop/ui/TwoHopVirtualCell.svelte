@@ -6,31 +6,41 @@
 	import UnresolvedPreviewPlaceholder from "card-preview/ui/UnresolvedPreviewPlaceholder.svelte";
 	import { previewHost } from "card-preview/ui/previewHostAction";
 	import type { CardSectionVariant } from "cards/components/cardPresentation";
-	import type { CardShellModel } from "cards/rendering/cardRenderModel";
+	import type { CardRenderModel } from "cards/rendering/cardRenderModel";
 	import type { IconName } from "shared/ui/icons/iconRegistry";
 	import type { TwoHopVirtualCell } from "two-hop/ui/virtual-grid/rowModel";
 	import type { TwoHopSectionModel } from "two-hop/ui/twoHopSectionModel";
+	import {
+		createInteractionHandle,
+		type InteractionHandle,
+	} from "cards/interactions/interactionTypes";
 
 	interface Props {
 		cell: TwoHopVirtualCell;
+		interactionHandle?: InteractionHandle;
 		previewHostEnabled: boolean;
 		previewKey: string;
 		registerCardModelConsumer: (
 			logicalKey: string,
-			consumer: (model: CardShellModel | undefined) => void,
+			consumer: (model: CardRenderModel | undefined) => void,
 		) => () => void;
 		onLoadMore: (sectionId: string) => void;
 	}
 
 	let {
 		cell,
+		interactionHandle,
 		previewHostEnabled,
 		previewKey,
 		registerCardModelConsumer,
 		onLoadMore,
 	}: Props = $props();
-	let cardModel = $state.raw<CardShellModel | undefined>(undefined);
+	let cardModel = $state.raw<CardRenderModel | undefined>(undefined);
 	let boundLogicalKey = cell.logicalKey;
+	const fallbackInteractionHandle = createInteractionHandle("c");
+	const resolvedInteractionHandle = $derived(
+		interactionHandle ?? fallbackInteractionHandle,
+	);
 
 	$effect(() => {
 		const nextLogicalKey = cell.logicalKey;
@@ -87,13 +97,12 @@
 	{@const section = cell.section}
 	{@const headerProps = section.header.props}
 	{@const sectionVariant = resolveTwoHopSectionVariant(section)}
-	{#if headerProps.interactionId}
+	{#if headerProps.interactionDescriptor || headerProps.onClick}
 		<InteractiveSectionHeader
 			title={section.title}
 			count={section.totalCount}
 			className={headerProps.className}
 			draggable={headerProps.draggable}
-			interactionId={headerProps.interactionId}
 			interactionDescriptor={headerProps.interactionDescriptor}
 			onClick={headerProps.onClick}
 			{sectionVariant}
@@ -134,9 +143,9 @@
 		ariaLabel={model?.ariaLabel ?? ""}
 		file={model?.targetFile ?? null}
 		extension={model?.extension ?? undefined}
-		interactionId={model?.interactionId ?? cell.logicalKey}
-		interactive={Boolean(model)}
-		draggable={Boolean(model)}
+		interactionHandle={resolvedInteractionHandle}
+		interactive={Boolean(model?.interactionDescriptor)}
+		draggable={Boolean(model?.interactionDescriptor)}
 		className={model
 			? (model.className ?? undefined)
 			: "twohop-card-shell is-skeleton"}

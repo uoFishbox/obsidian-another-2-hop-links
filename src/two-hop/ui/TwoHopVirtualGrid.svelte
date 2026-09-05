@@ -30,7 +30,6 @@
 	resolveNavigationTarget={list.resolveNavigationTarget}
 	resolveSequentialNavigationTarget={list.resolveSequentialNavigationTarget}
 	flushVirtualScrollMeasurement={list.flushVirtualScrollMeasurement}
-	interactionDescriptorScopeId="two-hop-virtual-card-slots"
 	interactionDescriptorResolverProvider={list.interactionDescriptorResolverProvider}
 	getCellDataTestId={(mountedCell) =>
 		mountedCell.cell.kind === "item" ? "twohop-virtual-item-cell" : undefined}
@@ -38,6 +37,9 @@
 	{#snippet renderCell({ mountedCell })}
 		<TwoHopVirtualCell
 			cell={mountedCell.cell}
+			interactionHandle={mountedCell.cell.kind === "item"
+				? list.getInteractionHandle(mountedCell.cell.logicalKey)
+				: undefined}
 			previewHostEnabled={list.isPreviewHostEnabled(mountedCell.rowIndex)}
 			previewKey={mountedCell.cell.logicalKey}
 			registerCardModelConsumer={list.registerCardModelConsumer}

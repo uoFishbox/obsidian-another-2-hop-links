@@ -2,7 +2,8 @@ import type { AppContext } from "cards/context/linkContext";
 import type { InteractionRegistry } from "cards/interactions/interactionRegistry";
 import {
 	INTERACTION_SELECTOR,
-	getInteractionIdFromElement,
+	getInteractionHandleFromElement,
+	type InteractionHandle,
 } from "cards/interactions/interactionTypes";
 import { buildShadowHoverLinkSpec } from "./shadowHoverLinkSpec";
 import {
@@ -37,6 +38,7 @@ interface SharedShadowHoverBridgeHandle {
 	controller: ShadowHoverControllerImpl;
 	hoveredAnchorEl: HTMLElement | null;
 	activeAnchorEl: HTMLElement | null;
+	activeInteractionHandle: InteractionHandle | null;
 	activeInteractionId: string | null;
 	lastPointerModState: boolean | null;
 	disposeListeners: () => void;
@@ -99,6 +101,7 @@ function isRelatedTargetWithinAnchor(
 
 function leaveActiveAnchor(handle: SharedShadowHoverBridgeHandle): void {
 	if (!handle.activeAnchorEl) {
+		handle.activeInteractionHandle = null;
 		handle.activeInteractionId = null;
 		handle.lastPointerModState = null;
 		return;
@@ -107,6 +110,7 @@ function leaveActiveAnchor(handle: SharedShadowHoverBridgeHandle): void {
 	delete handle.activeAnchorEl.dataset.cclHovered;
 	handle.controller.handleDelegatedLeave(handle.activeAnchorEl);
 	handle.activeAnchorEl = null;
+	handle.activeInteractionHandle = null;
 	handle.activeInteractionId = null;
 	handle.lastPointerModState = null;
 }
@@ -117,6 +121,7 @@ function releaseActiveAnchor(handle: SharedShadowHoverBridgeHandle): void {
 	}
 	handle.controller.releaseActivePopover();
 	handle.activeAnchorEl = null;
+	handle.activeInteractionHandle = null;
 	handle.activeInteractionId = null;
 	handle.lastPointerModState = null;
 }
@@ -135,15 +140,17 @@ function enterLogicalHover(
 function relaunchActiveAnchorForInteraction(
 	handle: SharedShadowHoverBridgeHandle,
 	anchorEl: HTMLElement,
+	interactionHandle: InteractionHandle,
 	interactionId: string,
 	event: MouseEvent,
 ): void {
 	releaseActiveAnchor(handle);
 	enterLogicalHover(handle, anchorEl);
 	handle.activeAnchorEl = anchorEl;
+	handle.activeInteractionHandle = interactionHandle;
 	handle.activeInteractionId = interactionId;
 	handle.lastPointerModState = getModifierState(event);
-	handle.controller.handleDelegatedEnter(anchorEl, interactionId, event);
+	handle.controller.handleDelegatedEnter(anchorEl, interactionHandle, event);
 }
 
 function handleModifierStateChange(
@@ -158,8 +165,8 @@ function handleModifierStateChange(
 	}
 
 	const activeAnchorEl = handle.activeAnchorEl;
-	const interactionId = handle.activeInteractionId;
-	if (!activeAnchorEl || !interactionId) {
+	const interactionHandle = handle.activeInteractionHandle;
+	if (!activeAnchorEl || !interactionHandle) {
 		return;
 	}
 
@@ -168,7 +175,11 @@ function handleModifierStateChange(
 		return;
 	}
 
-	handle.controller.handleDelegatedModifierKey(activeAnchorEl, interactionId, event);
+	handle.controller.handleDelegatedModifierKey(
+		activeAnchorEl,
+		interactionHandle,
+		event,
+	);
 }
 
 function handleMouseOver(
@@ -184,8 +195,8 @@ function handleMouseOver(
 		return;
 	}
 
-	const nextInteractionId = getInteractionIdFromElement(nextAnchorEl);
-	if (!nextInteractionId) {
+	const nextInteractionHandle = getInteractionHandleFromElement(nextAnchorEl);
+	if (!nextInteractionHandle) {
 		return;
 	}
 	if (isRelatedTargetWithinAnchor(nextAnchorEl, event)) {
@@ -193,8 +204,8 @@ function handleMouseOver(
 	}
 	enterLogicalHover(handle, nextAnchorEl);
 
-	const nextDescriptor = handle.registry.resolve(nextInteractionId);
-	if (nextDescriptor?.hoverPreviewEnabled === false) {
+	const nextDescriptor = handle.registry.resolve(nextInteractionHandle);
+	if (!nextDescriptor || nextDescriptor.hoverPreviewEnabled === false) {
 		if (handle.activeAnchorEl === nextAnchorEl) {
 			leaveActiveAnchor(handle);
 		}
@@ -203,34 +214,36 @@ function handleMouseOver(
 
 	if (handle.activeAnchorEl === nextAnchorEl) {
 		handle.lastPointerModState = getModifierState(event);
-		if (handle.activeInteractionId === nextInteractionId) {
+		if (handle.activeInteractionHandle === nextInteractionHandle) {
 			handle.controller.handleDelegatedAnchorSync(
 				nextAnchorEl,
-				nextInteractionId,
+				nextInteractionHandle,
 				event,
 			);
 		} else {
 			relaunchActiveAnchorForInteraction(
 				handle,
 				nextAnchorEl,
-				nextInteractionId,
+				nextInteractionHandle,
+				nextDescriptor.interactionId,
 				event,
 			);
 		}
 		return;
 	}
 
-	if (handle.activeInteractionId === nextInteractionId) {
+	if (handle.activeInteractionId === nextDescriptor.interactionId) {
 		if (handle.activeAnchorEl && handle.activeAnchorEl !== nextAnchorEl) {
 			delete handle.activeAnchorEl.dataset.cclHovered;
 		}
 		enterLogicalHover(handle, nextAnchorEl);
 		handle.activeAnchorEl = nextAnchorEl;
-		handle.activeInteractionId = nextInteractionId;
+		handle.activeInteractionHandle = nextInteractionHandle;
+		handle.activeInteractionId = nextDescriptor.interactionId;
 		handle.lastPointerModState = getModifierState(event);
 		handle.controller.handleDelegatedAnchorSync(
 			nextAnchorEl,
-			nextInteractionId,
+			nextInteractionHandle,
 			event,
 		);
 		return;
@@ -256,9 +269,10 @@ function handleMouseOver(
 	}
 	enterLogicalHover(handle, nextAnchorEl);
 	handle.activeAnchorEl = nextAnchorEl;
-	handle.activeInteractionId = nextInteractionId;
+	handle.activeInteractionHandle = nextInteractionHandle;
+	handle.activeInteractionId = nextDescriptor.interactionId;
 	handle.lastPointerModState = getModifierState(event);
-	handle.controller.handleDelegatedEnter(nextAnchorEl, nextInteractionId, event);
+	handle.controller.handleDelegatedEnter(nextAnchorEl, nextInteractionHandle, event);
 }
 
 function handleMouseOut(
@@ -281,7 +295,10 @@ function handleMouseOut(
 		handle.hoveredAnchorEl = null;
 	}
 
-	const currentInteractionId = getInteractionIdFromElement(currentAnchorEl);
+	const currentInteractionHandle = getInteractionHandleFromElement(currentAnchorEl);
+	const currentInteractionId = currentInteractionHandle
+		? handle.registry.resolve(currentInteractionHandle)?.interactionId
+		: null;
 	if (
 		currentAnchorEl !== handle.activeAnchorEl &&
 		currentInteractionId !== handle.activeInteractionId
@@ -293,7 +310,10 @@ function handleMouseOut(
 		handle.shadowRoot,
 		event.relatedTarget,
 	);
-	const nextInteractionId = getInteractionIdFromElement(nextAnchorEl);
+	const nextInteractionHandle = getInteractionHandleFromElement(nextAnchorEl);
+	const nextInteractionId = nextInteractionHandle
+		? handle.registry.resolve(nextInteractionHandle)?.interactionId
+		: null;
 	const wantsPreview = getModifierState(event);
 	if (
 		nextAnchorEl === currentAnchorEl ||
@@ -324,8 +344,8 @@ function handlePointerMove(
 	}
 
 	const activeAnchorEl = handle.activeAnchorEl;
-	const interactionId = handle.activeInteractionId;
-	if (!activeAnchorEl || !interactionId) {
+	const interactionHandle = handle.activeInteractionHandle;
+	if (!activeAnchorEl || !interactionHandle) {
 		return;
 	}
 
@@ -336,23 +356,24 @@ function handlePointerMove(
 		}
 	}
 
-	const currentInteractionId = getInteractionIdFromElement(activeAnchorEl);
-	if (!currentInteractionId) {
+	const currentInteractionHandle = getInteractionHandleFromElement(activeAnchorEl);
+	if (!currentInteractionHandle) {
 		leaveActiveAnchor(handle);
 		return;
 	}
 
-	const currentDescriptor = handle.registry.resolve(currentInteractionId);
-	if (currentDescriptor?.hoverPreviewEnabled === false) {
+	const currentDescriptor = handle.registry.resolve(currentInteractionHandle);
+	if (!currentDescriptor || currentDescriptor.hoverPreviewEnabled === false) {
 		leaveActiveAnchor(handle);
 		return;
 	}
 
-	if (currentInteractionId !== interactionId) {
+	if (currentInteractionHandle !== interactionHandle) {
 		relaunchActiveAnchorForInteraction(
 			handle,
 			activeAnchorEl,
-			currentInteractionId,
+			currentInteractionHandle,
+			currentDescriptor.interactionId,
 			event,
 		);
 		return;
@@ -365,7 +386,11 @@ function handlePointerMove(
 		return;
 	}
 
-	handle.controller.handleDelegatedPointerMove(activeAnchorEl, interactionId, event);
+	handle.controller.handleDelegatedPointerMove(
+		activeAnchorEl,
+		interactionHandle,
+		event,
+	);
 }
 
 function disposeHandle(handle: SharedShadowHoverBridgeHandle): void {
@@ -389,9 +414,9 @@ function createHandle({
 	}
 
 	let handle: SharedShadowHoverBridgeHandle;
-	const resolveLink = (interactionId: string) =>
+	const resolveLink = (interactionHandle: string) =>
 		buildShadowHoverLinkSpec(
-			handle.registry.resolve(interactionId),
+			handle.registry.resolve(interactionHandle as InteractionHandle),
 			handle.appContext,
 		);
 	const launchPopover = (request: ShadowPopoverLaunchRequest): void => {
@@ -424,6 +449,7 @@ function createHandle({
 		controller,
 		hoveredAnchorEl: null,
 		activeAnchorEl: null,
+		activeInteractionHandle: null,
 		activeInteractionId: null,
 		lastPointerModState: null,
 		disposeListeners: () => {},

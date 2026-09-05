@@ -6,6 +6,7 @@ import type { CardItem } from "cards/CardItem";
 import { createDelegatedInteractionDispatcher } from "../delegatedDispatcher";
 import { createInteractionRegistry } from "../interactionRegistry";
 import type { AppContext, LinkContext } from "cards/context/linkContext";
+import { createInteractionHandle } from "../interactionTypes";
 import type {
 	SectionHeaderInteractionDescriptor,
 	ItemInteractionDescriptor,
@@ -157,7 +158,8 @@ describe("delegated interaction dispatcher", () => {
 		const file = createMockTFile(TARGET_FILE_PATH);
 		const item = { type: "file", data: file } as CardItem;
 		const descriptor = createItemDescriptor(item, file);
-		registry.register(descriptor);
+		const interactionHandle = createInteractionHandle();
+		registry.register(interactionHandle, descriptor);
 
 		const dispatcher = createDelegatedInteractionDispatcher({
 			registry,
@@ -167,7 +169,7 @@ describe("delegated interaction dispatcher", () => {
 		attachDispatcher(root, dispatcher);
 
 		const element = document.createElement("div");
-		element.dataset.cclInteractionId = descriptor.interactionId;
+		element.dataset.cclInteractionHandle = interactionHandle;
 		root.append(element);
 
 		element.dispatchEvent(new MouseEvent("click", { bubbles: true }));
@@ -211,7 +213,8 @@ describe("delegated interaction dispatcher", () => {
 			{ type: "file", data: file } as CardItem,
 			file,
 		);
-		registry.register(descriptor);
+		const interactionHandle = createInteractionHandle();
+		registry.register(interactionHandle, descriptor);
 		const dispatcher = createDelegatedInteractionDispatcher({
 			registry,
 			linkContext,
@@ -219,7 +222,7 @@ describe("delegated interaction dispatcher", () => {
 		});
 		attachDispatcher(root, dispatcher);
 		const element = document.createElement("div");
-		element.dataset.cclInteractionId = descriptor.interactionId;
+		element.dataset.cclInteractionHandle = interactionHandle;
 		root.append(element);
 
 		element.dispatchEvent(new MouseEvent("click", { bubbles: true }));
@@ -250,7 +253,8 @@ describe("delegated interaction dispatcher", () => {
 			{ type: "file", data: file } as CardItem,
 			file,
 		);
-		registry.register(descriptor);
+		const interactionHandle = createInteractionHandle();
+		registry.register(interactionHandle, descriptor);
 
 		const dispatcher = createDelegatedInteractionDispatcher({
 			registry,
@@ -261,7 +265,7 @@ describe("delegated interaction dispatcher", () => {
 
 		const card = document.createElement("div");
 		card.className = "cosense-card-links__box";
-		card.dataset.cclInteractionId = descriptor.interactionId;
+		card.dataset.cclInteractionHandle = interactionHandle;
 		const child = document.createElement("span");
 		child.className = "cosense-card-links__box-title";
 		card.append(child);
@@ -270,6 +274,56 @@ describe("delegated interaction dispatcher", () => {
 		child.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 
 		expect(linkContext.onOpenFile).toHaveBeenCalledTimes(1);
+	});
+
+	it("dispatches each DOM binding independently when semantic IDs are shared", () => {
+		const linkContext = createLinkContext();
+		const appContext = createAppContext(linkContext);
+		const registry = createInteractionRegistry();
+		const firstFile = createMockTFile(TARGET_FILE_PATH);
+		const secondFile = createMockTFile(FOREIGN_TARGET_FILE_PATH);
+		const firstDescriptor = createItemDescriptor(
+			{ type: "file", data: firstFile } as CardItem,
+			firstFile,
+		);
+		const secondDescriptor = createItemDescriptor(
+			{ type: "file", data: secondFile } as CardItem,
+			secondFile,
+		);
+		const firstHandle = createInteractionHandle();
+		const secondHandle = createInteractionHandle();
+		registry.register(firstHandle, firstDescriptor);
+		registry.register(secondHandle, secondDescriptor);
+		const dispatcher = createDelegatedInteractionDispatcher({
+			registry,
+			linkContext,
+			appContext,
+		});
+		attachDispatcher(root, dispatcher);
+
+		const firstElement = document.createElement("div");
+		firstElement.dataset.cclInteractionHandle = firstHandle;
+		const secondElement = document.createElement("div");
+		secondElement.dataset.cclInteractionHandle = secondHandle;
+		root.append(firstElement, secondElement);
+
+		firstElement.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+		secondElement.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+
+		expect(linkContext.onOpenFile).toHaveBeenNthCalledWith(
+			1,
+			expect.any(MouseEvent),
+			firstFile,
+			expect.anything(),
+			expect.anything(),
+		);
+		expect(linkContext.onOpenFile).toHaveBeenNthCalledWith(
+			2,
+			expect.any(MouseEvent),
+			secondFile,
+			expect.anything(),
+			expect.anything(),
+		);
 	});
 
 	it("dispatches middle-click activation and prevents default propagation", () => {
@@ -281,7 +335,8 @@ describe("delegated interaction dispatcher", () => {
 			{ type: "file", data: file } as CardItem,
 			file,
 		);
-		registry.register(descriptor);
+		const interactionHandle = createInteractionHandle();
+		registry.register(interactionHandle, descriptor);
 		const dispatcher = createDelegatedInteractionDispatcher({
 			registry,
 			linkContext,
@@ -289,7 +344,7 @@ describe("delegated interaction dispatcher", () => {
 		});
 
 		const element = document.createElement("div");
-		element.dataset.cclInteractionId = descriptor.interactionId;
+		element.dataset.cclInteractionHandle = interactionHandle;
 
 		attachDispatcher(root, dispatcher);
 		root.append(element);
@@ -313,7 +368,8 @@ describe("delegated interaction dispatcher", () => {
 			{ type: "file", data: file } as CardItem,
 			file,
 		);
-		registry.register(descriptor);
+		const interactionHandle = createInteractionHandle();
+		registry.register(interactionHandle, descriptor);
 
 		const dispatcher = createDelegatedInteractionDispatcher({
 			registry,
@@ -323,7 +379,7 @@ describe("delegated interaction dispatcher", () => {
 		attachDispatcher(root, dispatcher);
 
 		const element = document.createElement("div");
-		element.dataset.cclInteractionId = descriptor.interactionId;
+		element.dataset.cclInteractionHandle = interactionHandle;
 		root.append(element);
 
 		element.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
@@ -349,7 +405,8 @@ describe("delegated interaction dispatcher", () => {
 			...createItemDescriptor({ type: "file", data: file } as CardItem, file),
 			hoverPreviewEnabled: false,
 		} satisfies ItemInteractionDescriptor;
-		registry.register(descriptor);
+		const interactionHandle = createInteractionHandle();
+		registry.register(interactionHandle, descriptor);
 
 		const dispatcher = createDelegatedInteractionDispatcher({
 			registry,
@@ -359,7 +416,7 @@ describe("delegated interaction dispatcher", () => {
 		attachDispatcher(root, dispatcher);
 
 		const element = document.createElement("div");
-		element.dataset.cclInteractionId = descriptor.interactionId;
+		element.dataset.cclInteractionHandle = interactionHandle;
 		root.append(element);
 
 		element.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
@@ -378,7 +435,8 @@ describe("delegated interaction dispatcher", () => {
 			{ type: "file", data: file } as CardItem,
 			file,
 		);
-		registry.register(descriptor);
+		const interactionHandle = createInteractionHandle();
+		registry.register(interactionHandle, descriptor);
 
 		const dispatcher = createDelegatedInteractionDispatcher({
 			registry,
@@ -388,7 +446,7 @@ describe("delegated interaction dispatcher", () => {
 		attachDispatcher(root, dispatcher);
 
 		const element = document.createElement("div");
-		element.dataset.cclInteractionId = descriptor.interactionId;
+		element.dataset.cclInteractionHandle = interactionHandle;
 		root.append(element);
 
 		element.dispatchEvent(
@@ -438,7 +496,8 @@ describe("delegated interaction dispatcher", () => {
 			{ type: "file", data: file } as CardItem,
 			file,
 		);
-		registry.register(descriptor);
+		const interactionHandle = createInteractionHandle();
+		registry.register(interactionHandle, descriptor);
 
 		const dispatcher = createDelegatedInteractionDispatcher({
 			registry,
@@ -448,7 +507,7 @@ describe("delegated interaction dispatcher", () => {
 		attachDispatcher(root, dispatcher);
 
 		const element = document.createElement("div");
-		element.dataset.cclInteractionId = descriptor.interactionId;
+		element.dataset.cclInteractionHandle = interactionHandle;
 		element.dataset.cclLongPressed = "1";
 		root.append(element);
 
@@ -469,7 +528,8 @@ describe("delegated interaction dispatcher", () => {
 			{ type: "file", data: file } as CardItem,
 			file,
 		);
-		registry.register(descriptor);
+		const interactionHandle = createInteractionHandle();
+		registry.register(interactionHandle, descriptor);
 
 		const dispatcher = createDelegatedInteractionDispatcher({
 			registry,
@@ -479,7 +539,7 @@ describe("delegated interaction dispatcher", () => {
 		attachDispatcher(root, dispatcher);
 
 		const element = document.createElement("div");
-		element.dataset.cclInteractionId = descriptor.interactionId;
+		element.dataset.cclInteractionHandle = interactionHandle;
 		root.append(element);
 
 		element.dispatchEvent(
@@ -507,7 +567,8 @@ describe("delegated interaction dispatcher", () => {
 		const registry = createInteractionRegistry();
 		const file = createMockTFile(TARGET_FILE_PATH);
 		const descriptor = createSectionDescriptor(file);
-		registry.register(descriptor);
+		const interactionHandle = createInteractionHandle();
+		registry.register(interactionHandle, descriptor);
 		const dispatcher = createDelegatedInteractionDispatcher({
 			registry,
 			linkContext,
@@ -515,7 +576,7 @@ describe("delegated interaction dispatcher", () => {
 		});
 
 		const element = document.createElement("div");
-		element.dataset.cclInteractionId = descriptor.interactionId;
+		element.dataset.cclInteractionHandle = interactionHandle;
 
 		attachDispatcher(root, dispatcher);
 		root.append(element);
@@ -559,7 +620,8 @@ describe("delegated interaction dispatcher", () => {
 		const registry = createInteractionRegistry();
 		const file = createMockTFile(TARGET_FILE_PATH);
 		const descriptor = createSectionDescriptor(file);
-		registry.register(descriptor);
+		const interactionHandle = createInteractionHandle();
+		registry.register(interactionHandle, descriptor);
 		const dispatcher = createDelegatedInteractionDispatcher({
 			registry,
 			linkContext,
@@ -567,7 +629,7 @@ describe("delegated interaction dispatcher", () => {
 		});
 
 		const element = document.createElement("div");
-		element.dataset.cclInteractionId = descriptor.interactionId;
+		element.dataset.cclInteractionHandle = interactionHandle;
 		const dataTransfer = {
 			setData: vi.fn(),
 		};
@@ -602,7 +664,8 @@ describe("delegated interaction dispatcher", () => {
 			{ type: "file", data: file } as CardItem,
 			file,
 		);
-		registry.register(descriptor);
+		const interactionHandle = createInteractionHandle();
+		registry.register(interactionHandle, descriptor);
 
 		const dispatcher = createDelegatedInteractionDispatcher({
 			registry,
@@ -613,7 +676,7 @@ describe("delegated interaction dispatcher", () => {
 
 		const shadowRoot = root.attachShadow({ mode: "open" });
 		const interactionElement = document.createElement("div");
-		interactionElement.dataset.cclInteractionId = descriptor.interactionId;
+		interactionElement.dataset.cclInteractionHandle = interactionHandle;
 		const child = document.createElement("span");
 		interactionElement.append(child);
 		shadowRoot.append(interactionElement);
@@ -642,7 +705,8 @@ describe("delegated interaction dispatcher", () => {
 			{ type: "file", data: file } as CardItem,
 			file,
 		);
-		registry.register(descriptor);
+		const interactionHandle = createInteractionHandle();
+		registry.register(interactionHandle, descriptor);
 
 		const dispatcher = createDelegatedInteractionDispatcher({
 			registry,
@@ -651,7 +715,7 @@ describe("delegated interaction dispatcher", () => {
 		});
 		const foreignRoot = foreignDocument.createElement("div");
 		const element = foreignDocument.createElement("div");
-		element.dataset.cclInteractionId = descriptor.interactionId;
+		element.dataset.cclInteractionHandle = interactionHandle;
 		foreignRoot.append(element);
 		foreignDocument.body.append(foreignRoot);
 		attachDispatcher(foreignRoot, dispatcher);
@@ -693,7 +757,8 @@ describe("delegated interaction dispatcher", () => {
 			{ type: "file", data: file } as CardItem,
 			file,
 		);
-		registry.register(descriptor);
+		const interactionHandle = createInteractionHandle();
+		registry.register(interactionHandle, descriptor);
 
 		const dispatcher = createDelegatedInteractionDispatcher({
 			registry,
@@ -702,7 +767,7 @@ describe("delegated interaction dispatcher", () => {
 		});
 		const foreignRoot = foreignDocument.createElement("div");
 		const element = foreignDocument.createElement("div");
-		element.dataset.cclInteractionId = descriptor.interactionId;
+		element.dataset.cclInteractionHandle = interactionHandle;
 		foreignRoot.append(element);
 		foreignDocument.body.append(foreignRoot);
 		attachDispatcher(foreignRoot, dispatcher);

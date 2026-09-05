@@ -24,7 +24,6 @@
 		columns?: number;
 		gap?: number;
 		mountedRows: readonly CardGridMountedRow<TCell>[];
-		interactionDescriptorScopeId?: string;
 		interactionDescriptorResolverProvider?: InteractionDescriptorResolverProvider;
 		renderCell: Snippet<
 			[{ mountedCell: TCell; scrollContainerEl: HTMLElement | null }]
@@ -60,7 +59,6 @@
 		columns = 1,
 		gap = undefined,
 		mountedRows,
-		interactionDescriptorScopeId,
 		interactionDescriptorResolverProvider = undefined,
 		renderCell,
 		afterContent,
@@ -84,7 +82,6 @@
 		},
 		getObserverRoot: () => scrollContainerEl,
 		getRowHeight: () => rowHeight,
-		getInteractionDescriptorScopeId: () => interactionDescriptorScopeId,
 		getInteractionDescriptorResolverProvider: () =>
 			interactionDescriptorResolverProvider,
 		resolveNavigationTarget,

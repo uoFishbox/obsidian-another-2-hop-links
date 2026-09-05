@@ -30,7 +30,6 @@ import type {
 	ClickableHeaderExtraProps,
 	SectionConfig,
 } from "two-hop/ui/section-descriptors/types";
-import { createInteractionTokenAllocator } from "cards/interactions/interactionRegistry";
 import {
 	createItemInteractionKey,
 	createSectionHeaderInteractionKey,
@@ -59,21 +58,16 @@ export function materializeItemPrefix<T>(
 	return items;
 }
 
-export interface TwoHopInteractionTokenAllocator {
-	readonly createItemInteractionToken: (semanticKey: string) => string;
-	readonly createHeaderInteractionToken: (sectionId: string) => string;
+export interface TwoHopInteractionIdentity {
+	readonly resolveItemInteractionId: (semanticKey: string) => string;
+	readonly resolveHeaderInteractionId: (sectionId: string) => string;
 }
 
-export function createTwoHopInteractionTokenAllocator(): TwoHopInteractionTokenAllocator {
-	const createItemInteractionToken = createInteractionTokenAllocator("i");
-	const allocateHeaderInteractionToken = createInteractionTokenAllocator("h");
-
+export function createTwoHopInteractionIdentity(): TwoHopInteractionIdentity {
 	return {
-		createItemInteractionToken,
-		createHeaderInteractionToken: (sectionId) =>
-			allocateHeaderInteractionToken(
-				createSectionHeaderInteractionKey(sectionId),
-			),
+		resolveItemInteractionId: (semanticKey) => semanticKey,
+		resolveHeaderInteractionId: (sectionId) =>
+			createSectionHeaderInteractionKey(sectionId),
 	};
 }
 
@@ -95,7 +89,7 @@ export interface CreatePrimarySectionDescriptorParams {
 	readonly input: PrimarySectionBuildInput;
 	readonly itemLimit: number;
 	readonly previousItems: readonly TwoHopItemModel[];
-	readonly createItemInteractionToken: (semanticKey: string) => string;
+	readonly resolveItemInteractionId: (semanticKey: string) => string;
 }
 
 /**
@@ -116,7 +110,7 @@ export function createPrimarySectionDescriptor(
 				config: outgoingLinksSectionConfig,
 				toCardItem: (item) => ({ type: "branch", data: item }),
 				getSearchKey: getOutgoingSearchKey,
-				createItemInteractionToken: params.createItemInteractionToken,
+				resolveItemInteractionId: params.resolveItemInteractionId,
 			});
 		case "backlinks":
 			return createPrimaryDescriptor({
@@ -126,7 +120,7 @@ export function createPrimarySectionDescriptor(
 				config: backlinksSectionConfig,
 				toCardItem: (item) => ({ type: "backlink", data: item }),
 				getSearchKey: getBacklinkSearchKey,
-				createItemInteractionToken: params.createItemInteractionToken,
+				resolveItemInteractionId: params.resolveItemInteractionId,
 			});
 		case "merged":
 			return createPrimaryDescriptor({
@@ -136,7 +130,7 @@ export function createPrimarySectionDescriptor(
 				config: mergedLinksSectionConfig,
 				toCardItem: toMergedViewItem,
 				getSearchKey: getMergedSearchKey,
-				createItemInteractionToken: params.createItemInteractionToken,
+				resolveItemInteractionId: params.resolveItemInteractionId,
 			});
 	}
 }
@@ -148,7 +142,7 @@ interface CreatePrimaryDescriptorParams<T> {
 	readonly config: SectionConfig<T>;
 	readonly toCardItem: (item: T) => CardItem;
 	readonly getSearchKey: (item: T) => string;
-	readonly createItemInteractionToken: (semanticKey: string) => string;
+	readonly resolveItemInteractionId: (semanticKey: string) => string;
 }
 
 function createPrimaryDescriptor<T>(
@@ -164,7 +158,7 @@ function createPrimaryDescriptor<T>(
 			const semanticKey = createItemInteractionKey(item, virtualKey);
 			return {
 				item,
-				interactionId: params.createItemInteractionToken(semanticKey),
+				interactionId: params.resolveItemInteractionId(semanticKey),
 				searchKey: params.getSearchKey(source),
 				key: virtualKey,
 			};
@@ -231,7 +225,7 @@ export function resolveBranchHeader(params: {
 /** Builds one immutable branch publication from a sorted, bounded prefix. */
 export function createBranchSectionDescriptor(
 	input: BranchSectionBuildInput,
-	tokens: TwoHopInteractionTokenAllocator,
+	tokens: TwoHopInteractionIdentity,
 ): TwoHopSectionModel {
 	const branchBaseKey = getTwohopBranchSearchBaseKey(input.branch);
 	const rows = materializeItemPrefix(
@@ -244,7 +238,7 @@ export function createBranchSectionDescriptor(
 			const semanticKey = createItemInteractionKey(item, virtualKey);
 			return {
 				item,
-				interactionId: tokens.createItemInteractionToken(semanticKey),
+				interactionId: tokens.resolveItemInteractionId(semanticKey),
 				searchKey: createTwohopChildSearchKeyFromBaseKeys(
 					branchBaseKey,
 					virtualKey,
@@ -253,7 +247,7 @@ export function createBranchSectionDescriptor(
 			};
 		},
 	);
-	const headerInteractionId = tokens.createHeaderInteractionToken(input.rawSectionId);
+	const headerInteractionId = tokens.resolveHeaderInteractionId(input.rawSectionId);
 	const headerInteractionDescriptor: SectionHeaderInteractionDescriptor = {
 		interactionId: headerInteractionId,
 		kind: "sectionHeader",
@@ -268,7 +262,6 @@ export function createBranchSectionDescriptor(
 	const headerProps: ClickableHeaderExtraProps = {
 		className: input.className,
 		draggable: true,
-		interactionId: headerInteractionDescriptor.interactionId,
 		interactionDescriptor: headerInteractionDescriptor,
 	};
 
@@ -294,12 +287,10 @@ export interface TagSectionBuildInput {
 /** Builds one immutable tag publication from a sorted, bounded prefix. */
 export function createTagSectionDescriptor(
 	input: TagSectionBuildInput,
-	tokens: TwoHopInteractionTokenAllocator,
+	tokens: TwoHopInteractionIdentity,
 ): TwoHopSectionModel {
-	const headerInteractionId = tokens.createHeaderInteractionToken(input.rawSectionId);
 	const headerProps: ClickableHeaderExtraProps = {
 		className: "cosense-card-links__box--tag",
-		interactionId: headerInteractionId,
 		onClick: () => input.onTagClick(input.source.tag),
 	};
 	const rows = materializeItemPrefix(
@@ -321,7 +312,7 @@ export function createTagSectionDescriptor(
 			const semanticKey = createItemInteractionKey(item, virtualKey);
 			return {
 				item,
-				interactionId: tokens.createItemInteractionToken(semanticKey),
+				interactionId: tokens.resolveItemInteractionId(semanticKey),
 				searchKey: getTagNoteSearchKeyFromBaseKey(input.source.tag, baseKey),
 				key: virtualKey,
 			};
@@ -341,7 +332,7 @@ export interface CreateNewLinksSectionDescriptorParams {
 	readonly items: readonly IndexedLink[];
 	readonly itemLimit: number;
 	readonly previousItems: readonly TwoHopItemModel[];
-	readonly createItemInteractionToken: (semanticKey: string) => string;
+	readonly resolveItemInteractionId: (semanticKey: string) => string;
 }
 
 /** Builds an immutable new-links publication with allocation-free viewport reads. */
@@ -358,7 +349,7 @@ export function createNewLinksSectionDescriptor(
 			const semanticKey = createItemInteractionKey(item, virtualKey);
 			return {
 				item,
-				interactionId: params.createItemInteractionToken(semanticKey),
+				interactionId: params.resolveItemInteractionId(semanticKey),
 				searchKey: virtualKey,
 				key: virtualKey,
 			};

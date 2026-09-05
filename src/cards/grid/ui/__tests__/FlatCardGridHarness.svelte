@@ -71,7 +71,7 @@
 						<div
 							class="cosense-card-links__box"
 							data-testid="item-focus-target"
-							data-ccl-interaction-id={`${item as string}-${index}`}
+							data-ccl-interaction-handle={`${item as string}-${index}`}
 							data-index={index}
 							tabindex="0"
 						>
@@ -103,7 +103,7 @@
 						<div
 							class="cosense-card-links__box"
 							data-testid="item-focus-target"
-							data-ccl-interaction-id={`${item as string}-${index}`}
+							data-ccl-interaction-handle={`${item as string}-${index}`}
 							data-index={index}
 							tabindex="0"
 						>

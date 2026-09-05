@@ -68,6 +68,17 @@ function createModel(file: TFile): CardRenderModel {
 	};
 }
 
+function findCardByTitle(root: ShadowRoot, title: string): HTMLElement | null {
+	return (
+		Array.from(root.querySelectorAll<HTMLElement>(".cosense-card-links__box")).find(
+			(element) =>
+				element
+					.querySelector(".cosense-card-links__box-title")
+					?.textContent?.trim() === title,
+		) ?? null
+	);
+}
+
 describe("FlatCardGrid preview surface", () => {
 	it("commits preview DOM through the virtual surface", async () => {
 		const file = {
@@ -242,13 +253,13 @@ describe("FlatCardGrid preview surface", () => {
 		const shadowRoot = gridRoot.shadowRoot;
 		if (!shadowRoot) throw new TypeError("Missing virtual grid shadow root");
 		await waitFor(() => {
-			const image = shadowRoot.querySelector<HTMLImageElement>(
-				'[data-ccl-interaction-id="duplicate-b.md"] img',
+			const image = findCardByTitle(shadowRoot, "duplicate-b")?.querySelector(
+				"img",
 			);
-			expect(image).not.toBeNull();
+			expect(image).toBeTruthy();
 		});
-		const imageBefore = shadowRoot.querySelector<HTMLImageElement>(
-			'[data-ccl-interaction-id="duplicate-b.md"] img',
+		const imageBefore = findCardByTitle(shadowRoot, "duplicate-b")?.querySelector(
+			"img",
 		);
 		if (!imageBefore) throw new TypeError("Missing duplicate-b preview image");
 		const loadsBefore = getPreview.mock.calls.filter(
@@ -267,8 +278,8 @@ describe("FlatCardGrid preview surface", () => {
 			await Promise.resolve();
 		}
 
-		const imageAfter = shadowRoot.querySelector<HTMLImageElement>(
-			'[data-ccl-interaction-id="duplicate-b.md"] img',
+		const imageAfter = findCardByTitle(shadowRoot, "duplicate-b")?.querySelector(
+			"img",
 		);
 		expect(imageAfter).toBe(imageBefore);
 		expect(

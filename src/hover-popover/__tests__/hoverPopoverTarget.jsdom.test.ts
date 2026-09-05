@@ -245,7 +245,7 @@ describe("hoverPopoverTarget", () => {
 		}
 
 		const element = foreignDocument.createElement("div");
-		element.dataset.cclInteractionId = "item:foreign";
+		element.dataset.cclInteractionHandle = "item:foreign";
 		foreignDocument.body.append(element);
 
 		const event = createHoverPreviewMouseEvent(element);

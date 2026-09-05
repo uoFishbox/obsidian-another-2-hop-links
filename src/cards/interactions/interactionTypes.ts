@@ -20,9 +20,25 @@ import {
 	isHTMLElementLike,
 } from "shared/ui/dom/realmSafeDom";
 
-export const INTERACTION_ID_ATTRIBUTE = "data-ccl-interaction-id";
+declare const interactionHandleBrand: unique symbol;
+
+/** Opaque identity for one live DOM-to-descriptor binding. */
+export type InteractionHandle = string & {
+	readonly [interactionHandleBrand]: true;
+};
+
+let nextInteractionHandleId = 0;
+
+/** Allocates a process-unique handle without retaining semantic-key history. */
+export function createInteractionHandle(prefix = "x"): InteractionHandle {
+	const id = nextInteractionHandleId;
+	nextInteractionHandleId += 1;
+	return `${prefix}${id.toString(36)}` as InteractionHandle;
+}
+
+export const INTERACTION_HANDLE_ATTRIBUTE = "data-ccl-interaction-handle";
 export const LONG_PRESSED_ATTRIBUTE = "data-ccl-long-pressed";
-export const INTERACTION_SELECTOR = `[${INTERACTION_ID_ATTRIBUTE}]`;
+export const INTERACTION_SELECTOR = `[${INTERACTION_HANDLE_ATTRIBUTE}]`;
 const CARD_INTERACTION_SELECTOR = `.cosense-card-links__box${INTERACTION_SELECTOR}`;
 const SYNTHETIC_HOVER_EVENT_FLAG = "__cclSyntheticHover";
 const LAST_TOUCH_AT_DATASET_KEY = "cclLastTouchAt";
@@ -260,14 +276,16 @@ export function getAttachedInteractionHoverTarget(event: Event): HTMLElement | n
 	return getInteractionElement(event);
 }
 
-export function getInteractionIdFromElement(
+export function getInteractionHandleFromElement(
 	element: HTMLElement | null,
-): string | null {
+): InteractionHandle | null {
 	if (!element) {
 		return null;
 	}
 
-	return element.dataset.cclInteractionId ?? null;
+	return (
+		(element.dataset.cclInteractionHandle as InteractionHandle | undefined) ?? null
+	);
 }
 
 export function markInteractionLongPressed(element: HTMLElement): void {

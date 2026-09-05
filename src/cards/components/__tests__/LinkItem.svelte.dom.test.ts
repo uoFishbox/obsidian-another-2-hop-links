@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/svelte";
 import { describe, expect, it, vi } from "vitest";
 import LinkItem from "../LinkItem.svelte";
+import type { InteractionHandle } from "cards/interactions/interactionTypes";
 
 vi.mock("obsidian", () => ({
 	Platform: {
@@ -9,13 +10,15 @@ vi.mock("obsidian", () => ({
 	TFile: class {},
 }));
 
+const handle = (value: string): InteractionHandle => value as InteractionHandle;
+
 describe("LinkItem", () => {
 	it("renders title as plain text when search query is empty", () => {
 		const { container } = render(LinkItem, {
 			props: {
 				title: "Target Note <Beta>",
 				ariaLabel: "target-note-card",
-				interactionId: "token-plain-card",
+				interactionHandle: handle("token-plain-card"),
 				searchQuery: "",
 			},
 		});
@@ -32,7 +35,7 @@ describe("LinkItem", () => {
 			props: {
 				title: "Notebook Search Result",
 				ariaLabel: "search result",
-				interactionId: "item:file:notes/search.md",
+				interactionHandle: handle("item:file:notes/search.md"),
 				searchQuery: "search",
 			},
 		});
@@ -50,7 +53,7 @@ describe("LinkItem", () => {
 			props: {
 				title: "diagram",
 				ariaLabel: "diagram",
-				interactionId: "item:file:notes/diagram.canvas",
+				interactionHandle: handle("item:file:notes/diagram.canvas"),
 				extension: "canvas",
 			},
 		});
@@ -70,7 +73,7 @@ describe("LinkItem", () => {
 			props: {
 				title: "Draggable Target",
 				ariaLabel: "draggable-target-card",
-				interactionId: "token-draggable-card",
+				interactionHandle: handle("token-draggable-card"),
 			},
 		});
 
@@ -84,7 +87,7 @@ describe("LinkItem", () => {
 			props: {
 				title: "Disabled Target",
 				ariaLabel: "disabled-target-card",
-				interactionId: "token-disabled-card",
+				interactionHandle: handle("token-disabled-card"),
 				draggable: false,
 			},
 		});
@@ -98,7 +101,7 @@ describe("LinkItem", () => {
 		const baseProps = {
 			title: "",
 			ariaLabel: "",
-			interactionId: "token-reusable-card",
+			interactionHandle: handle("token-reusable-card"),
 			className: "twohop-card-shell is-skeleton",
 		};
 		const { container, rerender } = render(LinkItem, {
@@ -112,7 +115,7 @@ describe("LinkItem", () => {
 		expect(card).toHaveAttribute("aria-hidden", "true");
 		expect(card).not.toHaveAttribute("role");
 		expect(card).not.toHaveAttribute("tabindex");
-		expect(card).not.toHaveAttribute("data-ccl-interaction-id");
+		expect(card).not.toHaveAttribute("data-ccl-interaction-handle");
 		expect(card).not.toHaveAttribute("draggable");
 
 		await rerender({
@@ -127,7 +130,10 @@ describe("LinkItem", () => {
 		expect(card).not.toHaveAttribute("aria-hidden");
 		expect(card).toHaveAttribute("role", "button");
 		expect(card).toHaveAttribute("tabindex", "0");
-		expect(card).toHaveAttribute("data-ccl-interaction-id", "token-reusable-card");
+		expect(card).toHaveAttribute(
+			"data-ccl-interaction-handle",
+			"token-reusable-card",
+		);
 		expect(card).toHaveAttribute("draggable", "true");
 	});
 
@@ -136,7 +142,7 @@ describe("LinkItem", () => {
 			props: {
 				title: "Missing PDF",
 				ariaLabel: "missing PDF",
-				interactionId: "item:new-link:missing-pdf",
+				interactionHandle: handle("item:new-link:missing-pdf"),
 				className: "cosense-card-links__box--missing",
 				extension: "pdf",
 			},

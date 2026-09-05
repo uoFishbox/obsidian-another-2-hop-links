@@ -444,8 +444,12 @@
 			{resolveItemInteractionDescriptor}
 			header={config.showSectionHeader ? sectionHeader : undefined}
 		>
-			{#snippet item({ item, previewKey })}
-				<ViewItemCard model={resolveViewItemCardModel(item)} {previewKey} />
+			{#snippet item({ item, previewKey, interactionHandle })}
+				<ViewItemCard
+					model={resolveViewItemCardModel(item)}
+					{previewKey}
+					{interactionHandle}
+				/>
 			{/snippet}
 		</LinkList>
 		{#if isSearchLoading}

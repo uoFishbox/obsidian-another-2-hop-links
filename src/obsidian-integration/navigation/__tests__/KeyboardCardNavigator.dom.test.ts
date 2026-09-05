@@ -81,7 +81,7 @@ function setVisibleRect(
 function createCard(id: string, rect: RectInit): HTMLElement {
 	const card = document.createElement("div");
 	card.className = "cosense-card-links__box";
-	card.dataset.cclInteractionId = id;
+	card.dataset.cclInteractionHandle = id;
 	setVisibleRect(card, rect);
 	return card;
 }
@@ -166,7 +166,7 @@ function getHintForElement(
 	interactionId: string,
 ): string | undefined {
 	const el = root.querySelector<HTMLElement>(
-		`[data-ccl-interaction-id="${interactionId}"]`,
+		`[data-ccl-interaction-handle="${interactionId}"]`,
 	);
 	return el?.dataset.cclKbHint;
 }
@@ -285,14 +285,12 @@ describe("KeyboardCardNavigator", () => {
 			const rows = navigator.collectVisibleRows(root);
 
 			expect(rows).toHaveLength(2);
-			expect(rows[0].cards.map((card) => card.dataset.cclInteractionId)).toEqual([
-				"row-1-a",
-				"row-1-b",
-			]);
-			expect(rows[1].cards.map((card) => card.dataset.cclInteractionId)).toEqual([
-				"row-2-a",
-				"row-2-b",
-			]);
+			expect(
+				rows[0].cards.map((card) => card.dataset.cclInteractionHandle),
+			).toEqual(["row-1-a", "row-1-b"]);
+			expect(
+				rows[1].cards.map((card) => card.dataset.cclInteractionHandle),
+			).toEqual(["row-2-a", "row-2-b"]);
 		});
 
 		it("collects visible rows from cards rendered inside shadow roots", () => {
@@ -312,13 +310,12 @@ describe("KeyboardCardNavigator", () => {
 			const rows = navigator.collectVisibleRows(root);
 
 			expect(rows).toHaveLength(2);
-			expect(rows[0].cards.map((card) => card.dataset.cclInteractionId)).toEqual([
-				"row-1-a",
-				"row-1-b",
-			]);
-			expect(rows[1].cards.map((card) => card.dataset.cclInteractionId)).toEqual([
-				"row-2-a",
-			]);
+			expect(
+				rows[0].cards.map((card) => card.dataset.cclInteractionHandle),
+			).toEqual(["row-1-a", "row-1-b"]);
+			expect(
+				rows[1].cards.map((card) => card.dataset.cclInteractionHandle),
+			).toEqual(["row-2-a"]);
 		});
 	});
 
@@ -339,7 +336,7 @@ describe("KeyboardCardNavigator", () => {
 			navigator.activate(root, "inline");
 
 			expect(root.classList.contains("ccl-kb-nav-active")).toBe(true);
-			expect(getSelectedCard(root)?.dataset.cclInteractionId).toBe("row-1-a");
+			expect(getSelectedCard(root)?.dataset.cclInteractionHandle).toBe("row-1-a");
 			expect(hasAnyHints(root)).toBe(true);
 		});
 
@@ -357,7 +354,7 @@ describe("KeyboardCardNavigator", () => {
 
 			dispatchKey("ArrowDown");
 
-			expect(getSelectedCard(root)?.dataset.cclInteractionId).toBe("row-2-a");
+			expect(getSelectedCard(root)?.dataset.cclInteractionHandle).toBe("row-2-a");
 		});
 
 		it("moves selection up with ArrowUp", () => {
@@ -375,7 +372,7 @@ describe("KeyboardCardNavigator", () => {
 
 			dispatchKey("ArrowUp");
 
-			expect(getSelectedCard(root)?.dataset.cclInteractionId).toBe("row-1-a");
+			expect(getSelectedCard(root)?.dataset.cclInteractionHandle).toBe("row-1-a");
 		});
 
 		it("exits navigation mode on Escape", () => {
@@ -412,7 +409,7 @@ describe("KeyboardCardNavigator", () => {
 
 			dispatchKey("ArrowDown", { target: input });
 
-			expect(getSelectedCard(root)?.dataset.cclInteractionId).toBe("row-1-a");
+			expect(getSelectedCard(root)?.dataset.cclInteractionHandle).toBe("row-1-a");
 		});
 
 		it("ignores keys when modifiers are pressed", () => {
@@ -435,7 +432,7 @@ describe("KeyboardCardNavigator", () => {
 			});
 			document.dispatchEvent(event);
 
-			expect(getSelectedCard(root)?.dataset.cclInteractionId).toBe("row-1-a");
+			expect(getSelectedCard(root)?.dataset.cclInteractionHandle).toBe("row-1-a");
 		});
 	});
 

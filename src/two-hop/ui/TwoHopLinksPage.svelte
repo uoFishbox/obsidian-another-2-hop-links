@@ -30,7 +30,7 @@
 	import type { DisplayData } from "two-hop/display/displayDataBuilder";
 	import { tick, untrack } from "svelte";
 	import { createTwoHopSectionPublicationMemo } from "two-hop/ui/section-descriptors/cache";
-	import { createTwoHopInteractionTokenAllocator } from "two-hop/ui/section-descriptors/descriptors";
+	import { createTwoHopInteractionIdentity } from "two-hop/ui/section-descriptors/descriptors";
 	import {
 		buildScopedSectionId,
 		normalizeIncrement,
@@ -283,7 +283,7 @@
 	const sourceFile = linkContext.sourceFile;
 	const fileToLinktext = linkContext.fileToLinktext;
 	const onTagClick = linkContext.onTagClick;
-	const interactionTokens = createTwoHopInteractionTokenAllocator();
+	const interactionIdentity = createTwoHopInteractionIdentity();
 	const sectionPublicationMemo = createTwoHopSectionPublicationMemo();
 	let getSectionVisibleCount = $derived.by(() => {
 		const expandedLimits = applicationUiState.sectionExpandedLimits ?? {};
@@ -318,7 +318,7 @@
 			getSortedTwoHopItems,
 			getSortedTagGroupItems,
 			getVisibleCount: getSectionVisibleCount,
-			interactionTokens,
+			interactionIdentity,
 			onTagClick,
 		}),
 	);

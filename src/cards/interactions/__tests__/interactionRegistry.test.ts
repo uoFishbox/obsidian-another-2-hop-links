@@ -2,7 +2,10 @@ import { describe, expect, it, vi } from "vitest";
 import type { TFile } from "obsidian";
 import type { CardItem } from "cards/CardItem";
 import { createInteractionRegistry } from "../interactionRegistry";
-import type { ItemInteractionDescriptor } from "../interactionTypes";
+import {
+	createInteractionHandle,
+	type ItemInteractionDescriptor,
+} from "../interactionTypes";
 
 function createDescriptor(
 	interactionId: string,
@@ -20,15 +23,6 @@ function createDescriptor(
 }
 
 describe("interactionRegistry", () => {
-	it("allocates stable short interaction tokens per semantic key", () => {
-		const registry = createInteractionRegistry();
-
-		expect(registry.createInteractionToken("item:file:first.md")).toBe("i0");
-		expect(registry.createInteractionToken("item:file:first.md")).toBe("i0");
-		expect(registry.createInteractionToken("item:file:second.md")).toBe("i1");
-		expect(registry.createInteractionToken("section:first", "h")).toBe("h0");
-	});
-
 	it("releases a direct descriptor through its registration lease", () => {
 		const registry = createInteractionRegistry();
 		const descriptor = createDescriptor(
@@ -36,12 +30,13 @@ describe("interactionRegistry", () => {
 			"[[drag-alias]]",
 			"notes/registry-target.md",
 		);
+		const handle = createInteractionHandle();
 
-		const release = registry.register(descriptor);
-		expect(registry.resolve(descriptor.interactionId)).toBe(descriptor);
+		const release = registry.register(handle, descriptor);
+		expect(registry.resolve(handle)).toBe(descriptor);
 
 		release();
-		expect(registry.resolve(descriptor.interactionId)).toBeUndefined();
+		expect(registry.resolve(handle)).toBeUndefined();
 	});
 
 	it("keeps a newer owner when an earlier registration is released", () => {
@@ -52,14 +47,15 @@ describe("interactionRegistry", () => {
 			"[[second]]",
 			"notes/second.md",
 		);
-		const releaseFirst = registry.register(first);
-		const releaseSecond = registry.register(second);
+		const handle = createInteractionHandle();
+		const releaseFirst = registry.register(handle, first);
+		const releaseSecond = registry.register(handle, second);
 
 		releaseFirst();
 
-		expect(registry.resolve("shared-token")).toBe(second);
+		expect(registry.resolve(handle)).toBe(second);
 		releaseSecond();
-		expect(registry.resolve("shared-token")).toBeUndefined();
+		expect(registry.resolve(handle)).toBeUndefined();
 	});
 
 	it("restores the previous owner when the latest registration is released", () => {
@@ -70,12 +66,13 @@ describe("interactionRegistry", () => {
 			"[[second]]",
 			"notes/second.md",
 		);
-		const releaseFirst = registry.register(first);
-		const releaseSecond = registry.register(second);
+		const handle = createInteractionHandle();
+		const releaseFirst = registry.register(handle, first);
+		const releaseSecond = registry.register(handle, second);
 
 		releaseSecond();
 
-		expect(registry.resolve("shared-token")).toBe(first);
+		expect(registry.resolve(handle)).toBe(first);
 		releaseFirst();
 	});
 
@@ -83,14 +80,15 @@ describe("interactionRegistry", () => {
 		const registry = createInteractionRegistry();
 		const stale = createDescriptor("shared-token", "[[stale]]", "notes/stale.md");
 		const fresh = createDescriptor("shared-token", "[[fresh]]", "notes/fresh.md");
-		const releaseStale = registry.register(stale);
+		const handle = createInteractionHandle();
+		const releaseStale = registry.register(handle, stale);
 
 		registry.clear();
-		const releaseFresh = registry.register(fresh);
+		const releaseFresh = registry.register(handle, fresh);
 		releaseStale();
 		releaseStale();
 
-		expect(registry.resolve("shared-token")).toBe(fresh);
+		expect(registry.resolve(handle)).toBe(fresh);
 		releaseFresh();
 	});
 
@@ -106,15 +104,16 @@ describe("interactionRegistry", () => {
 			"[[direct-alias]]",
 			"notes/direct-target.md",
 		);
-		registry.syncInteractionDescriptorResolverProvider("mounted-items", {
+		const handle = createInteractionHandle();
+		registry.setInteractionDescriptorResolverProvider({
 			resolveInteractionDescriptor: () => provided,
 		});
 
-		const release = registry.register(direct);
-		expect(registry.resolve(direct.interactionId)).toBe(direct);
+		const release = registry.register(handle, direct);
+		expect(registry.resolve(handle)).toBe(direct);
 
 		release();
-		expect(registry.resolve(provided.interactionId)).toBe(provided);
+		expect(registry.resolve(handle)).toBe(provided);
 	});
 
 	it("resolves provider descriptors lazily without caching them", () => {
@@ -130,16 +129,17 @@ describe("interactionRegistry", () => {
 			"notes/fresh-target.md",
 		);
 		let descriptor = stale;
+		const handle = createInteractionHandle();
 		const resolveInteractionDescriptor = vi.fn(() => descriptor);
 
-		registry.syncInteractionDescriptorResolverProvider("mounted-items", {
+		registry.setInteractionDescriptorResolverProvider({
 			resolveInteractionDescriptor,
 		});
 		expect(resolveInteractionDescriptor).not.toHaveBeenCalled();
-		expect(registry.resolve(stale.interactionId)).toBe(stale);
+		expect(registry.resolve(handle)).toBe(stale);
 
 		descriptor = fresh;
-		expect(registry.resolve(fresh.interactionId)).toBe(fresh);
+		expect(registry.resolve(handle)).toBe(fresh);
 		expect(resolveInteractionDescriptor).toHaveBeenCalledTimes(2);
 	});
 
@@ -150,12 +150,13 @@ describe("interactionRegistry", () => {
 			"[[cleared-alias]]",
 			"notes/cleared-target.md",
 		);
-		registry.syncInteractionDescriptorResolverProvider("mounted-items", {
+		const handle = createInteractionHandle();
+		registry.setInteractionDescriptorResolverProvider({
 			resolveInteractionDescriptor: () => descriptor,
 		});
 
-		registry.syncInteractionDescriptorResolverProvider("mounted-items", undefined);
+		registry.setInteractionDescriptorResolverProvider(undefined);
 
-		expect(registry.resolve(descriptor.interactionId)).toBeUndefined();
+		expect(registry.resolve(handle)).toBeUndefined();
 	});
 });
