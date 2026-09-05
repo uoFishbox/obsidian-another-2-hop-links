@@ -4,7 +4,10 @@ import { DEFAULT_SETTINGS } from "settings/model";
 import type { CardCollectionState } from "cards/CardCollectionState.svelte";
 import type { CardRenderModel } from "cards/rendering/cardRenderModel";
 import type { LinkContext } from "cards/context/linkContext";
-import type { SectionHeaderInteractionDescriptor } from "cards/interactions/interactionTypes";
+import type {
+	ItemInteractionDescriptor,
+	SectionHeaderInteractionDescriptor,
+} from "cards/interactions/interactionTypes";
 import type {
 	TwoHopItemModel,
 	TwoHopSectionModel,
@@ -84,6 +87,30 @@ function createCardModelResolver() {
 	);
 }
 
+function createInteractiveCardModelResolver() {
+	return vi.fn((item: TwoHopItemModel, revision: unknown): CardRenderModel => {
+		const interactionId = `${item.key}:${String(revision)}`;
+		const interactionDescriptor: ItemInteractionDescriptor = {
+			interactionId,
+			kind: "item",
+			item: item.item,
+			targetFile: null,
+		};
+		return {
+			item: item.item,
+			targetFile: null,
+			title: item.key,
+			ariaLabel: item.key,
+			className: null,
+			extension: null,
+			interactionId,
+			interactionDescriptor,
+			searchQuery: "",
+			previewRequest: null,
+		};
+	});
+}
+
 interface SurfaceFixture {
 	readonly root: HTMLElement;
 	readonly scroller: HTMLElement;
@@ -96,7 +123,8 @@ interface SurfaceFixture {
 
 async function renderSurface(params: {
 	section: TwoHopSectionModel;
-	resolveItemCardModel: ReturnType<typeof createCardModelResolver>;
+	resolveItemCardModel: (item: TwoHopItemModel, revision: unknown) => CardRenderModel;
+	linkContext?: LinkContext;
 	loadMoreSection?: (sectionId: string) => void;
 	rootTop?: number;
 	cardModelRevision?: unknown;
@@ -121,7 +149,8 @@ async function renderSurface(params: {
 	const baseProps = {
 		sections: [params.section],
 		applicationStore,
-		linkContext: { getPreview: vi.fn() } as unknown as LinkContext,
+		linkContext:
+			params.linkContext ?? ({ getPreview: vi.fn() } as unknown as LinkContext),
 		loadMoreSection: params.loadMoreSection,
 		resolveItemCardModel: params.resolveItemCardModel,
 		cardModelRevision: params.cardModelRevision ?? 0,
@@ -313,6 +342,45 @@ describe("TwoHopVirtualGrid component", () => {
 		await vi.waitFor(() => expect(resolver).toHaveBeenCalled());
 		expect(resolver.mock.calls.length).toBeLessThan(40);
 		expect(findCardByTitle(root, "item:0")).not.toBeNull();
+	});
+
+	it("updates the DOM handle when a mounted card interaction identity changes", async () => {
+		const resolver = createInteractiveCardModelResolver();
+		const onHop1Click = vi.fn();
+		const section = createSection(1);
+		const { root, publishSection } = await renderSurface({
+			section,
+			resolveItemCardModel: resolver,
+			linkContext: {
+				getPreview: vi.fn(),
+				onHop1Click,
+			} as unknown as LinkContext,
+		});
+		const initialCard = await vi.waitFor(() => {
+			const card = findCardByTitle(root, "item:0");
+			expect(card?.dataset.cclInteractionHandle).toBeDefined();
+			return card!;
+		});
+		const initialHandle = initialCard.dataset.cclInteractionHandle;
+		await fireEvent.click(initialCard);
+		expect(onHop1Click).toHaveBeenCalledTimes(1);
+
+		await publishSection(section, 1);
+		for (let index = 0; index < 4; index += 1) await flushFrames();
+		const refreshedCard = await vi.waitFor(() => {
+			const card = findCardByTitle(root, "item:0");
+			expect(card?.dataset.cclInteractionHandle).toBeDefined();
+			expect(card?.dataset.cclInteractionHandle).not.toBe(initialHandle);
+			return card!;
+		});
+		const refreshedHandle = refreshedCard.dataset.cclInteractionHandle;
+		refreshedCard.dataset.cclInteractionHandle = initialHandle!;
+		await fireEvent.click(refreshedCard);
+		expect(onHop1Click).toHaveBeenCalledTimes(1);
+
+		refreshedCard.dataset.cclInteractionHandle = refreshedHandle!;
+		await fireEvent.click(refreshedCard);
+		expect(onHop1Click).toHaveBeenCalledTimes(2);
 	});
 
 	it("retains valid hydrated models across filtered publications and invalidates precise changes", async () => {

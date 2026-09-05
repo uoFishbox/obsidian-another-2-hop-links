@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
 import type { CardRenderModel } from "cards/rendering/cardRenderModel";
-import type { ItemInteractionDescriptor } from "cards/interactions/interactionTypes";
 import type {
 	VirtualFrameCoordinator,
 	VirtualFrameLane,
@@ -67,12 +66,6 @@ function createItem(index: number): TwoHopItemModel {
 
 function resolveCardModel(item: TwoHopItemModel): CardRenderModel {
 	const interactionId = item.interactionId ?? item.key;
-	const interactionDescriptor: ItemInteractionDescriptor = {
-		interactionId,
-		kind: "item",
-		item: item.item,
-		targetFile: null,
-	};
 	return {
 		item: item.item,
 		targetFile: null,
@@ -81,7 +74,7 @@ function resolveCardModel(item: TwoHopItemModel): CardRenderModel {
 		className: null,
 		extension: null,
 		interactionId,
-		interactionDescriptor,
+		interactionDescriptor: null,
 		searchQuery: "",
 		previewRequest: null,
 	};
@@ -120,6 +113,7 @@ describe("createTwoHopCardHydrator", () => {
 			getRevision: () => 0,
 			resolveCardModel: resolver,
 			isPreviewActive: () => false,
+			onModelsChanged: vi.fn(),
 			onPreviewModelsChanged: vi.fn(),
 		});
 		let expiredKeyReads = 0;
@@ -158,7 +152,7 @@ describe("createTwoHopCardHydrator", () => {
 		hydrator.dispose();
 	});
 
-	it("bounds retained models and keeps interactions for all demanded cards", () => {
+	it("bounds retained models and notifies consumers when retained models expire", () => {
 		const items = Array.from({ length: 70 }, (_, index) => createItem(index));
 		const section = createTwoHopSectionModel({
 			id: "section",
@@ -174,20 +168,20 @@ describe("createTwoHopCardHydrator", () => {
 		});
 		const frames = createTestFrameCoordinator();
 		const previewChanged = vi.fn();
+		const modelsChanged = vi.fn();
 		const resolver = vi.fn(resolveCardModel);
 		const hydrator = createTwoHopCardHydrator({
 			frameCoordinator: frames.coordinator,
 			getRevision: () => 0,
 			resolveCardModel: resolver,
 			isPreviewActive: () => true,
+			onModelsChanged: modelsChanged,
 			onPreviewModelsChanged: previewChanged,
 		});
 		const firstKey = "item:section:item:0";
 		const secondKey = "item:section:item:1";
 		const firstConsumer = vi.fn();
 		hydrator.registerConsumer(firstKey, firstConsumer);
-		const firstHandle = hydrator.getInteractionHandle(firstKey);
-		const secondHandle = hydrator.getInteractionHandle(secondKey);
 
 		hydrator.setDemand({
 			foreground: collectItemCells(rowModel, 1, 2),
@@ -197,33 +191,13 @@ describe("createTwoHopCardHydrator", () => {
 
 		expect(hydrator.getModel(firstKey)).toBeDefined();
 		expect(hydrator.getModel(secondKey)).toBeDefined();
-		expect(
-			hydrator.interactionDescriptorResolverProvider.resolveInteractionDescriptor(
-				firstHandle,
-			),
-		).not.toBeNull();
-		expect(
-			hydrator.interactionDescriptorResolverProvider.resolveInteractionDescriptor(
-				secondHandle,
-			),
-		).not.toBeNull();
+		expect(modelsChanged).toHaveBeenCalled();
 
 		hydrator.setDemand({
 			foreground: [],
 			background: collectItemCells(rowModel, 1, 3),
 		});
 		frames.drain();
-
-		expect(
-			hydrator.interactionDescriptorResolverProvider.resolveInteractionDescriptor(
-				firstHandle,
-			),
-		).not.toBeNull();
-		expect(
-			hydrator.interactionDescriptorResolverProvider.resolveInteractionDescriptor(
-				secondHandle,
-			),
-		).not.toBeNull();
 
 		hydrator.setDemand({
 			foreground: collectItemCells(rowModel, 2, 3),
@@ -233,16 +207,6 @@ describe("createTwoHopCardHydrator", () => {
 
 		expect(hydrator.getModel(firstKey)).toBeDefined();
 		expect(hydrator.getModel(secondKey)).toBeDefined();
-		expect(
-			hydrator.interactionDescriptorResolverProvider.resolveInteractionDescriptor(
-				firstHandle,
-			),
-		).toBeNull();
-		expect(
-			hydrator.interactionDescriptorResolverProvider.resolveInteractionDescriptor(
-				secondHandle,
-			),
-		).not.toBeNull();
 
 		const resolverCallsBeforeReturn = resolver.mock.calls.length;
 		hydrator.setDemand({
@@ -253,11 +217,6 @@ describe("createTwoHopCardHydrator", () => {
 
 		expect(hydrator.getModel(firstKey)).toBeDefined();
 		expect(resolver.mock.calls.length).toBe(resolverCallsBeforeReturn);
-		expect(
-			hydrator.interactionDescriptorResolverProvider.resolveInteractionDescriptor(
-				hydrator.getInteractionHandle(firstKey),
-			),
-		).not.toBeNull();
 
 		for (let rowIndex = 3; rowIndex < rowModel.rowCount; rowIndex += 1) {
 			hydrator.setDemand({
@@ -301,6 +260,7 @@ describe("createTwoHopCardHydrator", () => {
 			getRevision: () => revision,
 			resolveCardModel: resolver,
 			isPreviewActive: () => false,
+			onModelsChanged: vi.fn(),
 			onPreviewModelsChanged: vi.fn(),
 		});
 
@@ -340,6 +300,7 @@ describe("createTwoHopCardHydrator", () => {
 			getRevision: () => 0,
 			resolveCardModel,
 			isPreviewActive: () => false,
+			onModelsChanged: vi.fn(),
 			onPreviewModelsChanged: vi.fn(),
 		});
 

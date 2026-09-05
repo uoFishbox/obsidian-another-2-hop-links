@@ -2,8 +2,6 @@ import type { CardRenderModel } from "cards/rendering/cardRenderModel";
 import type { TwoHopItemModel } from "two-hop/ui/twoHopSectionModel";
 import type { TwoHopVirtualCell } from "./rowModel";
 import type { VirtualFrameCoordinator } from "shared/ui/scheduling/frameCoordinator";
-import { createVirtualCardInteractionController } from "cards/interactions/virtualCardInteractionController";
-import type { InteractionHandle } from "cards/interactions/interactionTypes";
 
 type CardModelConsumer = (model: CardRenderModel | undefined) => void;
 type HydrationPriority = "foreground" | "background";
@@ -35,7 +33,7 @@ interface HydrationQueue {
 /**
  * Resident item cells to hydrate, split by scheduling priority.
  * Foreground wins when a logical key appears in both collections.
- * Priority controls scheduling only; every demanded cell remains interactive.
+ * Priority controls scheduling only; interaction lifetime is owned by the grid.
  */
 export interface TwoHopCardDemand {
 	readonly foreground: readonly TwoHopCardHydrationCell[];
@@ -51,19 +49,16 @@ export interface TwoHopCardHydratorParams {
 		revision: unknown,
 	) => CardRenderModel;
 	readonly isPreviewActive: () => boolean;
+	readonly onModelsChanged: () => void;
 	readonly onPreviewModelsChanged: () => void;
 }
 
 /** Bounded asynchronous hydration and card-model cache for resident cells. */
 export interface TwoHopCardHydrator {
-	readonly interactionDescriptorResolverProvider: ReturnType<
-		typeof createVirtualCardInteractionController
-	>["provider"];
 	registerConsumer(logicalKey: string, consumer: CardModelConsumer): () => void;
 	setDemand(demand: TwoHopCardDemand): void;
 	refreshDemand(): void;
 	getModel(logicalKey: string): CardRenderModel | undefined;
-	getInteractionHandle(logicalKey: string): InteractionHandle;
 	dispose(): void;
 }
 
@@ -82,7 +77,6 @@ export function createTwoHopCardHydrator(
 	const pendingByKey = new Map<string, PendingHydration>();
 	const foregroundQueue = createHydrationQueue();
 	const backgroundQueue = createHydrationQueue();
-	const interactionController = createVirtualCardInteractionController();
 	let demandByKey = new Map<string, DemandedHydration>();
 	let cancelDrain: (() => void) | undefined;
 	let scheduledPriority: HydrationPriority | undefined;
@@ -124,6 +118,7 @@ export function createTwoHopCardHydrator(
 		const previewChanged = reconcileModelRetention();
 		enqueueDemand(false);
 		scheduleDrain();
+		if (previewChanged) params.onModelsChanged();
 		if (previewChanged) params.onPreviewModelsChanged();
 	}
 
@@ -143,7 +138,6 @@ export function createTwoHopCardHydrator(
 				retainedEntryCount += 1;
 				continue;
 			}
-			interactionController.setCard(logicalKey, null);
 		}
 
 		let retainedCacheSize = entries.size - retainedEntryCount;
@@ -197,10 +191,6 @@ export function createTwoHopCardHydrator(
 			current.revision === revision &&
 			!refreshExisting
 		) {
-			interactionController.setCard(
-				cell.logicalKey,
-				current.model.interactionDescriptor,
-			);
 			return;
 		}
 
@@ -287,15 +277,14 @@ export function createTwoHopCardHydrator(
 				revision,
 				model,
 			});
-			interactionController.setCard(
-				hydration.logicalKey,
-				model.interactionDescriptor,
-			);
 			notify(hydration.logicalKey, model);
 			if (previewActive && previewRenderKeyChanged) previewChanged = true;
 		}
 		compactHydrationQueue(queue);
 		const retainedModelsEvicted = reconcileModelRetention();
+		if (processed > 0 || retainedModelsEvicted) {
+			params.onModelsChanged();
+		}
 		if (previewChanged || retainedModelsEvicted) {
 			params.onPreviewModelsChanged();
 		}
@@ -342,7 +331,6 @@ export function createTwoHopCardHydrator(
 		disposed = true;
 		clearPending();
 		consumers.clear();
-		interactionController.clear();
 	}
 
 	function queueFor(priority: HydrationPriority): HydrationQueue {
@@ -350,12 +338,10 @@ export function createTwoHopCardHydrator(
 	}
 
 	return {
-		interactionDescriptorResolverProvider: interactionController.provider,
 		registerConsumer,
 		setDemand,
 		refreshDemand,
 		getModel,
-		getInteractionHandle: interactionController.getInteractionHandle,
 		dispose,
 	};
 }

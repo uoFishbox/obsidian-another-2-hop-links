@@ -38,7 +38,7 @@
 		<TwoHopVirtualCell
 			cell={mountedCell.cell}
 			interactionHandle={mountedCell.cell.kind === "item"
-				? list.getInteractionHandle(mountedCell.cell.logicalKey)
+				? list.getInteractionHandle(mountedCell.physicalCellSlot)
 				: undefined}
 			previewHostEnabled={list.isPreviewHostEnabled(mountedCell.rowIndex)}
 			previewKey={mountedCell.cell.logicalKey}

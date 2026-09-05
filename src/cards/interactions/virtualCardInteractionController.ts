@@ -7,14 +7,14 @@ import type { InteractionDescriptorResolverProvider } from "./interactionRegistr
 
 export interface VirtualCardInteractionBinding {
 	readonly slotId: string;
-	descriptor: ItemInteractionDescriptor;
+	/** Null while the live DOM slot is mounted but its card is not hydrated. */
+	descriptor: ItemInteractionDescriptor | null;
 }
 
 export interface VirtualCardInteractionController {
 	readonly provider: InteractionDescriptorResolverProvider;
 	getInteractionHandle(slotId: string): InteractionHandle;
 	syncCards(cards: readonly VirtualCardInteractionBinding[]): void;
-	setCard(slotId: string, descriptor: ItemInteractionDescriptor | null): void;
 	clear(): void;
 }
 
@@ -72,6 +72,20 @@ export function createVirtualCardInteractionController(): VirtualCardInteraction
 		descriptorByHandle.set(binding.handle, descriptor);
 	}
 
+	function bindEmptySlot(slotId: string): void {
+		const previous = bindingBySlot.get(slotId);
+		if (!previous) {
+			bindingBySlot.set(slotId, createSlotBinding(null));
+			return;
+		}
+
+		descriptorByHandle.delete(previous.handle);
+		bindingBySlot.set(slotId, {
+			handle: previous.handle,
+			descriptor: null,
+		});
+	}
+
 	const provider: InteractionDescriptorResolverProvider = {
 		resolveInteractionDescriptor(interactionHandle) {
 			return descriptorByHandle.get(interactionHandle) ?? null;
@@ -85,17 +99,11 @@ export function createVirtualCardInteractionController(): VirtualCardInteraction
 			const activeSlotIds = new Set<string>();
 			for (const card of cards) {
 				activeSlotIds.add(card.slotId);
-				bindCard(card.slotId, card.descriptor);
+				if (card.descriptor) bindCard(card.slotId, card.descriptor);
+				else bindEmptySlot(card.slotId);
 			}
 			for (const slotId of bindingBySlot.keys()) {
 				if (!activeSlotIds.has(slotId)) removeSlot(slotId);
-			}
-		},
-		setCard(slotId, descriptor) {
-			if (descriptor) {
-				bindCard(slotId, descriptor);
-			} else {
-				removeSlot(slotId);
 			}
 		},
 		clear() {

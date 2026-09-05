@@ -1,9 +1,30 @@
 import { applyCardPreviewDimensions } from "card-preview/pipeline/cardPreviewRequest";
 import type { VirtualPreviewBinding } from "card-preview/scheduling/virtualPreviewSurface";
 import type { CardRenderModel } from "cards/rendering/cardRenderModel";
+import type { VirtualCardInteractionBinding } from "cards/interactions/virtualCardInteractionController";
 import type { RowRange } from "cards/virtualization/public";
 import type { TwoHopCardDemand, TwoHopCardHydrationCell } from "./cardHydrator";
 import type { MountedTwoHopRow } from "./mountedRows";
+
+/** Builds interaction bindings owned by the current resident physical slots. */
+export function buildTwoHopInteractionBindings(
+	rows: readonly MountedTwoHopRow[],
+	getCardModel: (logicalKey: string) => CardRenderModel | undefined,
+): VirtualCardInteractionBinding[] {
+	const bindings: VirtualCardInteractionBinding[] = [];
+	for (const row of rows) {
+		for (const mountedCell of row.bindings) {
+			if (!mountedCell || mountedCell.cell.kind !== "item") continue;
+			bindings.push({
+				slotId: String(mountedCell.physicalCellSlot),
+				descriptor:
+					getCardModel(mountedCell.cell.logicalKey)?.interactionDescriptor ??
+					null,
+			});
+		}
+	}
+	return bindings;
+}
 
 /** Builds the preview publication for the current resident two-hop window. */
 export function buildTwoHopPreviewBindings(

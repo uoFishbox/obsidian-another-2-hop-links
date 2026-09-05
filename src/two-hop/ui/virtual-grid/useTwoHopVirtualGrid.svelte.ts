@@ -39,6 +39,7 @@ import type {
 import type { ProgrammaticScrollSnapshot } from "cards/virtualization/public";
 import {
 	buildTwoHopPreviewBindings,
+	buildTwoHopInteractionBindings,
 	collectTwoHopCardDemand,
 } from "./mountedCardBindings";
 import {
@@ -48,6 +49,8 @@ import {
 } from "./layoutAnchor";
 import { createPreviewPrefetchRangeTracker } from "card-preview/prefetch/previewPrefetchRange";
 import { createCardGridVisibilityPolicyResolver } from "cards/grid/model/cardGridVisibilityPolicy";
+import { createVirtualCardInteractionController } from "cards/interactions/virtualCardInteractionController";
+import type { InteractionHandle } from "cards/interactions/interactionTypes";
 
 /** Dependencies required to enable previews on the two-hop virtual surface. */
 export interface TwoHopPreviewDependencies {
@@ -98,7 +101,9 @@ export function useTwoHopVirtualGrid(
 	let postCommitMeasurementScheduled = false;
 	let previewVisibleRange: Readonly<RowRange> = EMPTY_RANGE;
 	let previewPrefetchRange: Readonly<RowRange> = EMPTY_RANGE;
+	let interactionBindingRevision = $state(0);
 	const previewPrefetchRangeTracker = createPreviewPrefetchRangeTracker();
+	const interactionController = createVirtualCardInteractionController();
 
 	const resolveConfiguredLayout = createResolvedCardLayoutSettingsMemo();
 	const configuredLayout = $derived(
@@ -119,6 +124,14 @@ export function useTwoHopVirtualGrid(
 	const resolveCardGridVisibilityPolicy = createCardGridVisibilityPolicyResolver();
 	const resolveVisibilityPolicy = (model: TwoHopRowModel) =>
 		resolveCardGridVisibilityPolicy(model.layout.rowStride);
+	const cardHydrator = createTwoHopCardHydrator({
+		frameCoordinator,
+		getRevision: () => untrack(() => props.cardModelRevision),
+		resolveCardModel: props.resolveItemCardModel,
+		isPreviewActive: isPreviewSurfaceActive,
+		onModelsChanged: syncMountedInteractions,
+		onPreviewModelsChanged: publishPreviewSnapshot,
+	});
 
 	const virtualList = useVirtualizer<
 		TwoHopVirtualCell,
@@ -143,7 +156,10 @@ export function useTwoHopVirtualGrid(
 				previousBuild,
 				rowSlotAllocator,
 			}),
-		onSnapshotUpdated: () => {
+		onSnapshotUpdated: (snapshot) => {
+			syncMountedInteractions(
+				snapshot.mountedBuild?.rowsInMountedRange ?? EMPTY_MOUNTED_ROWS,
+			);
 			scheduleAnchorRestoration();
 			scheduleRangeEffects();
 		},
@@ -158,16 +174,23 @@ export function useTwoHopVirtualGrid(
 	});
 	const measurement = virtualList.measurement;
 
-	const cardHydrator = createTwoHopCardHydrator({
-		frameCoordinator,
-		getRevision: () => untrack(() => props.cardModelRevision),
-		resolveCardModel: props.resolveItemCardModel,
-		isPreviewActive: isPreviewSurfaceActive,
-		onPreviewModelsChanged: publishPreviewSnapshot,
-	});
-
 	function getMountedRows(): readonly MountedTwoHopRow[] {
 		return virtualList.getMountedBuild()?.rowsInMountedRange ?? EMPTY_MOUNTED_ROWS;
+	}
+
+	function syncMountedInteractions(
+		rows: readonly MountedTwoHopRow[] = getMountedRows(),
+	): void {
+		if (disposed) return;
+		interactionController.syncCards(
+			buildTwoHopInteractionBindings(rows, cardHydrator.getModel),
+		);
+		interactionBindingRevision += 1;
+	}
+
+	function getInteractionHandle(physicalCellSlot: number): InteractionHandle {
+		void interactionBindingRevision;
+		return interactionController.getInteractionHandle(String(physicalCellSlot));
 	}
 
 	function publishPreviewSnapshot(): void {
@@ -353,6 +376,7 @@ export function useTwoHopVirtualGrid(
 		pendingLayoutAnchor = null;
 		frameCoordinator.cancel("post-paint", RANGE_EFFECT_TASK_KEY);
 		cardHydrator.dispose();
+		interactionController.clear();
 		previewSurface.dispose();
 	});
 
@@ -412,7 +436,7 @@ export function useTwoHopVirtualGrid(
 			return previewSurface;
 		},
 		get interactionDescriptorResolverProvider() {
-			return cardHydrator.interactionDescriptorResolverProvider;
+			return interactionController.provider;
 		},
 		isPreviewHostEnabled(rowIndex: number): boolean {
 			const mounted = virtualList.getSnapshot()?.ranges.mounted;
@@ -424,7 +448,7 @@ export function useTwoHopVirtualGrid(
 			);
 		},
 		registerCardModelConsumer: cardHydrator.registerConsumer,
-		getInteractionHandle: cardHydrator.getInteractionHandle,
+		getInteractionHandle,
 		resolveNavigationTarget,
 		resolveSequentialNavigationTarget,
 		flushVirtualScrollMeasurement,
