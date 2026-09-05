@@ -1,11 +1,11 @@
-import {
-	RESULT_FOCUS_SELECTOR,
-	type ResultNavigationDirection,
-} from "cards/navigation/resultFocus";
+import { RESULT_FOCUS_SELECTOR } from "cards/navigation/resultTargets";
+import type {
+	NavigationDirection,
+	SequentialNavigationDirection,
+} from "cards/navigation/types";
 import { waitForNextAnimationFrame } from "shared/ui/scheduling/frame";
 import type {
 	VirtualNavigationTarget,
-	VirtualSequentialNavigationDirection,
 	VirtualSequentialNavigationTarget,
 } from "cards/virtualization/public";
 import {
@@ -88,7 +88,7 @@ interface CardSurfaceNavigationOptions {
 	flushMountedState: () => Promise<void>;
 	resolveNavigationTarget?: (
 		currentKey: string,
-		direction: ResultNavigationDirection,
+		direction: NavigationDirection,
 		currentPosition: {
 			rowIndex: number;
 			columnIndex: number;
@@ -96,7 +96,7 @@ interface CardSurfaceNavigationOptions {
 	) => VirtualNavigationTarget | null;
 	resolveSequentialNavigationTarget?: (
 		currentKey: string,
-		direction: VirtualSequentialNavigationDirection,
+		direction: SequentialNavigationDirection,
 		currentPosition: {
 			rowIndex: number;
 			columnIndex: number;
@@ -145,6 +145,7 @@ export const createCardSurfaceNavigation = (
 		}
 
 		target.focus({ preventScroll: true });
+		target.scrollIntoView({ block: "nearest", inline: "nearest" });
 		return true;
 	};
 
@@ -159,10 +160,13 @@ export const createCardSurfaceNavigation = (
 				options.cellBindingRegistry,
 			);
 		const mountedCellElement = getMountedCellElement(target.key);
+		if (focusCellTarget(mountedCellElement, resolveTarget)) {
+			return true;
+		}
 
 		const rootEl = options.getRootEl();
 		if (!rootEl) {
-			return focusCellTarget(mountedCellElement, resolveTarget);
+			return false;
 		}
 		const scrollContainerEl =
 			options.getScrollContainerEl() ?? findNearestScrollContainer(rootEl);
@@ -173,13 +177,6 @@ export const createCardSurfaceNavigation = (
 			targetTop: target.rowTop,
 			targetHeight: options.getRowHeight(),
 		});
-		if (
-			!scrollSnapshot.didScroll &&
-			focusCellTarget(mountedCellElement, resolveTarget)
-		) {
-			return true;
-		}
-
 		await waitForNextAnimationFrame(rootEl.ownerDocument.defaultView);
 		options.flushVirtualScrollMeasurement?.(scrollSnapshot);
 		await options.flushMountedState();
@@ -189,7 +186,7 @@ export const createCardSurfaceNavigation = (
 
 	const moveFocusWithinResolvedNavigation = async (
 		currentTarget: HTMLElement,
-		direction: ResultNavigationDirection,
+		direction: NavigationDirection,
 	): Promise<boolean> => {
 		const registeredCell =
 			options.cellBindingRegistry.findClosestCell(currentTarget);
@@ -292,7 +289,7 @@ export const createCardSurfaceNavigation = (
 
 	const prepareSequentialFocusMove = (
 		currentTarget: HTMLElement,
-		direction: VirtualSequentialNavigationDirection,
+		direction: SequentialNavigationDirection,
 	): (() => Promise<boolean>) | null => {
 		const resolver = options.resolveSequentialNavigationTarget;
 		if (!resolver) return null;
@@ -335,15 +332,12 @@ export const createCardSurfaceNavigation = (
 	};
 
 	const handleKeyDown = createCardGridKeyboardHandler({
-		getRootEl: options.getRootEl,
-		getScrollContainerEl: options.getScrollContainerEl,
 		delegatedInteractions: options.delegatedInteractions,
 		moveFocusWithinList: async (currentTarget, direction) =>
 			options.resolveNavigationTarget
 				? moveFocusWithinResolvedNavigation(currentTarget, direction)
 				: false,
 		prepareSequentialFocusMove,
-		flushMountedState: options.flushMountedState,
 	});
 
 	const handlePointerDown = (): void => {

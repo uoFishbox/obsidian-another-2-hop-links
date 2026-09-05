@@ -104,6 +104,7 @@ export abstract class AbstractSvelteListView<
 	private unsubscribeFromIndex: (() => void) | undefined = undefined;
 	private readonly searchFocusScope: Scope;
 	private unregisterSearchFocusShortcut: (() => void) | undefined = undefined;
+	private unregisterKeyboardNavigationSurface: (() => void) | undefined = undefined;
 
 	private readonly guardedIndexUpdateHandler = createGuardedIndexUpdateHandler({
 		isReady: () => this.isViewReady(),
@@ -208,7 +209,7 @@ export abstract class AbstractSvelteListView<
 		const sectionEl = options.parentEl.createDiv({
 			cls: "cosense-card-links__temp-view",
 		});
-		sectionEl.dataset.cclCardSurface = "inline";
+		sectionEl.dataset.cclCardSurface = "workspace";
 		applyCardLayoutCssVars(sectionEl, this.plugin.settings);
 
 		const linkContext = createLinkContextForView(
@@ -243,6 +244,8 @@ export abstract class AbstractSvelteListView<
 				uiState: options.uiState,
 			},
 		}) as ListHostComponent;
+		this.unregisterKeyboardNavigationSurface =
+			this.viewServices.keyboardNavigationSurfaceRegistry.register(sectionEl);
 	}
 
 	protected applyItemsDiff(nextItems: TItem[], context?: DataUpdateContext): void {
@@ -271,6 +274,8 @@ export abstract class AbstractSvelteListView<
 	}
 
 	private destroyListHost(): void {
+		this.unregisterKeyboardNavigationSurface?.();
+		this.unregisterKeyboardNavigationSurface = undefined;
 		[this.listHostComponent, this.cardCollectionState] = cleanupSvelteAndStore(
 			this.listHostComponent,
 			this.cardCollectionState,

@@ -11,7 +11,7 @@
 		type SearchMatchSnapshot,
 	} from "search/useStreamingSearchSession.svelte";
 	import type { SearchMatchedItem, SearchMatchScope } from "search/searchTypes";
-	import { focusResultEdge } from "cards/navigation/resultFocus";
+	import { focusResultEdge } from "cards/navigation/focusNavigation";
 	import {
 		setLinkContext,
 		type LinkContext,
@@ -45,6 +45,7 @@
 		type CardRenderModel,
 	} from "cards/rendering/cardRenderModel";
 	import type { TwoHopItemModel } from "two-hop/ui/twoHopSectionModel";
+	import type { KeyboardNavigationSurfaceRegistry } from "obsidian-integration/navigation/keyboardNavigationSurface";
 
 	interface TwoHopCardModelRevision {
 		readonly settings: PluginSettings;
@@ -89,6 +90,7 @@
 			value: PluginSettings[K],
 		) => Promise<void>;
 		uiState?: TwoHopLinksRootUiState;
+		keyboardNavigationSurfaceRegistry: KeyboardNavigationSurfaceRegistry;
 	}
 
 	interface TwoHopSearchPresentation {
@@ -129,6 +131,7 @@
 		isSidebar = false,
 		updateSetting,
 		uiState,
+		keyboardNavigationSurfaceRegistry,
 	}: Props = $props();
 	const applicationUiState = applicationStore.uiState;
 
@@ -400,6 +403,13 @@
 		const element = rootEl;
 		if (!element) return;
 
+		return keyboardNavigationSurfaceRegistry.register(element);
+	});
+
+	$effect(() => {
+		const element = rootEl;
+		if (!element) return;
+
 		return observePreviewSurfaceVisibility(element, (active) => {
 			previewSurfaceActive = active;
 		});
@@ -429,7 +439,7 @@
 		}
 
 		const inlineRoot = view.containerEl.querySelector<HTMLElement>(
-			'.cosense-card-links__root[data-ccl-card-surface="inline"]',
+			'.cosense-card-links__root[data-ccl-card-surface="editor"]',
 		);
 		if (!inlineRoot) {
 			return false;
@@ -470,7 +480,7 @@
 <div
 	bind:this={rootEl}
 	class="cosense-card-links__root"
-	data-ccl-card-surface={isSidebar ? "sidebar" : "inline"}
+	data-ccl-card-surface={isSidebar ? "sidebar" : "editor"}
 	tabindex="-1"
 	style={cardLayoutCssText}
 >

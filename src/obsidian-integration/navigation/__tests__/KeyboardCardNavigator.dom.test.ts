@@ -1,6 +1,10 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { KeyboardCardNavigator } from "../KeyboardCardNavigator";
 import { MarkdownView } from "obsidian";
+import {
+	collectVisibleKeyboardNavigationRows,
+	createKeyboardNavigationSurfaceRegistry,
+} from "../keyboardNavigationSurface";
 
 vi.mock("obsidian", () => {
 	class MarkdownView {
@@ -96,13 +100,15 @@ function createLoadMoreButton(rect: RectInit): HTMLButtonElement {
 }
 
 function createSurface(
-	host: "inline" | "sidebar" | "empty",
+	placement: "editor" | "sidebar" | "workspace",
 	cards: HTMLElement[] = [],
 ): HTMLElement {
 	const surface = document.createElement("div");
 	surface.className =
-		host === "empty" ? "cosense-card-links-empty-view" : "cosense-card-links__root";
-	surface.dataset.cclCardSurface = host;
+		placement === "workspace"
+			? "cosense-card-links-empty-view"
+			: "cosense-card-links__root";
+	surface.dataset.cclCardSurface = placement;
 	surface.tabIndex = -1;
 	setVisibleRect(surface, { top: 0, left: 0, width: 600, height: 400 });
 	for (const card of cards) {
@@ -116,31 +122,26 @@ function createWorkspace(options: {
 	sidebarContainers?: HTMLElement[];
 	emptyViewContainers?: HTMLElement[];
 }) {
-	return {
-		activeLeaf: options.activeView ? { view: options.activeView } : undefined,
-		getActiveViewOfType: vi.fn((type: new (...args: any[]) => unknown) => {
-			if (!options.activeView) {
-				return null;
-			}
-
-			return options.activeView instanceof type ? options.activeView : null;
-		}),
-		getLeavesOfType: vi.fn(() =>
-			(options.sidebarContainers ?? []).map((contentEl) => ({
-				view: { contentEl },
-			})),
-		),
-		iterateAllLeaves: vi.fn((callback: (leaf: any) => void) => {
-			for (const contentEl of options.emptyViewContainers ?? []) {
-				callback({
-					view: {
-						contentEl,
-						getViewType: () => "empty",
-					},
-				});
-			}
-		}),
-	};
+	const registry = createKeyboardNavigationSurfaceRegistry();
+	const editorSurface = options.activeView?.containerEl.querySelector<HTMLElement>(
+		'[data-ccl-card-surface="editor"]',
+	);
+	if (editorSurface) {
+		registry.register(editorSurface);
+	}
+	for (const container of options.sidebarContainers ?? []) {
+		const surface = container.querySelector<HTMLElement>(
+			'[data-ccl-card-surface="sidebar"]',
+		);
+		if (surface) registry.register(surface);
+	}
+	for (const container of options.emptyViewContainers ?? []) {
+		const surface = container.querySelector<HTMLElement>(
+			'[data-ccl-card-surface="workspace"]',
+		);
+		if (surface) registry.register(surface);
+	}
+	return registry;
 }
 
 function dispatchKey(key: string, options?: { target?: HTMLElement }) {
@@ -186,7 +187,7 @@ describe("KeyboardCardNavigator", () => {
 				top: 10,
 				left: 20,
 			});
-			const inlineSurface = createSurface("inline", [inlineCard]);
+			const inlineSurface = createSurface("editor", [inlineCard]);
 			const sidebarCard = createCard("sidebar-card", {
 				top: 10,
 				left: 20,
@@ -204,17 +205,14 @@ describe("KeyboardCardNavigator", () => {
 				activeView,
 				sidebarContainers: [sidebarContainer],
 			});
-			const navigator = new KeyboardCardNavigator({ workspace }, vi.fn());
+			const navigator = new KeyboardCardNavigator(workspace, vi.fn());
 
-			expect(navigator.resolveTargetSurface()).toEqual({
-				rootEl: inlineSurface,
-				host: "inline",
-			});
+			expect(workspace.findBestVisibleSurface()).toBe(inlineSurface);
 		});
 
 		it("falls back to sidebar when active editor surface has no cards", () => {
 			const activeView = new MarkdownView({} as never);
-			const emptyInlineSurface = createSurface("inline", []);
+			const emptyInlineSurface = createSurface("editor", []);
 			activeView.containerEl.append(emptyInlineSurface);
 			document.body.append(activeView.containerEl);
 			const sidebarCard = createCard("sidebar-card", {
@@ -229,17 +227,14 @@ describe("KeyboardCardNavigator", () => {
 				activeView,
 				sidebarContainers: [sidebarContainer],
 			});
-			const navigator = new KeyboardCardNavigator({ workspace }, vi.fn());
+			const navigator = new KeyboardCardNavigator(workspace, vi.fn());
 
-			expect(navigator.resolveTargetSurface()).toEqual({
-				rootEl: sidebarSurface,
-				host: "sidebar",
-			});
+			expect(workspace.findBestVisibleSurface()).toBe(sidebarSurface);
 		});
 
 		it("falls back to sidebar when inline surface has only non-navigable elements", () => {
 			const activeView = new MarkdownView({} as never);
-			const inlineSurface = createSurface("inline");
+			const inlineSurface = createSurface("editor");
 			const nonCard = document.createElement("div");
 			nonCard.className = "some-other-class";
 			inlineSurface.append(nonCard);
@@ -259,42 +254,68 @@ describe("KeyboardCardNavigator", () => {
 				activeView,
 				sidebarContainers: [sidebarContainer],
 			});
-			const navigator = new KeyboardCardNavigator({ workspace }, vi.fn());
+			const navigator = new KeyboardCardNavigator(workspace, vi.fn());
 
-			expect(navigator.resolveTargetSurface()).toEqual({
-				rootEl: sidebarSurface,
-				host: "sidebar",
-			});
+			expect(workspace.findBestVisibleSurface()).toBe(sidebarSurface);
+		});
+
+		it("prefers an active workspace surface over a non-preferred editor surface", () => {
+			const editorSurface = createSurface("editor", [
+				createCard("editor-card", { top: 10, left: 20 }),
+			]);
+			const workspaceSurface = createSurface("workspace", [
+				createCard("workspace-card", { top: 10, left: 20 }),
+			]);
+			document.body.append(editorSurface, workspaceSurface);
+			const registry = createKeyboardNavigationSurfaceRegistry();
+			const activeLeaf = document.createElement("div");
+			activeLeaf.className = "workspace-leaf mod-active";
+			activeLeaf.append(workspaceSurface);
+			document.body.append(activeLeaf);
+			registry.register(editorSurface);
+			registry.register(workspaceSurface);
+
+			expect(registry.findBestVisibleSurface()).toBe(workspaceSurface);
+		});
+
+		it("removes a surface when its registration cleanup runs", () => {
+			const surface = createSurface("editor", [
+				createCard("editor-card", { top: 10, left: 20 }),
+			]);
+			document.body.append(surface);
+			const registry = createKeyboardNavigationSurfaceRegistry();
+			const unregister = registry.register(surface);
+
+			unregister();
+
+			expect(registry.findBestVisibleSurface()).toBeNull();
 		});
 	});
 
 	describe("row collection", () => {
 		it("groups visible cards into rows by top position and sorts each row left-to-right", () => {
-			const root = createSurface("inline", [
+			const root = createSurface("editor", [
 				createCard("row-1-b", { top: 12, left: 240 }),
 				createCard("row-2-a", { top: 92, left: 20 }),
 				createCard("row-1-a", { top: 10, left: 20 }),
 				createCard("row-2-b", { top: 95, left: 210 }),
 			]);
 			document.body.append(root);
-			const navigator = new KeyboardCardNavigator(
-				{ workspace: createWorkspace({}) },
-				vi.fn(),
-			);
+			const navigator = new KeyboardCardNavigator(createWorkspace({}), vi.fn());
 
-			const rows = navigator.collectVisibleRows(root);
+			const rows = collectVisibleKeyboardNavigationRows(root);
 
 			expect(rows).toHaveLength(2);
 			expect(
-				rows[0].cards.map((card) => card.dataset.cclInteractionHandle),
+				rows[0].elements.map((card) => card.dataset.cclInteractionHandle),
 			).toEqual(["row-1-a", "row-1-b"]);
 			expect(
-				rows[1].cards.map((card) => card.dataset.cclInteractionHandle),
+				rows[1].elements.map((card) => card.dataset.cclInteractionHandle),
 			).toEqual(["row-2-a", "row-2-b"]);
 		});
 
 		it("collects visible rows from cards rendered inside shadow roots", () => {
-			const root = createSurface("inline");
+			const root = createSurface("editor");
 			const shadowRoot = root.attachShadow({ mode: "open" });
 			shadowRoot.append(
 				createCard("row-1-a", { top: 10, left: 20 }),
@@ -302,38 +323,56 @@ describe("KeyboardCardNavigator", () => {
 				createCard("row-2-a", { top: 92, left: 20 }),
 			);
 			document.body.append(root);
-			const navigator = new KeyboardCardNavigator(
-				{ workspace: createWorkspace({}) },
-				vi.fn(),
-			);
+			const navigator = new KeyboardCardNavigator(createWorkspace({}), vi.fn());
 
-			const rows = navigator.collectVisibleRows(root);
+			const rows = collectVisibleKeyboardNavigationRows(root);
 
 			expect(rows).toHaveLength(2);
 			expect(
-				rows[0].cards.map((card) => card.dataset.cclInteractionHandle),
+				rows[0].elements.map((card) => card.dataset.cclInteractionHandle),
 			).toEqual(["row-1-a", "row-1-b"]);
 			expect(
-				rows[1].cards.map((card) => card.dataset.cclInteractionHandle),
+				rows[1].elements.map((card) => card.dataset.cclInteractionHandle),
 			).toEqual(["row-2-a"]);
 		});
 	});
 
 	describe("keyboard navigation", () => {
+		it("handles global keyboard mode before the CardGrid local keydown handler", () => {
+			const firstCard = createCard("row-1-a", { top: 10, left: 20 });
+			const root = createSurface("editor", [
+				firstCard,
+				createCard("row-2-a", { top: 90, left: 20 }),
+			]);
+			const localKeydown = vi.fn();
+			root.addEventListener("keydown", localKeydown);
+			document.body.append(root);
+			const navigator = new KeyboardCardNavigator(createWorkspace({}), vi.fn());
+			navigator.activate(root);
+
+			firstCard.dispatchEvent(
+				new KeyboardEvent("keydown", {
+					key: "ArrowDown",
+					bubbles: true,
+					cancelable: true,
+				}),
+			);
+
+			expect(localKeydown).not.toHaveBeenCalled();
+			expect(getSelectedCard(root)?.dataset.cclInteractionHandle).toBe("row-2-a");
+		});
+
 		it("selects the first row on activation and assigns hints to visible cards", () => {
-			const root = createSurface("inline", [
+			const root = createSurface("editor", [
 				createCard("row-1-a", { top: 10, left: 20 }),
 				createCard("row-1-b", { top: 10, left: 180 }),
 				createCard("row-2-a", { top: 90, left: 20 }),
 				createCard("row-2-b", { top: 90, left: 180 }),
 			]);
 			document.body.append(root);
-			const navigator = new KeyboardCardNavigator(
-				{ workspace: createWorkspace({}) },
-				vi.fn(),
-			);
+			const navigator = new KeyboardCardNavigator(createWorkspace({}), vi.fn());
 
-			navigator.activate(root, "inline");
+			navigator.activate(root);
 
 			expect(root.classList.contains("ccl-kb-nav-active")).toBe(true);
 			expect(getSelectedCard(root)?.dataset.cclInteractionHandle).toBe("row-1-a");
@@ -341,16 +380,13 @@ describe("KeyboardCardNavigator", () => {
 		});
 
 		it("moves selection down with ArrowDown", () => {
-			const root = createSurface("inline", [
+			const root = createSurface("editor", [
 				createCard("row-1-a", { top: 10, left: 20 }),
 				createCard("row-2-a", { top: 90, left: 20 }),
 			]);
 			document.body.append(root);
-			const navigator = new KeyboardCardNavigator(
-				{ workspace: createWorkspace({}) },
-				vi.fn(),
-			);
-			navigator.activate(root, "inline");
+			const navigator = new KeyboardCardNavigator(createWorkspace({}), vi.fn());
+			navigator.activate(root);
 
 			dispatchKey("ArrowDown");
 
@@ -358,16 +394,13 @@ describe("KeyboardCardNavigator", () => {
 		});
 
 		it("moves selection up with ArrowUp", () => {
-			const root = createSurface("inline", [
+			const root = createSurface("editor", [
 				createCard("row-1-a", { top: 10, left: 20 }),
 				createCard("row-2-a", { top: 90, left: 20 }),
 			]);
 			document.body.append(root);
-			const navigator = new KeyboardCardNavigator(
-				{ workspace: createWorkspace({}) },
-				vi.fn(),
-			);
-			navigator.activate(root, "inline");
+			const navigator = new KeyboardCardNavigator(createWorkspace({}), vi.fn());
+			navigator.activate(root);
 			dispatchKey("ArrowDown");
 
 			dispatchKey("ArrowUp");
@@ -375,17 +408,35 @@ describe("KeyboardCardNavigator", () => {
 			expect(getSelectedCard(root)?.dataset.cclInteractionHandle).toBe("row-1-a");
 		});
 
+		it("preserves selection by interaction identity when physical cards are recycled", () => {
+			const firstCard = createCard("row-1-a", { top: 10, left: 20 });
+			const recycledCard = createCard("row-2-a", { top: 90, left: 20 });
+			const root = createSurface("editor", [firstCard, recycledCard]);
+			document.body.append(root);
+			const navigator = new KeyboardCardNavigator(createWorkspace({}), vi.fn());
+			navigator.activate(root);
+			dispatchKey("ArrowDown");
+
+			const replacementCard = createCard("row-2-a", { top: 90, left: 20 });
+			recycledCard.dataset.cclInteractionHandle = "row-3-a";
+			setVisibleRect(recycledCard, { top: 170, left: 20 });
+			root.append(replacementCard);
+
+			dispatchKey("ArrowUp");
+
+			expect(getSelectedCard(root)?.dataset.cclInteractionHandle).toBe("row-1-a");
+			expect(replacementCard.dataset.cclKbRowSelected).toBeUndefined();
+			expect(recycledCard.dataset.cclKbRowSelected).toBeUndefined();
+		});
+
 		it("exits navigation mode on Escape", () => {
-			const root = createSurface("inline", [
+			const root = createSurface("editor", [
 				createCard("row-1-a", { top: 10, left: 20 }),
 				createCard("row-2-a", { top: 90, left: 20 }),
 			]);
 			document.body.append(root);
-			const navigator = new KeyboardCardNavigator(
-				{ workspace: createWorkspace({}) },
-				vi.fn(),
-			);
-			navigator.activate(root, "inline");
+			const navigator = new KeyboardCardNavigator(createWorkspace({}), vi.fn());
+			navigator.activate(root);
 
 			dispatchKey("Escape");
 
@@ -394,18 +445,15 @@ describe("KeyboardCardNavigator", () => {
 		});
 
 		it("ignores arrow keys from editable elements", () => {
-			const root = createSurface("inline", [
+			const root = createSurface("editor", [
 				createCard("row-1-a", { top: 10, left: 20 }),
 				createCard("row-2-a", { top: 90, left: 20 }),
 			]);
 			const input = document.createElement("input");
 			root.append(input);
 			document.body.append(root);
-			const navigator = new KeyboardCardNavigator(
-				{ workspace: createWorkspace({}) },
-				vi.fn(),
-			);
-			navigator.activate(root, "inline");
+			const navigator = new KeyboardCardNavigator(createWorkspace({}), vi.fn());
+			navigator.activate(root);
 
 			dispatchKey("ArrowDown", { target: input });
 
@@ -413,16 +461,13 @@ describe("KeyboardCardNavigator", () => {
 		});
 
 		it("ignores keys when modifiers are pressed", () => {
-			const root = createSurface("inline", [
+			const root = createSurface("editor", [
 				createCard("row-1-a", { top: 10, left: 20 }),
 				createCard("row-2-a", { top: 90, left: 20 }),
 			]);
 			document.body.append(root);
-			const navigator = new KeyboardCardNavigator(
-				{ workspace: createWorkspace({}) },
-				vi.fn(),
-			);
-			navigator.activate(root, "inline");
+			const navigator = new KeyboardCardNavigator(createWorkspace({}), vi.fn());
+			navigator.activate(root);
 
 			const event = new KeyboardEvent("keydown", {
 				key: "ArrowDown",
@@ -443,18 +488,15 @@ describe("KeyboardCardNavigator", () => {
 			const rowOneB = createCard("row-1-b", { top: 10, left: 180 });
 			rowOneB.addEventListener("click", targetListener);
 
-			const root = createSurface("inline", [
+			const root = createSurface("editor", [
 				rowOneA,
 				rowOneB,
 				createCard("row-2-a", { top: 90, left: 20 }),
 			]);
 			document.body.append(root);
-			const navigator = new KeyboardCardNavigator(
-				{ workspace: createWorkspace({}) },
-				vi.fn(),
-			);
+			const navigator = new KeyboardCardNavigator(createWorkspace({}), vi.fn());
 
-			navigator.activate(root, "inline");
+			navigator.activate(root);
 			const hintB = getHintForElement(root, "row-1-b");
 			expect(hintB).toBeDefined();
 
@@ -466,16 +508,13 @@ describe("KeyboardCardNavigator", () => {
 		});
 
 		it("does nothing for an invalid hint key", () => {
-			const root = createSurface("inline", [
+			const root = createSurface("editor", [
 				createCard("row-1-a", { top: 10, left: 20 }),
 				createCard("row-2-a", { top: 90, left: 20 }),
 			]);
 			document.body.append(root);
-			const navigator = new KeyboardCardNavigator(
-				{ workspace: createWorkspace({}) },
-				vi.fn(),
-			);
-			navigator.activate(root, "inline");
+			const navigator = new KeyboardCardNavigator(createWorkspace({}), vi.fn());
+			navigator.activate(root);
 			const initialSelected = getSelectedCard(root);
 
 			navigator.activateCardByHint("z");
@@ -496,7 +535,7 @@ describe("KeyboardCardNavigator", () => {
 
 			const firstRowCard = createCard("row-1-a", { top: 46, left: 20 });
 			const loadMoreButton = createLoadMoreButton({ top: 126, left: 20 });
-			const root = createSurface("inline", [firstRowCard, loadMoreButton]);
+			const root = createSurface("editor", [firstRowCard, loadMoreButton]);
 			scrollContainer.append(root);
 			document.body.append(scrollContainer);
 
@@ -506,12 +545,9 @@ describe("KeyboardCardNavigator", () => {
 			});
 			loadMoreButton.addEventListener("click", onExpand);
 
-			const navigator = new KeyboardCardNavigator(
-				{ workspace: createWorkspace({}) },
-				vi.fn(),
-			);
+			const navigator = new KeyboardCardNavigator(createWorkspace({}), vi.fn());
 
-			navigator.activate(root, "inline");
+			navigator.activate(root);
 			dispatchKey("ArrowDown");
 
 			expect(getSelectedCard(root)).toBe(loadMoreButton);
@@ -528,7 +564,7 @@ describe("KeyboardCardNavigator", () => {
 		});
 
 		it("dispatches composed synthetic click from shadow-rendered card", () => {
-			const root = createSurface("inline");
+			const root = createSurface("editor");
 			const shadowRoot = root.attachShadow({ mode: "open" });
 
 			const card = createCard("shadow-card", { top: 10, left: 20 });
@@ -539,12 +575,9 @@ describe("KeyboardCardNavigator", () => {
 
 			document.body.append(root);
 
-			const navigator = new KeyboardCardNavigator(
-				{ workspace: createWorkspace({}) },
-				vi.fn(),
-			);
+			const navigator = new KeyboardCardNavigator(createWorkspace({}), vi.fn());
 
-			navigator.activate(root, "inline");
+			navigator.activate(root);
 			const hint = card.dataset.cclKbHint;
 			expect(hint).toBeDefined();
 
@@ -565,19 +598,16 @@ describe("KeyboardCardNavigator", () => {
 				height: 100,
 			});
 
-			const root = createSurface("inline", [
+			const root = createSurface("editor", [
 				createCard("row-1-a", { top: 26, left: 20 }),
 				createCard("row-2-a", { top: 126, left: 20 }),
 			]);
 			scrollContainer.append(root);
 			document.body.append(scrollContainer);
 
-			const navigator = new KeyboardCardNavigator(
-				{ workspace: createWorkspace({}) },
-				vi.fn(),
-			);
+			const navigator = new KeyboardCardNavigator(createWorkspace({}), vi.fn());
 
-			navigator.activate(root, "inline");
+			navigator.activate(root);
 			expect(scrollContainer.scrollTop).toBe(0);
 
 			navigator.moveRow(1);
@@ -588,16 +618,13 @@ describe("KeyboardCardNavigator", () => {
 
 	describe("deactivation", () => {
 		it("cleans up selection state and class on deactivate", () => {
-			const root = createSurface("inline", [
+			const root = createSurface("editor", [
 				createCard("row-1-a", { top: 10, left: 20 }),
 				createCard("row-2-a", { top: 90, left: 20 }),
 			]);
 			document.body.append(root);
-			const navigator = new KeyboardCardNavigator(
-				{ workspace: createWorkspace({}) },
-				vi.fn(),
-			);
-			navigator.activate(root, "inline");
+			const navigator = new KeyboardCardNavigator(createWorkspace({}), vi.fn());
+			navigator.activate(root);
 			expect(root.classList.contains("ccl-kb-nav-active")).toBe(true);
 
 			navigator.deactivate();
@@ -608,7 +635,7 @@ describe("KeyboardCardNavigator", () => {
 	});
 	describe("window migration", () => {
 		it("rebinds the keydown listener to the migrated surface document", () => {
-			const root = createSurface("inline", [
+			const root = createSurface("editor", [
 				createCard("row-1-a", { top: 10, left: 20 }),
 			]);
 			document.body.append(root);
@@ -621,11 +648,8 @@ describe("KeyboardCardNavigator", () => {
 					return unregister;
 				}),
 			});
-			const navigator = new KeyboardCardNavigator(
-				{ workspace: createWorkspace({}) },
-				vi.fn(),
-			);
-			navigator.activate(root, "inline");
+			const navigator = new KeyboardCardNavigator(createWorkspace({}), vi.fn());
+			navigator.activate(root);
 
 			const frame = document.createElement("iframe");
 			document.body.append(frame);

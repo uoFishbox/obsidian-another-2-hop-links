@@ -5,6 +5,7 @@ import type { LinkContext } from "cards/context/linkContext";
 import type { CardCollectionState } from "cards/CardCollectionState.svelte";
 import type { TwoHopState } from "two-hop/state/TwoHopState.svelte";
 import type { AllNotesCatalog } from "search/all-notes/allNotesCatalog";
+import type { KeyboardNavigationSurfaceRegistry } from "obsidian-integration/navigation/keyboardNavigationSurface";
 
 /** UI views に対して composition root が提供する生成・共有 capability。 */
 export interface ViewServices {
@@ -18,4 +19,6 @@ export interface ViewServices {
 	readonly previewRuntime: PreviewRuntime;
 	/** plugin load 単位で共有される All Notes のsource・sort cache。 */
 	readonly allNotesCatalog: AllNotesCatalog;
+	/** mount 済み card surface を keyboard navigation に公開する registry。 */
+	readonly keyboardNavigationSurfaceRegistry: KeyboardNavigationSurfaceRegistry;
 }

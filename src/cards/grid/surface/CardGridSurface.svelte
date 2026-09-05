@@ -1,12 +1,14 @@
 <script lang="ts" generics="TMountedCell extends MountedVirtualCell">
 	import PooledCardGridRows from "./PooledCardGridRows.svelte";
 	import type { Snippet } from "svelte";
-	import type { ResultNavigationDirection } from "cards/navigation/resultFocus";
+	import type {
+		NavigationDirection,
+		SequentialNavigationDirection,
+	} from "cards/navigation/types";
 	import type { InteractionDescriptorResolverProvider } from "cards/interactions/interactionRegistry";
 	import type {
 		ProgrammaticScrollSnapshot,
 		VirtualNavigationTarget,
-		VirtualSequentialNavigationDirection,
 		VirtualSequentialNavigationTarget,
 	} from "cards/virtualization/public";
 	import type { CardGridMountedRow } from "./cardGridSurfaceTypes";
@@ -37,12 +39,12 @@
 		slotBodyRevision?: unknown;
 		resolveNavigationTarget?: (
 			currentKey: string,
-			direction: ResultNavigationDirection,
+			direction: NavigationDirection,
 			currentPosition: { rowIndex: number; columnIndex: number },
 		) => VirtualNavigationTarget | null;
 		resolveSequentialNavigationTarget?: (
 			currentKey: string,
-			direction: VirtualSequentialNavigationDirection,
+			direction: SequentialNavigationDirection,
 			currentPosition: { rowIndex: number; columnIndex: number },
 		) => VirtualSequentialNavigationTarget | null;
 		flushVirtualScrollMeasurement?: (snapshot: ProgrammaticScrollSnapshot) => void;

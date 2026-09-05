@@ -512,7 +512,7 @@ describe("SearchableItemList integration", () => {
 		]);
 	});
 
-	it("moves focus between the search input and visible result cards", async () => {
+	it("moves focus from the search input and between visible result cards", async () => {
 		const sourceFile = createMockTFile("notes/source.md");
 		const items = [
 			createTaggedNoteItem(createMockTFile("notes/alpha-note.md")),
@@ -557,6 +557,12 @@ describe("SearchableItemList integration", () => {
 
 		await flushAsyncUi();
 		await waitFor(() => expect(getAllSearchableItems()).toHaveLength(2));
+		const resultsContainer = document.querySelector(
+			".cosense-card-links__search-result-container",
+		);
+		expect(
+			resultsContainer?.querySelectorAll(":scope > .cosense-card-links__section"),
+		).toHaveLength(1);
 		const input = screen.getByRole("searchbox");
 		await fireEvent.keyDown(input, { key: "ArrowDown" });
 		await flushAsyncUi();
@@ -568,10 +574,5 @@ describe("SearchableItemList integration", () => {
 		await fireEvent.keyDown(firstItem, { key: "ArrowDown" });
 		await flushAsyncUi();
 		expectComposedFocus(secondItem);
-
-		firstItem.focus();
-		await fireEvent.keyDown(firstItem, { key: "ArrowUp" });
-		await flushAsyncUi();
-		expect(input).toHaveFocus();
 	});
 });

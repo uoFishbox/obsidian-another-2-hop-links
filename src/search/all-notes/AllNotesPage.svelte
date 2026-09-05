@@ -13,6 +13,7 @@
 	import type { PreviewRuntime } from "card-preview/runtime/previewRuntime";
 	import type { ListViewUiState } from "cards/list/model/listViewUiState";
 	import type { AllNotesCatalog } from "./allNotesCatalog";
+	import type { KeyboardNavigationSurfaceRegistry } from "obsidian-integration/navigation/keyboardNavigationSurface";
 
 	interface Props {
 		app: App;
@@ -23,6 +24,7 @@
 		previewRuntime?: PreviewRuntime;
 		uiState?: ListViewUiState;
 		allNotesCatalog: AllNotesCatalog;
+		keyboardNavigationSurfaceRegistry: KeyboardNavigationSurfaceRegistry;
 	}
 
 	let {
@@ -34,11 +36,13 @@
 		previewRuntime = undefined,
 		uiState = undefined,
 		allNotesCatalog,
+		keyboardNavigationSurfaceRegistry,
 	}: Props = $props();
 
 	let catalogRevision = $state(allNotesCatalog.getRevision());
 	let cardLayoutCssText = $derived(getCardLayoutCssText(settings));
 	let isCreatingSearchNote = $state(false);
+	let rootEl = $state<HTMLDivElement | null>(null);
 
 	let noteViewItems = $derived.by(() => {
 		void catalogRevision;
@@ -119,11 +123,19 @@
 			catalogRevision = revision;
 		});
 	});
+
+	$effect(() => {
+		const element = rootEl;
+		if (!element) return;
+
+		return keyboardNavigationSurfaceRegistry.register(element);
+	});
 </script>
 
 <div
+	bind:this={rootEl}
 	class="cosense-card-links-empty-view"
-	data-ccl-card-surface="empty"
+	data-ccl-card-surface="workspace"
 	tabindex="-1"
 	style={cardLayoutCssText}
 >

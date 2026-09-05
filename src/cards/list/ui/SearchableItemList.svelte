@@ -12,7 +12,7 @@
 		type SearchDatasetSnapshot,
 		type SearchMatchSnapshot,
 	} from "search/useStreamingSearchSession.svelte";
-	import { focusResultEdge } from "cards/navigation/resultFocus";
+	import { focusResultEdge } from "cards/navigation/focusNavigation";
 	import type { ListConfig } from "./types";
 	import {
 		setLinkContext,

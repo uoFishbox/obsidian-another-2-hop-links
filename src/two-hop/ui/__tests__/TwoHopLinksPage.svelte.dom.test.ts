@@ -4,6 +4,8 @@ import { DEFAULT_SETTINGS } from "settings/model";
 import { createMockTFile } from "testing/__mocks__/testHelpers";
 import type { TwoHopLinkResult } from "two-hop/model";
 import TwoHopLinksPage from "../TwoHopLinksPage.svelte";
+import { createKeyboardNavigationSurfaceRegistry } from "obsidian-integration/navigation/keyboardNavigationSurface";
+import type { KeyboardNavigationSurfaceRegistry } from "obsidian-integration/navigation/keyboardNavigationSurface";
 
 vi.mock("obsidian", () => {
 	class TFile {
@@ -104,8 +106,14 @@ describe("TwoHopLinksPage", () => {
 			onHop2Click: vi.fn(),
 			onTagClick: vi.fn(),
 		};
+		const unregisterSurface = vi.fn();
+		const keyboardNavigationSurfaceRegistry: KeyboardNavigationSurfaceRegistry = {
+			register: vi.fn(() => unregisterSurface),
+			findBestVisibleSurface: vi.fn(() => null),
+			clear: vi.fn(),
+		};
 
-		const { container, rerender } = render(TwoHopLinksPage, {
+		const { container, rerender, unmount } = render(TwoHopLinksPage, {
 			props: {
 				file,
 				linkContext,
@@ -113,13 +121,15 @@ describe("TwoHopLinksPage", () => {
 				app: {} as never,
 				lazyLoaderCache: new Set<string>(),
 				isSidebar: false,
+				keyboardNavigationSurfaceRegistry,
 			} as any,
 		});
 
 		let root = container.querySelector(".cosense-card-links__root");
 		expect(root).not.toBeNull();
-		expect(root).toHaveAttribute("data-ccl-card-surface", "inline");
+		expect(root).toHaveAttribute("data-ccl-card-surface", "editor");
 		expect(root).toHaveAttribute("tabindex", "-1");
+		expect(keyboardNavigationSurfaceRegistry.register).toHaveBeenCalledWith(root);
 
 		await rerender({
 			file,
@@ -128,10 +138,18 @@ describe("TwoHopLinksPage", () => {
 			app: {} as never,
 			lazyLoaderCache: new Set<string>(),
 			isSidebar: true,
+			keyboardNavigationSurfaceRegistry,
 		} as any);
 
 		root = container.querySelector(".cosense-card-links__root");
 		expect(root).toHaveAttribute("data-ccl-card-surface", "sidebar");
+		expect(unregisterSurface).toHaveBeenCalledTimes(1);
+		expect(keyboardNavigationSurfaceRegistry.register).toHaveBeenLastCalledWith(
+			root,
+		);
+
+		unmount();
+		expect(unregisterSurface).toHaveBeenCalledTimes(2);
 	});
 
 	it("displays LoadingState in card area while loading", () => {
@@ -182,6 +200,8 @@ describe("TwoHopLinksPage", () => {
 				app: {} as never,
 				lazyLoaderCache: new Set<string>(),
 				isSidebar: false,
+				keyboardNavigationSurfaceRegistry:
+					createKeyboardNavigationSurfaceRegistry(),
 			} as any,
 		});
 
@@ -261,6 +281,8 @@ describe("TwoHopLinksPage", () => {
 				app: {} as never,
 				lazyLoaderCache: new Set<string>(),
 				isSidebar: false,
+				keyboardNavigationSurfaceRegistry:
+					createKeyboardNavigationSurfaceRegistry(),
 			} as any,
 		});
 

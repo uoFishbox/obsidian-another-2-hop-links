@@ -44,6 +44,7 @@ import {
 	type PropertyWidgetStyler,
 } from "obsidian-integration/link-decoration/propertyWidgetStyler";
 import { KeyboardCardNavigator } from "obsidian-integration/navigation/KeyboardCardNavigator";
+import { createKeyboardNavigationSurfaceRegistry } from "obsidian-integration/navigation/keyboardNavigationSurface";
 import {
 	createPreviewService,
 	type DisposablePreviewService,
@@ -160,6 +161,7 @@ export function createPluginRuntime(options: PluginRuntimeOptions): PluginRuntim
 		sortService,
 		getSortContextVersion: options.getSortContextVersion,
 	});
+	const keyboardNavigationSurfaceRegistry = createKeyboardNavigationSurfaceRegistry();
 	const linkStatusService = createLinkStatusService(
 		indexingService,
 		options.getSettings,
@@ -206,6 +208,7 @@ export function createPluginRuntime(options: PluginRuntimeOptions): PluginRuntim
 			createDisplayDataBuilder: createPluginDisplayDataBuilder,
 			createLinkContext: linkContextFactory,
 			previewRuntime,
+			keyboardNavigationSurfaceRegistry,
 		},
 		options.updateContentSearch,
 	);
@@ -225,6 +228,7 @@ export function createPluginRuntime(options: PluginRuntimeOptions): PluginRuntim
 		createLinkContext: linkContextFactory,
 		previewRuntime,
 		allNotesCatalog,
+		keyboardNavigationSurfaceRegistry,
 	};
 	const domMutationObserver = new DOMMutationObserver(options.plugin, stylingService);
 	const indexUpdateQueue = new IndexUpdateQueue(options.plugin, indexingService);
@@ -250,7 +254,9 @@ export function createPluginRuntime(options: PluginRuntimeOptions): PluginRuntim
 	});
 	const scrollManager = new ScrollManager();
 	const emptyViewController = createEmptyViewController(options.app, options.plugin);
-	const keyboardCardNavigator = new KeyboardCardNavigator(options.app);
+	const keyboardCardNavigator = new KeyboardCardNavigator(
+		keyboardNavigationSurfaceRegistry,
+	);
 
 	const unsubscribeIndexDataUpdate = indexingService.onDataUpdate((context) => {
 		sortService.invalidateCache();
@@ -286,6 +292,7 @@ export function createPluginRuntime(options: PluginRuntimeOptions): PluginRuntim
 		domMutationObserver.destroy();
 		emptyViewController.destroy();
 		keyboardCardNavigator.deactivate();
+		keyboardNavigationSurfaceRegistry.clear();
 		renderedMdElementsRegistry.destroy();
 		getLazyLoadManager().cleanup();
 	}

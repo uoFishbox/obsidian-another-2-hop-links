@@ -7,6 +7,7 @@ import type { PreviewRuntime } from "card-preview/runtime/previewRuntime";
 import type { SvelteComponentInstance } from "obsidian-integration/views/svelteLifecycle";
 import TwoHopLinksPage from "./TwoHopLinksPage.svelte";
 import type { TwoHopLinksRootUiState } from "./twoHopLinksRootUiState";
+import type { KeyboardNavigationSurfaceRegistry } from "obsidian-integration/navigation/keyboardNavigationSurface";
 
 export interface MountTwoHopLinksRootViewOptions {
 	target: Element;
@@ -23,6 +24,7 @@ export interface MountTwoHopLinksRootViewOptions {
 		value: PluginSettings[K],
 	) => Promise<void>;
 	uiState?: TwoHopLinksRootUiState;
+	keyboardNavigationSurfaceRegistry: KeyboardNavigationSurfaceRegistry;
 }
 
 export interface MountedTwoHopLinksRootView {
@@ -46,6 +48,7 @@ export function mountTwoHopLinksRootView(
 		isSidebar = false,
 		updateSetting,
 		uiState,
+		keyboardNavigationSurfaceRegistry,
 	} = options;
 	applicationStore.uiState.setSettings(settings);
 
@@ -61,6 +64,7 @@ export function mountTwoHopLinksRootView(
 			isSidebar,
 			updateSetting,
 			uiState,
+			keyboardNavigationSurfaceRegistry,
 		},
 	}) as SvelteComponentInstance;
 

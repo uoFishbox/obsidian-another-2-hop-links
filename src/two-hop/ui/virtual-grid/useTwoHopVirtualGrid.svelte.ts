@@ -32,8 +32,10 @@ import {
 import { useVirtualizer } from "cards/virtualization/public";
 import type { VirtualMeasurement } from "cards/virtualization/public";
 import type { RowRange } from "cards/virtualization/public";
-import type { ResultNavigationDirection } from "cards/navigation/resultFocus";
-import type { VirtualSequentialNavigationDirection } from "cards/virtualization/public";
+import type {
+	NavigationDirection,
+	SequentialNavigationDirection,
+} from "cards/navigation/types";
 import type { ProgrammaticScrollSnapshot } from "cards/virtualization/public";
 import {
 	buildTwoHopPreviewBindings,
@@ -360,7 +362,7 @@ export function useTwoHopVirtualGrid(
 
 	function resolveNavigationTarget(
 		currentKey: string,
-		direction: ResultNavigationDirection,
+		direction: NavigationDirection,
 		currentPosition: { rowIndex: number; columnIndex: number },
 	) {
 		return (
@@ -374,7 +376,7 @@ export function useTwoHopVirtualGrid(
 
 	function resolveSequentialNavigationTarget(
 		currentKey: string,
-		direction: VirtualSequentialNavigationDirection,
+		direction: SequentialNavigationDirection,
 		currentPosition: { rowIndex: number; columnIndex: number },
 	) {
 		return (

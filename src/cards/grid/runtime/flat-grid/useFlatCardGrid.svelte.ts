@@ -1,6 +1,8 @@
 import { untrack, getContext, onDestroy, type Snippet } from "svelte";
-import type { ResultNavigationDirection } from "cards/navigation/resultFocus";
-import type { VirtualSequentialNavigationDirection } from "cards/virtualization/public";
+import type {
+	NavigationDirection,
+	SequentialNavigationDirection,
+} from "cards/navigation/types";
 import type { RowRange } from "cards/virtualization/public";
 import { getLazyLoadManager } from "obsidian-integration/observers/IntersectionObserverRegistry";
 import {
@@ -417,7 +419,7 @@ export function useFlatCardGrid<T>(
 
 	const resolveNavigationTarget = (
 		currentKey: string,
-		direction: ResultNavigationDirection,
+		direction: NavigationDirection,
 		currentPosition: {
 			rowIndex: number;
 			columnIndex: number;
@@ -428,7 +430,7 @@ export function useFlatCardGrid<T>(
 
 	const resolveSequentialNavigationTarget = (
 		currentKey: string,
-		direction: VirtualSequentialNavigationDirection,
+		direction: SequentialNavigationDirection,
 		currentPosition: { rowIndex: number; columnIndex: number },
 	) =>
 		rowModel.resolveSequentialNavigationTarget?.(

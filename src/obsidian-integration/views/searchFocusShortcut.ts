@@ -1,4 +1,4 @@
-import { SEARCH_INPUT_SELECTOR } from "cards/navigation/resultFocus";
+import { SEARCH_INPUT_SELECTOR } from "cards/navigation/resultTargets";
 import { querySelectorAllIncludingShadow } from "shared/ui/dom/shadowDom";
 import type { Scope } from "obsidian";
 

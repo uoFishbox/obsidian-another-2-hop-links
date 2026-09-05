@@ -4,13 +4,15 @@ import type { MutableStableScrollTopBand } from "cards/virtualization/public";
 import type { VirtualRowLayoutMetrics } from "cards/virtualization/public";
 import type { MutableRowRange, RowRange } from "cards/virtualization/public";
 import type {
-	VirtualNavigationDirection,
 	VirtualNavigationTarget,
-	VirtualSequentialNavigationDirection,
 	VirtualSequentialNavigationTarget,
 	VirtualRow,
 	VirtualRowModel,
 } from "cards/virtualization/public";
+import type {
+	NavigationDirection,
+	SequentialNavigationDirection,
+} from "cards/navigation/types";
 import {
 	createSectionedGridGeometry,
 	resolveVirtualRangesInto,
@@ -192,7 +194,7 @@ export function createTwoHopRowModel(
 
 	const resolveNavigationTarget = (
 		currentKey: string,
-		direction: VirtualNavigationDirection,
+		direction: NavigationDirection,
 		currentPosition: { rowIndex: number; columnIndex: number },
 	): VirtualNavigationTarget | null => {
 		const currentCell = getCell(
@@ -204,6 +206,7 @@ export function createTwoHopRowModel(
 			direction === "left" || direction === "right"
 				? resolveHorizontalNavigationTarget(
 						getCell,
+						rowCount,
 						columns,
 						currentPosition,
 						direction,
@@ -222,7 +225,7 @@ export function createTwoHopRowModel(
 
 	const resolveSequentialNavigationTarget = (
 		currentKey: string,
-		direction: VirtualSequentialNavigationDirection,
+		direction: SequentialNavigationDirection,
 		currentPosition: { rowIndex: number; columnIndex: number },
 	): VirtualSequentialNavigationTarget | null => {
 		const currentCell = getCell(
@@ -373,19 +376,55 @@ function isFocusableCell(cell: TwoHopVirtualCell): boolean {
 
 function resolveHorizontalNavigationTarget(
 	getCell: (rowIndex: number, columnIndex: number) => TwoHopVirtualCell | null,
+	rowCount: number,
 	columns: number,
 	currentPosition: { readonly rowIndex: number; readonly columnIndex: number },
 	direction: "left" | "right",
 ): TwoHopVirtualCell | null {
-	const step = direction === "left" ? -1 : 1;
+	if (direction === "left") {
+		for (
+			let columnIndex = currentPosition.columnIndex - 1;
+			columnIndex >= 0;
+			columnIndex -= 1
+		) {
+			const cell = getCell(currentPosition.rowIndex, columnIndex);
+			if (cell && isFocusableCell(cell)) return cell;
+		}
+
+		for (
+			let rowIndex = currentPosition.rowIndex - 1;
+			rowIndex >= 0;
+			rowIndex -= 1
+		) {
+			for (let columnIndex = columns - 1; columnIndex >= 0; columnIndex -= 1) {
+				const cell = getCell(rowIndex, columnIndex);
+				if (cell && isFocusableCell(cell)) return cell;
+			}
+		}
+
+		return null;
+	}
+
 	for (
-		let columnIndex = currentPosition.columnIndex + step;
-		columnIndex >= 0 && columnIndex < columns;
-		columnIndex += step
+		let columnIndex = currentPosition.columnIndex + 1;
+		columnIndex < columns;
+		columnIndex += 1
 	) {
 		const cell = getCell(currentPosition.rowIndex, columnIndex);
 		if (cell && isFocusableCell(cell)) return cell;
 	}
+
+	for (
+		let rowIndex = currentPosition.rowIndex + 1;
+		rowIndex < rowCount;
+		rowIndex += 1
+	) {
+		for (let columnIndex = 0; columnIndex < columns; columnIndex += 1) {
+			const cell = getCell(rowIndex, columnIndex);
+			if (cell && isFocusableCell(cell)) return cell;
+		}
+	}
+
 	return null;
 }
 

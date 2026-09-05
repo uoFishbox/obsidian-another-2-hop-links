@@ -151,6 +151,9 @@ function createController() {
 			createDisplayDataBuilder,
 			createLinkContext: linkContextFactory,
 			previewRuntime: {},
+			keyboardNavigationSurfaceRegistry: {
+				register: vi.fn(() => vi.fn()),
+			},
 		} as never,
 	);
 

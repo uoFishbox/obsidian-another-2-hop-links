@@ -2,7 +2,7 @@
 	import { Menu, setIcon, type IconName } from "obsidian";
 	import { onDestroy } from "svelte";
 	import { ARIA_LABELS } from "cards/ariaLabels";
-	import type { ResultFocusDirection } from "cards/navigation/resultFocus";
+	import type { VerticalNavigationDirection } from "cards/navigation/types";
 	import type { SortOption } from "cards/sorting";
 
 	interface SortField {
@@ -64,7 +64,7 @@
 		onSearchInput?: (value: string) => void;
 		onSearchSubmit?: (value: string) => void | Promise<void>;
 		onMoveFocusToResults?: (
-			direction: ResultFocusDirection,
+			direction: VerticalNavigationDirection,
 		) => void | Promise<void>;
 		contentSearchEnabled?: boolean;
 		onToggleContentSearch?: () => void;

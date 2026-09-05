@@ -7,10 +7,12 @@ import {
 	type InteractionDescriptorResolverProvider,
 } from "cards/interactions/interactionRegistry";
 import { useAppContext, useLinkContext } from "cards/context/linkContext";
-import type { ResultNavigationDirection } from "cards/navigation/resultFocus";
+import type {
+	NavigationDirection,
+	SequentialNavigationDirection,
+} from "cards/navigation/types";
 import type {
 	VirtualNavigationTarget,
-	VirtualSequentialNavigationDirection,
 	VirtualSequentialNavigationTarget,
 } from "cards/virtualization/public";
 import type { ProgrammaticScrollSnapshot } from "cards/virtualization/public";
@@ -31,7 +33,7 @@ export interface CardSurfaceInteractionParams {
 		| undefined;
 	resolveNavigationTarget?: (
 		currentKey: string,
-		direction: ResultNavigationDirection,
+		direction: NavigationDirection,
 		currentPosition: {
 			rowIndex: number;
 			columnIndex: number;
@@ -39,7 +41,7 @@ export interface CardSurfaceInteractionParams {
 	) => VirtualNavigationTarget | null;
 	resolveSequentialNavigationTarget?: (
 		currentKey: string,
-		direction: VirtualSequentialNavigationDirection,
+		direction: SequentialNavigationDirection,
 		currentPosition: {
 			rowIndex: number;
 			columnIndex: number;

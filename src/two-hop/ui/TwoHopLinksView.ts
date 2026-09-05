@@ -104,6 +104,8 @@ export class TwoHopLinksView extends ItemView {
 				linkContext,
 				previewRuntime: this.viewServices.previewRuntime,
 				lazyLoaderCache: this.lazyLoaderCache,
+				keyboardNavigationSurfaceRegistry:
+					this.viewServices.keyboardNavigationSurfaceRegistry,
 				isSidebar: true,
 				updateSetting: (key, value) => this.plugin.updateSetting(key, value),
 			}));

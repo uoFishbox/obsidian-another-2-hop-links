@@ -21,7 +21,7 @@ type FakeEditorView = {
 function createInlineSurface(): HTMLElement {
 	const root = document.createElement("div");
 	root.className = "cosense-card-links__root";
-	root.dataset.cclCardSurface = "inline";
+	root.dataset.cclCardSurface = "editor";
 
 	const input = document.createElement("input");
 	input.className = "twohop-search-input";

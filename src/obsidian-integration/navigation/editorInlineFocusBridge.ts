@@ -1,11 +1,11 @@
 import { Prec } from "@codemirror/state";
 import { keymap, type EditorView } from "@codemirror/view";
-import { SEARCH_INPUT_SELECTOR } from "cards/navigation/resultFocus";
+import { SEARCH_INPUT_SELECTOR } from "cards/navigation/resultTargets";
 import type { PluginHost } from "obsidian-integration/pluginHost";
 import { getOptionalOwnerWindow } from "shared/ui/dom/realmSafeDom";
 
 const INLINE_SURFACE_SELECTOR =
-	'.cosense-card-links__root[data-ccl-card-surface="inline"]';
+	'.cosense-card-links__root[data-ccl-card-surface="editor"]';
 
 type VisibleElement = HTMLElement & {
 	isConnected: boolean;

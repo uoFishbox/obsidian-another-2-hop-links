@@ -187,4 +187,33 @@ describe("flatLinkRowModel", () => {
 			columnIndex: 1,
 		});
 	});
+
+	it("wraps between rows with left and right navigation", () => {
+		const rowModel = createRowModel(6);
+		const item2 = rowModel.resolveCellAtIndex(2);
+		const item3 = rowModel.resolveCellAtIndex(3);
+		expect(item2).toBeTruthy();
+		expect(item3).toBeTruthy();
+		if (!item2 || !item3) return;
+
+		expect(
+			rowModel.resolveNavigationTarget?.(item2.key, "right", {
+				rowIndex: 0,
+				columnIndex: 2,
+			}),
+		).toEqual({
+			key: item3.key,
+			rowTop: 110,
+		});
+
+		expect(
+			rowModel.resolveNavigationTarget?.(item3.key, "left", {
+				rowIndex: 1,
+				columnIndex: 0,
+			}),
+		).toEqual({
+			key: item2.key,
+			rowTop: 0,
+		});
+	});
 });

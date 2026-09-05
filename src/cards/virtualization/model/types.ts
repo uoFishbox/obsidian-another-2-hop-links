@@ -1,3 +1,8 @@
+import type {
+	NavigationDirection,
+	SequentialNavigationDirection,
+} from "cards/navigation/types";
+
 export interface RowRange {
 	readonly start: number;
 	readonly end: number;
@@ -73,7 +78,7 @@ export interface VirtualRowModel<TCell> {
 
 	resolveNavigationTarget?: (
 		currentKey: string,
-		direction: VirtualNavigationDirection,
+		direction: NavigationDirection,
 		currentPosition: {
 			rowIndex: number;
 			columnIndex: number;
@@ -81,16 +86,13 @@ export interface VirtualRowModel<TCell> {
 	) => VirtualNavigationTarget | null;
 	resolveSequentialNavigationTarget?: (
 		currentKey: string,
-		direction: VirtualSequentialNavigationDirection,
+		direction: SequentialNavigationDirection,
 		currentPosition: {
 			rowIndex: number;
 			columnIndex: number;
 		},
 	) => VirtualSequentialNavigationTarget | null;
 }
-
-export type VirtualNavigationDirection = "up" | "down" | "left" | "right";
-export type VirtualSequentialNavigationDirection = "forward" | "backward";
 
 export interface VirtualNavigationTarget {
 	key: string;

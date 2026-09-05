@@ -38,4 +38,45 @@ export function scheduleAnimationFrame(
 	return () => globalThis.clearTimeout(timeoutId);
 }
 
+export interface ScheduledFrameTask {
+	cancel(): void;
+}
+
+/** Schedules a cancellable callback after the requested number of layout frames. */
+export function scheduleAfterAnimationFrames(
+	targetWindow: Window | null,
+	frameCount: number,
+	callback: () => void,
+): ScheduledFrameTask {
+	let remainingFrames = Math.max(1, Math.floor(frameCount));
+	let cancelFrame: (() => void) | null = null;
+	let canceled = false;
+
+	const scheduleNextFrame = (): void => {
+		cancelFrame = scheduleAnimationFrame(() => {
+			cancelFrame = null;
+			if (canceled) return;
+
+			remainingFrames -= 1;
+			if (remainingFrames > 0) {
+				scheduleNextFrame();
+				return;
+			}
+
+			callback();
+		}, targetWindow);
+	};
+
+	scheduleNextFrame();
+
+	return {
+		cancel(): void {
+			if (canceled) return;
+			canceled = true;
+			cancelFrame?.();
+			cancelFrame = null;
+		},
+	};
+}
+
 export const waitForNextAnimationFrame = nextAnimationFrame;

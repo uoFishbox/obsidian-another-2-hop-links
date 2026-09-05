@@ -1,34 +1,29 @@
-import { MarkdownView, type WorkspaceLeaf } from "obsidian";
-import { TWO_HOP_LINKS_VIEW_TYPE } from "two-hop/ui/TwoHopLinksView";
-import { VIEW_TYPE_PRE_CREATE } from "two-hop/pre-creation/PreCreationView";
-import { VIEW_TYPE_TAG_NOTES } from "search/tag-notes/TagNotesView";
-import { VIEW_TYPE_ALL_NOTES } from "search/all-notes/AllNotesView";
-import { CARD_SELECTOR, LOAD_MORE_SELECTOR } from "cards/navigation/resultFocus";
-import { querySelectorAllIncludingShadow } from "shared/ui/dom/shadowDom";
+import { CARD_SELECTOR, LOAD_MORE_SELECTOR } from "cards/navigation/resultTargets";
 import { isElementVisible } from "shared/ui/dom/domUtils";
-import { isHTMLElementLike } from "shared/ui/dom/realmSafeDom";
+import { querySelectorAllIncludingShadow } from "shared/ui/dom/shadowDom";
 
 export const KEYBOARD_ROW_TOP_TOLERANCE_PX = 8;
 
-const INLINE_SURFACE_SELECTOR =
-	'.cosense-card-links__root[data-ccl-card-surface="inline"]';
-const SIDEBAR_SURFACE_SELECTOR =
-	'.cosense-card-links__root[data-ccl-card-surface="sidebar"]';
-const EMPTY_SURFACE_SELECTOR = '[data-ccl-card-surface="empty"]';
 const ROW_ELEMENT_SELECTOR = `${CARD_SELECTOR}, ${LOAD_MORE_SELECTOR}`;
+const SURFACE_PLACEMENT_PRIORITY: Readonly<Record<string, number>> = {
+	editor: 3,
+	sidebar: 2,
+	workspace: 1,
+};
 
-export type CardSurfaceHost = "inline" | "sidebar" | "empty";
-
-export interface KeyboardNavigationTargetSurface {
-	rootEl: HTMLElement;
-	host: CardSurfaceHost;
+export interface KeyboardNavigationSurfaceRegistry {
+	/** Registers a mounted card surface and returns its idempotent cleanup function. */
+	register(rootEl: HTMLElement): () => void;
+	/** Returns the best mounted surface that currently contains navigable rows. */
+	findBestVisibleSurface(): HTMLElement | null;
+	/** Removes every registration owned by this registry. */
+	clear(): void;
 }
 
 export interface KeyboardNavigationRow {
 	top: number;
 	bottom: number;
 	elements: HTMLElement[];
-	cards: HTMLElement[];
 }
 
 interface VisibleRowEntry {
@@ -36,105 +31,62 @@ interface VisibleRowEntry {
 	top: number;
 	left: number;
 	bottom: number;
-	isHintTarget: boolean;
 }
 
-interface WorkspaceLike {
-	activeLeaf?: {
-		view?: unknown;
-	} | null;
-	getActiveViewOfType(type: new (...args: any[]) => unknown): unknown | null;
-	getLeavesOfType(type: string): Array<{
-		view?: {
-			contentEl?: HTMLElement;
-			containerEl?: HTMLElement;
+interface RegisteredSurface {
+	rootEl: HTMLElement;
+	order: number;
+}
+
+/** Creates a registry whose lifetime is owned by one plugin runtime. */
+export function createKeyboardNavigationSurfaceRegistry(): KeyboardNavigationSurfaceRegistry {
+	const registrations = new Map<symbol, RegisteredSurface>();
+	let nextOrder = 0;
+
+	function register(rootEl: HTMLElement): () => void {
+		const registrationId = Symbol("keyboard-navigation-surface");
+		registrations.set(registrationId, {
+			rootEl,
+			order: nextOrder++,
+		});
+
+		let isRegistered = true;
+		return () => {
+			if (!isRegistered) return;
+			isRegistered = false;
+			registrations.delete(registrationId);
 		};
-	}>;
-	iterateAllLeaves(callback: (leaf: WorkspaceLeaf) => void): void;
-}
-
-export interface KeyboardNavigationApp {
-	workspace: WorkspaceLike;
-}
-
-/** Resolves the first visible card surface that can accept keyboard navigation. */
-export function resolveKeyboardNavigationTargetSurface(
-	app: KeyboardNavigationApp,
-): KeyboardNavigationTargetSurface | null {
-	const candidates: KeyboardNavigationTargetSurface[] = [];
-
-	const activeMarkdownView = app.workspace.getActiveViewOfType(
-		MarkdownView,
-	) as MarkdownView | null;
-
-	if (isHTMLElementLike(activeMarkdownView?.containerEl)) {
-		const inlineSurface = findVisibleSurfaceRoot(
-			activeMarkdownView.containerEl,
-			"inline",
-		);
-		if (inlineSurface) {
-			candidates.push({
-				rootEl: inlineSurface,
-				host: "inline",
-			});
-		}
 	}
 
-	for (const leaf of app.workspace.getLeavesOfType(TWO_HOP_LINKS_VIEW_TYPE)) {
-		const container = isHTMLElementLike(leaf.view?.contentEl)
-			? leaf.view.contentEl
-			: leaf.view?.containerEl;
-		if (!isHTMLElementLike(container)) continue;
+	function findBestVisibleSurface(): HTMLElement | null {
+		const candidates = Array.from(registrations.values()).filter(({ rootEl }) => {
+			return (
+				rootEl.isConnected &&
+				isElementVisible(rootEl) &&
+				collectVisibleKeyboardNavigationRows(rootEl).length > 0
+			);
+		});
 
-		const sidebarSurface = findVisibleSurfaceRoot(container, "sidebar");
-		if (sidebarSurface) {
-			candidates.push({
-				rootEl: sidebarSurface,
-				host: "sidebar",
-			});
-		}
+		candidates.sort((left, right) => {
+			const preferredDifference =
+				Number(isPreferred(right.rootEl)) - Number(isPreferred(left.rootEl));
+			if (preferredDifference !== 0) return preferredDifference;
+
+			const placementDifference =
+				getPlacementPriority(right.rootEl) - getPlacementPriority(left.rootEl);
+			if (placementDifference !== 0) return placementDifference;
+
+			return right.order - left.order;
+		});
+
+		return candidates[0]?.rootEl ?? null;
 	}
 
-	app.workspace.iterateAllLeaves((leaf) => {
-		const view = leaf.view as {
-			getViewType?: () => string;
-			contentEl?: HTMLElement;
-			containerEl?: HTMLElement;
-		} | null;
-		const viewType = view?.getViewType?.();
-		if (
-			viewType !== "empty" &&
-			viewType !== VIEW_TYPE_ALL_NOTES &&
-			viewType !== VIEW_TYPE_PRE_CREATE &&
-			viewType !== VIEW_TYPE_TAG_NOTES
-		) {
-			return;
-		}
-
-		const container = isHTMLElementLike(view?.contentEl)
-			? view.contentEl
-			: view?.containerEl;
-		if (!isHTMLElementLike(container)) return;
-
-		const host: CardSurfaceHost =
-			viewType === "empty" || viewType === VIEW_TYPE_ALL_NOTES
-				? "empty"
-				: "inline";
-		const emptySurface = findVisibleSurfaceRoot(container, host);
-		if (emptySurface) {
-			candidates.push({
-				rootEl: emptySurface,
-				host,
-			});
-		}
-	});
-
-	return (
-		candidates.find(
-			(candidate) =>
-				collectVisibleKeyboardNavigationRows(candidate.rootEl).length > 0,
-		) ?? null
-	);
+	return {
+		register,
+		findBestVisibleSurface,
+		clear: () => registrations.clear(),
+	};
 }
 
 /** Collects visible card/load-more rows from a surface, including shadow roots. */
@@ -157,7 +109,6 @@ export function collectVisibleKeyboardNavigationRows(
 			top: rect.top,
 			left: rect.left,
 			bottom: rect.bottom,
-			isHintTarget: element.matches(CARD_SELECTOR),
 		});
 	}
 	rowElements.sort((left, right) => {
@@ -175,7 +126,6 @@ export function collectVisibleKeyboardNavigationRows(
 			Math.abs(lastRow.top - entry.top) <= KEYBOARD_ROW_TOP_TOLERANCE_PX
 		) {
 			lastRow.elements.push(entry.element);
-			if (entry.isHintTarget) lastRow.cards.push(entry.element);
 			lastRow.top = Math.min(lastRow.top, entry.top);
 			lastRow.bottom = Math.max(lastRow.bottom, entry.bottom);
 			continue;
@@ -185,36 +135,16 @@ export function collectVisibleKeyboardNavigationRows(
 			top: entry.top,
 			bottom: entry.bottom,
 			elements: [entry.element],
-			cards: entry.isHintTarget ? [entry.element] : [],
 		});
 	}
 
 	return rows.sort((left, right) => left.top - right.top);
 }
 
-function findVisibleSurfaceRoot(
-	containerEl: HTMLElement,
-	host: CardSurfaceHost,
-): HTMLElement | null {
-	const selectors =
-		host === "inline"
-			? [
-					INLINE_SURFACE_SELECTOR,
-					'.cosense-card-links__temp-view[data-ccl-card-surface="inline"]',
-				]
-			: host === "sidebar"
-				? [SIDEBAR_SURFACE_SELECTOR]
-				: [EMPTY_SURFACE_SELECTOR];
+function isPreferred(rootEl: HTMLElement): boolean {
+	return rootEl.closest(".workspace-leaf.mod-active") !== null;
+}
 
-	for (const selector of selectors) {
-		const surfaces = Array.from(
-			containerEl.querySelectorAll<HTMLElement>(selector),
-		);
-
-		for (const surface of surfaces) {
-			if (isElementVisible(surface)) return surface;
-		}
-	}
-
-	return null;
+function getPlacementPriority(rootEl: HTMLElement): number {
+	return SURFACE_PLACEMENT_PRIORITY[rootEl.dataset.cclCardSurface ?? ""] ?? 0;
 }

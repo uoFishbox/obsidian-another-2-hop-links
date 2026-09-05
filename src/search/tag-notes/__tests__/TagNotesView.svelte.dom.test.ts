@@ -227,7 +227,12 @@ function createPlugin(): any {
 }
 
 function createViewServices(): any {
-	return { previewRuntime: {} };
+	return {
+		previewRuntime: {},
+		keyboardNavigationSurfaceRegistry: {
+			register: vi.fn(() => vi.fn()),
+		},
+	};
 }
 
 function createTaggedNote(

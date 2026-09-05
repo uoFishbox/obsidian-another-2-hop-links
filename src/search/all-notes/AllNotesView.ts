@@ -130,6 +130,8 @@ export class AllNotesView extends ItemView {
 				applicationStore: cardCollectionState,
 				previewRuntime: this.viewServices.previewRuntime,
 				allNotesCatalog: this.viewServices.allNotesCatalog,
+				keyboardNavigationSurfaceRegistry:
+					this.viewServices.keyboardNavigationSurfaceRegistry,
 				uiState: this.listUiState,
 			},
 		}) as SvelteComponentInstance;

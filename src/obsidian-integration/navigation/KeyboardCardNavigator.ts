@@ -1,5 +1,8 @@
 import { Notice } from "obsidian";
-import { LOAD_MORE_SELECTOR } from "cards/navigation/resultFocus";
+import {
+	getResultTargetIdentity,
+	LOAD_MORE_SELECTOR,
+} from "cards/navigation/resultTargets";
 import { querySelectorAllIncludingShadow } from "shared/ui/dom/shadowDom";
 import { isElementVisible } from "shared/ui/dom/domUtils";
 import {
@@ -8,13 +11,14 @@ import {
 	isHTMLElementLike,
 } from "shared/ui/dom/realmSafeDom";
 import {
+	scheduleAfterAnimationFrames,
+	type ScheduledFrameTask,
+} from "shared/ui/scheduling/frame";
+import {
 	collectVisibleKeyboardNavigationRows,
 	KEYBOARD_ROW_TOP_TOLERANCE_PX,
-	resolveKeyboardNavigationTargetSurface,
-	type CardSurfaceHost,
-	type KeyboardNavigationApp,
+	type KeyboardNavigationSurfaceRegistry,
 	type KeyboardNavigationRow,
-	type KeyboardNavigationTargetSurface,
 } from "./keyboardNavigationSurface";
 import {
 	centerKeyboardNavigationRow,
@@ -25,15 +29,16 @@ import {
 } from "./keyboardNavigationScroll";
 
 export type {
-	CardSurfaceHost,
-	KeyboardNavigationApp,
+	KeyboardNavigationSurfaceRegistry,
 	KeyboardNavigationRow,
-	KeyboardNavigationTargetSurface,
 } from "./keyboardNavigationSurface";
 
 const SHORT_HINT_KEYS = ["d", "f", "j", "k"] as const;
 const LONG_HINT_KEYS = ["a", "s", "d", "f", "j", "k", "l", ";"] as const;
 const HANDLED_HINT_KEYS = new Set<string>(LONG_HINT_KEYS);
+
+// Global keyboard mode owns its shortcuts before CardGrid's local keydown policy.
+const GLOBAL_KEYBOARD_MODE_CAPTURE = true;
 
 type WindowWithEventConstructor = Window & {
 	Event: typeof Event;
@@ -41,18 +46,17 @@ type WindowWithEventConstructor = Window & {
 
 export class KeyboardCardNavigator {
 	private rootEl: HTMLElement | null = null;
-	private host: CardSurfaceHost | null = null;
 	private rows: KeyboardNavigationRow[] = [];
 	private selectedRowIndex = -1;
-	private scrollFrameId: number | null = null;
-	private scrollFrameWindow: Window | null = null;
+	private selectedItemIds = new Set<string>();
+	private pendingLayoutTask: ScheduledFrameTask | null = null;
 	private keydownDocument: Document | null = null;
 	private unregisterWindowMigration: (() => void) | null = null;
 	private cachedScrollContainer: HTMLElement | null = null;
 	private readonly handleDocumentKeydownBound = this.handleDocumentKeydown.bind(this);
 
 	constructor(
-		private readonly app: KeyboardNavigationApp,
+		private readonly surfaceRegistry: KeyboardNavigationSurfaceRegistry,
 		private readonly notify: (message: string) => void = (message) =>
 			new Notice(message),
 	) {}
@@ -63,32 +67,26 @@ export class KeyboardCardNavigator {
 			return;
 		}
 
-		const targetSurface = this.resolveTargetSurface();
+		const targetSurface = this.surfaceRegistry.findBestVisibleSurface();
 		if (!targetSurface) {
 			this.notify("No visible card surface found.");
 			return;
 		}
 
-		this.activate(targetSurface.rootEl, targetSurface.host);
+		this.activate(targetSurface);
 	}
 
-	public activate(rootEl: HTMLElement, host: CardSurfaceHost): void {
+	public activate(rootEl: HTMLElement): void {
 		this.deactivate();
 
 		this.rootEl = rootEl;
-		this.host = host;
 		this.rootEl.classList.add("ccl-kb-nav-active");
-		this.rootEl.dataset.cclKbNavHost = host;
 
 		this.bindKeydownDocument();
 		if (typeof this.rootEl.onWindowMigrated === "function") {
 			this.unregisterWindowMigration = this.rootEl.onWindowMigrated(() => {
 				this.bindKeydownDocument();
-				if (this.scrollFrameId !== null) {
-					this.scrollFrameWindow?.cancelAnimationFrame(this.scrollFrameId);
-					this.scrollFrameId = null;
-					this.scrollFrameWindow = null;
-				}
+				this.cancelPendingLayoutTask();
 				this.cachedScrollContainer = null;
 				this.refreshRows(false);
 			});
@@ -107,23 +105,18 @@ export class KeyboardCardNavigator {
 		this.unregisterWindowMigration = null;
 		this.unbindKeydownDocument();
 
-		if (this.scrollFrameId !== null) {
-			this.scrollFrameWindow?.cancelAnimationFrame(this.scrollFrameId);
-			this.scrollFrameId = null;
-		}
-		this.scrollFrameWindow = null;
+		this.cancelPendingLayoutTask();
 
 		this.clearSelectionState();
 
 		if (this.rootEl) {
 			this.rootEl.classList.remove("ccl-kb-nav-active");
-			delete this.rootEl.dataset.cclKbNavHost;
 		}
 
 		this.rootEl = null;
-		this.host = null;
 		this.rows = [];
 		this.selectedRowIndex = -1;
+		this.selectedItemIds.clear();
 		this.cachedScrollContainer = null;
 	}
 
@@ -131,7 +124,7 @@ export class KeyboardCardNavigator {
 		this.keydownDocument?.removeEventListener(
 			"keydown",
 			this.handleDocumentKeydownBound,
-			true,
+			GLOBAL_KEYBOARD_MODE_CAPTURE,
 		);
 		this.keydownDocument = null;
 	}
@@ -144,16 +137,8 @@ export class KeyboardCardNavigator {
 		this.keydownDocument?.addEventListener(
 			"keydown",
 			this.handleDocumentKeydownBound,
-			true,
+			GLOBAL_KEYBOARD_MODE_CAPTURE,
 		);
-	}
-
-	public resolveTargetSurface(): KeyboardNavigationTargetSurface | null {
-		return resolveKeyboardNavigationTargetSurface(this.app);
-	}
-
-	public collectVisibleRows(rootEl: HTMLElement): KeyboardNavigationRow[] {
-		return collectVisibleKeyboardNavigationRows(rootEl);
 	}
 
 	public moveRow(delta: -1 | 1): void {
@@ -222,22 +207,16 @@ export class KeyboardCardNavigator {
 			return;
 		}
 
-		if (event.ctrlKey || event.metaKey || event.altKey) {
-			return;
-		}
-
-		if (this.isEditableTarget(event.target)) {
-			return;
-		}
+		if (event.ctrlKey || event.metaKey || event.altKey) return;
+		if (this.isEditableTarget(event.target)) return;
 
 		const key = event.key.toLowerCase();
-		const isHandledKey =
-			key === "arrowup" ||
-			key === "arrowdown" ||
-			key === "escape" ||
-			HANDLED_HINT_KEYS.has(key);
-
-		if (!isHandledKey) {
+		if (
+			key !== "arrowup" &&
+			key !== "arrowdown" &&
+			key !== "escape" &&
+			!HANDLED_HINT_KEYS.has(key)
+		) {
 			return;
 		}
 
@@ -245,22 +224,10 @@ export class KeyboardCardNavigator {
 		event.stopPropagation();
 		event.stopImmediatePropagation?.();
 
-		if (key === "escape") {
-			this.deactivate();
-			return;
-		}
-
-		if (key === "arrowup") {
-			this.moveRow(-1);
-			return;
-		}
-
-		if (key === "arrowdown") {
-			this.moveRow(1);
-			return;
-		}
-
-		this.activateCardByHint(key);
+		if (key === "arrowup") this.moveRow(-1);
+		else if (key === "arrowdown") this.moveRow(1);
+		else if (key === "escape") this.deactivate();
+		else this.activateCardByHint(key);
 	}
 
 	private refreshRows(preserveSelection: boolean): boolean {
@@ -268,14 +235,15 @@ export class KeyboardCardNavigator {
 			return false;
 		}
 
-		const previousSelectedElements =
+		const previousSelectedItemIds =
 			preserveSelection && this.selectedRowIndex >= 0
-				? new Set(this.rows[this.selectedRowIndex]?.elements ?? [])
-				: new Set<HTMLElement>();
+				? new Set(this.selectedItemIds)
+				: new Set<string>();
 
-		this.rows = this.collectVisibleRows(this.rootEl);
+		this.rows = collectVisibleKeyboardNavigationRows(this.rootEl);
 		if (this.rows.length === 0) {
 			this.selectedRowIndex = -1;
+			this.selectedItemIds.clear();
 			this.clearSelectionState();
 			return false;
 		}
@@ -285,7 +253,7 @@ export class KeyboardCardNavigator {
 			return true;
 		}
 
-		if (previousSelectedElements.size === 0) {
+		if (previousSelectedItemIds.size === 0) {
 			const fallbackIndex =
 				this.selectedRowIndex >= 0
 					? Math.min(this.selectedRowIndex, this.rows.length - 1)
@@ -295,7 +263,10 @@ export class KeyboardCardNavigator {
 		}
 
 		const preservedIndex = this.rows.findIndex((row) =>
-			row.elements.some((element) => previousSelectedElements.has(element)),
+			row.elements.some((element) => {
+				const itemId = getResultTargetIdentity(element);
+				return itemId !== null && previousSelectedItemIds.has(itemId);
+			}),
 		);
 		const nextIndex =
 			preservedIndex >= 0
@@ -305,9 +276,19 @@ export class KeyboardCardNavigator {
 		return true;
 	}
 
+	private collectRowItemIds(row: KeyboardNavigationRow | undefined): Set<string> {
+		const itemIds = new Set<string>();
+		for (const element of row?.elements ?? []) {
+			const itemId = getResultTargetIdentity(element);
+			if (itemId !== null) itemIds.add(itemId);
+		}
+		return itemIds;
+	}
+
 	private selectRow(index: number): void {
 		if (!this.rootEl || this.rows.length === 0) {
 			this.selectedRowIndex = -1;
+			this.selectedItemIds.clear();
 			return;
 		}
 
@@ -316,6 +297,7 @@ export class KeyboardCardNavigator {
 		this.clearSelectionState();
 
 		const row = this.rows[clampedIndex];
+		this.selectedItemIds = this.collectRowItemIds(row);
 		this.centerRow(row);
 		for (const element of row.elements) {
 			element.dataset.cclKbRowSelected = "1";
@@ -348,11 +330,7 @@ export class KeyboardCardNavigator {
 			return;
 		}
 
-		if (this.scrollFrameId !== null) {
-			this.scrollFrameWindow?.cancelAnimationFrame(this.scrollFrameId);
-			this.scrollFrameId = null;
-			this.scrollFrameWindow = null;
-		}
+		this.cancelPendingLayoutTask();
 
 		const currentRow = this.rows[this.selectedRowIndex];
 		if (!currentRow) {
@@ -364,7 +342,11 @@ export class KeyboardCardNavigator {
 			return;
 		}
 
-		const scrollStep = this.estimateScrollStep(delta);
+		const scrollStep = estimateKeyboardNavigationScrollStep(
+			this.rows,
+			this.selectedRowIndex,
+			delta,
+		);
 		const anchorTop = currentRow.top;
 		scrollKeyboardNavigationContainerBy(
 			scrollContainer,
@@ -377,43 +359,37 @@ export class KeyboardCardNavigator {
 			return;
 		}
 
-		this.scrollFrameWindow = ownerWindow;
-		this.scrollFrameId = ownerWindow.requestAnimationFrame(() => {
-			this.scrollFrameId = ownerWindow.requestAnimationFrame(() => {
-				this.scrollFrameId = null;
-				this.scrollFrameWindow = null;
+		this.pendingLayoutTask = scheduleAfterAnimationFrames(ownerWindow, 2, () => {
+			this.pendingLayoutTask = null;
 
-				if (!this.rootEl) {
-					return;
-				}
+			if (!this.rootEl) {
+				return;
+			}
 
-				this.rows = this.collectVisibleRows(this.rootEl);
-				if (this.rows.length === 0) {
-					this.deactivate();
-					return;
-				}
+			this.rows = collectVisibleKeyboardNavigationRows(this.rootEl);
+			if (this.rows.length === 0) {
+				this.deactivate();
+				return;
+			}
 
-				const nextIndex =
-					delta > 0
-						? this.rows.findIndex(
-								(row) =>
-									row.top >
-									anchorTop + KEYBOARD_ROW_TOP_TOLERANCE_PX / 2,
-							)
-						: this.findLastIndex(
-								this.rows,
-								(row) =>
-									row.top <
-									anchorTop - KEYBOARD_ROW_TOP_TOLERANCE_PX / 2,
-							);
+			const nextIndex =
+				delta > 0
+					? this.rows.findIndex(
+							(row) =>
+								row.top > anchorTop + KEYBOARD_ROW_TOP_TOLERANCE_PX / 2,
+						)
+					: this.findLastIndex(
+							this.rows,
+							(row) =>
+								row.top < anchorTop - KEYBOARD_ROW_TOP_TOLERANCE_PX / 2,
+						);
 
-				if (nextIndex >= 0) {
-					this.selectRow(nextIndex);
-					return;
-				}
+			if (nextIndex >= 0) {
+				this.selectRow(nextIndex);
+				return;
+			}
 
-				this.selectRow(delta > 0 ? this.rows.length - 1 : 0);
-			});
+			this.selectRow(delta > 0 ? this.rows.length - 1 : 0);
 		});
 	}
 
@@ -435,11 +411,7 @@ export class KeyboardCardNavigator {
 		loadMoreButton: HTMLButtonElement,
 		rowIndex: number,
 	): void {
-		if (this.scrollFrameId !== null) {
-			this.scrollFrameWindow?.cancelAnimationFrame(this.scrollFrameId);
-			this.scrollFrameId = null;
-		}
-		this.scrollFrameWindow = null;
+		this.cancelPendingLayoutTask();
 
 		loadMoreButton.click();
 
@@ -448,16 +420,14 @@ export class KeyboardCardNavigator {
 			return;
 		}
 
-		this.scrollFrameWindow = ownerWindow;
-		this.scrollFrameId = ownerWindow.requestAnimationFrame(() => {
-			this.scrollFrameId = null;
-			this.scrollFrameWindow = null;
+		this.pendingLayoutTask = scheduleAfterAnimationFrames(ownerWindow, 1, () => {
+			this.pendingLayoutTask = null;
 
 			if (!this.rootEl) {
 				return;
 			}
 
-			this.rows = this.collectVisibleRows(this.rootEl);
+			this.rows = collectVisibleKeyboardNavigationRows(this.rootEl);
 			if (this.rows.length === 0) {
 				this.deactivate();
 				return;
@@ -467,18 +437,15 @@ export class KeyboardCardNavigator {
 		});
 	}
 
-	private estimateScrollStep(delta: -1 | 1): number {
-		return estimateKeyboardNavigationScrollStep(
-			this.rows,
-			this.selectedRowIndex,
-			delta,
-		);
+	private cancelPendingLayoutTask(): void {
+		this.pendingLayoutTask?.cancel();
+		this.pendingLayoutTask = null;
 	}
 
-	private getHintKeysForRow(cardCount: number): string[] {
+	private getHintKeysForRow(targetCount: number): string[] {
 		const keys =
-			cardCount <= SHORT_HINT_KEYS.length ? SHORT_HINT_KEYS : LONG_HINT_KEYS;
-		return keys.slice(0, cardCount);
+			targetCount <= SHORT_HINT_KEYS.length ? SHORT_HINT_KEYS : LONG_HINT_KEYS;
+		return keys.slice(0, targetCount);
 	}
 
 	private isLoadMoreButton(element: HTMLElement): element is HTMLButtonElement {

@@ -23,6 +23,7 @@ import type { TwoHopLinksRootUiState } from "two-hop/ui/twoHopLinksRootUiState";
 import type { SvelteComponentInstance } from "obsidian-integration/views/svelteLifecycle";
 import { createInlineSurfaceLayoutController } from "shared/ui/dom/inlineSurfaceLayoutController";
 import { TwoHopStatePool } from "./TwoHopStatePool";
+import type { KeyboardNavigationSurfaceRegistry } from "obsidian-integration/navigation/keyboardNavigationSurface";
 
 export { RECENT_TWO_HOP_STATE_LIMIT } from "./TwoHopStatePool";
 
@@ -47,6 +48,7 @@ export interface ComponentControllerViewDeps {
 	createDisplayDataBuilder(): DisplayDataBuilder;
 	createLinkContext(file: TFile, settings: PluginSettings): LinkContext;
 	readonly previewRuntime: PreviewRuntime;
+	readonly keyboardNavigationSurfaceRegistry: KeyboardNavigationSurfaceRegistry;
 }
 
 export interface IComponentManager {
@@ -302,6 +304,8 @@ export class ComponentController implements IComponentManager {
 				applicationStore,
 				linkContext,
 				previewRuntime: this.viewDeps.previewRuntime,
+				keyboardNavigationSurfaceRegistry:
+					this.viewDeps.keyboardNavigationSurfaceRegistry,
 				lazyLoaderCache,
 				updateSetting: (key, value) => this.plugin.updateSetting(key, value),
 				uiState: this.getInlineUiState(view, file.path),

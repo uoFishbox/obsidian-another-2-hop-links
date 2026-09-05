@@ -9,11 +9,11 @@ import {
 	type RowRange,
 	type MutableStableScrollTopBand,
 	type VirtualNavigationTarget,
-	type VirtualSequentialNavigationDirection,
 	type VirtualSequentialNavigationTarget,
 	type VirtualRow,
 	type VirtualRowModel,
 } from "cards/virtualization/public";
+import type { SequentialNavigationDirection } from "cards/navigation/types";
 import { resolveFlatVirtualNavigationTarget } from "./navigation";
 
 export interface CreateFlatGridRowModelParams<T> {
@@ -202,7 +202,7 @@ export function createFlatGridRowModel<T>(
 		},
 		resolveSequentialNavigationTarget(
 			currentKey: string,
-			direction: VirtualSequentialNavigationDirection,
+			direction: SequentialNavigationDirection,
 			currentPosition: { rowIndex: number; columnIndex: number },
 		): VirtualSequentialNavigationTarget | null {
 			const currentIndex = getCellIndex(

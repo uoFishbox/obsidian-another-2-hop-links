@@ -1,16 +1,16 @@
 import type { FlatGridLogicalCell } from "./logicalCell";
 import type {
-	VirtualNavigationDirection,
 	VirtualNavigationTarget,
 	VirtualRowModel,
 } from "cards/virtualization/public";
+import type { NavigationDirection } from "cards/navigation/types";
 
 export function resolveFlatVirtualNavigationTarget<T>(params: {
 	rowModel: VirtualRowModel<FlatGridLogicalCell<T>>;
 	cellCount: number;
 	resolveCellAtIndex(index: number): FlatGridLogicalCell<T> | null;
 	currentKey: string;
-	direction: VirtualNavigationDirection;
+	direction: NavigationDirection;
 	currentPosition: {
 		rowIndex: number;
 		columnIndex: number;
@@ -24,7 +24,6 @@ export function resolveFlatVirtualNavigationTarget<T>(params: {
 		return null;
 	}
 
-	const currentRow = params.currentPosition.rowIndex;
 	let targetIndex: number | null = null;
 
 	switch (params.direction) {
@@ -37,17 +36,14 @@ export function resolveFlatVirtualNavigationTarget<T>(params: {
 					? currentIndex + columns
 					: null;
 			break;
-		case "left":
-			targetIndex =
-				params.currentPosition.columnIndex > 0 ? currentIndex - 1 : null;
+		case "left": {
+			const prevIndex = currentIndex - 1;
+			targetIndex = prevIndex >= 0 ? prevIndex : null;
 			break;
+		}
 		case "right": {
 			const nextIndex = currentIndex + 1;
-			targetIndex =
-				nextIndex < params.cellCount &&
-				Math.floor(nextIndex / columns) === currentRow
-					? nextIndex
-					: null;
+			targetIndex = nextIndex < params.cellCount ? nextIndex : null;
 			break;
 		}
 	}

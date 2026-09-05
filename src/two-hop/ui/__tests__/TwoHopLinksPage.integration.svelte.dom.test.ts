@@ -8,6 +8,7 @@ import type { TagGroup, TwoHopLinkBranch, TwoHopLinkResult } from "two-hop/model
 import type { TaggedNote, IndexedLink } from "indexing/model";
 import type { DisplayData } from "two-hop/display/displayDataBuilder";
 import TwoHopLinksPage from "../TwoHopLinksPage.svelte";
+import { createKeyboardNavigationSurfaceRegistry } from "obsidian-integration/navigation/keyboardNavigationSurface";
 import {
 	installAnimationFrameMock,
 	installIntersectionObserverMock,
@@ -253,6 +254,7 @@ function createRootProps(
 		previewRuntime,
 		lazyLoaderCache: new Set<string>(),
 		isSidebar: false,
+		keyboardNavigationSurfaceRegistry: createKeyboardNavigationSurfaceRegistry(),
 	} as unknown as ComponentProps<typeof TwoHopLinksPage>;
 }
 
@@ -359,6 +361,12 @@ describe("TwoHopLinksPage behavior", () => {
 
 		await showEntireVirtualSurface();
 
+		const resultsContainer = document.querySelector(
+			".cosense-card-links__search-result-container",
+		);
+		expect(
+			resultsContainer?.querySelectorAll(":scope > .cosense-card-links__section"),
+		).toHaveLength(1);
 		expect(queryCard("outgoing-parent")).toBeInTheDocument();
 		expect(queryCard("backlink-note")).toBeInTheDocument();
 		expect(queryCard("tagged-note")).toBeInTheDocument();

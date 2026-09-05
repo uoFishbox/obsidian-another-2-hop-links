@@ -230,4 +230,88 @@ describe("TwoHopRowModel", () => {
 			...firstItemPosition,
 		});
 	});
+	it("wraps to the left column of the next row when navigating right past the last column", () => {
+		const section = createSection("section", 4);
+		const model = createModel([section]);
+		const item0Position = model.resolveCellPosition("item:section:section-0");
+		const item1Position = model.resolveCellPosition("item:section:section-1");
+		const item2Position = model.resolveCellPosition("item:section:section-2");
+		const item3Position = model.resolveCellPosition("item:section:section-3");
+		expect(item0Position).toEqual({ rowIndex: 0, columnIndex: 1 });
+		expect(item1Position).toEqual({ rowIndex: 1, columnIndex: 0 });
+		expect(item2Position).toEqual({ rowIndex: 1, columnIndex: 1 });
+		expect(item3Position).toEqual({ rowIndex: 2, columnIndex: 0 });
+
+		expect(
+			model.resolveNavigationTarget?.(
+				"item:section:section-0",
+				"right",
+				item0Position!,
+			),
+		).toEqual({
+			key: "item:section:section-1",
+			rowTop: model.getRow(1)?.top,
+		});
+
+		expect(
+			model.resolveNavigationTarget?.(
+				"item:section:section-2",
+				"right",
+				item2Position!,
+			),
+		).toEqual({
+			key: "item:section:section-3",
+			rowTop: model.getRow(2)?.top,
+		});
+
+		expect(
+			model.resolveNavigationTarget?.(
+				"item:section:section-3",
+				"right",
+				item3Position!,
+			),
+		).toBeNull();
+	});
+	it("wraps to the right column of the previous row when navigating left past the first column", () => {
+		const section = createSection("section", 4);
+		const model = createModel([section]);
+		const item0Position = model.resolveCellPosition("item:section:section-0");
+		const item1Position = model.resolveCellPosition("item:section:section-1");
+		const item2Position = model.resolveCellPosition("item:section:section-2");
+		const item3Position = model.resolveCellPosition("item:section:section-3");
+		expect(item0Position).toEqual({ rowIndex: 0, columnIndex: 1 });
+		expect(item1Position).toEqual({ rowIndex: 1, columnIndex: 0 });
+		expect(item2Position).toEqual({ rowIndex: 1, columnIndex: 1 });
+		expect(item3Position).toEqual({ rowIndex: 2, columnIndex: 0 });
+
+		expect(
+			model.resolveNavigationTarget?.(
+				"item:section:section-3",
+				"left",
+				item3Position!,
+			),
+		).toEqual({
+			key: "item:section:section-2",
+			rowTop: model.getRow(1)?.top,
+		});
+
+		expect(
+			model.resolveNavigationTarget?.(
+				"item:section:section-1",
+				"left",
+				item1Position!,
+			),
+		).toEqual({
+			key: "item:section:section-0",
+			rowTop: model.getRow(0)?.top,
+		});
+
+		expect(
+			model.resolveNavigationTarget?.(
+				"item:section:section-0",
+				"left",
+				item0Position!,
+			),
+		).toBeNull();
+	});
 });
