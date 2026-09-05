@@ -102,6 +102,7 @@ export function useTwoHopVirtualGrid(
 	let previewVisibleRange: Readonly<RowRange> = EMPTY_RANGE;
 	let previewPrefetchRange: Readonly<RowRange> = EMPTY_RANGE;
 	let interactionBindingRevision = $state(0);
+	let lastInteractionMountedBuild: MountedTwoHopBuild | null | undefined;
 	const previewPrefetchRangeTracker = createPreviewPrefetchRangeTracker();
 	const interactionController = createVirtualCardInteractionController();
 
@@ -129,7 +130,7 @@ export function useTwoHopVirtualGrid(
 		getRevision: () => untrack(() => props.cardModelRevision),
 		resolveCardModel: props.resolveItemCardModel,
 		isPreviewActive: isPreviewSurfaceActive,
-		onModelsChanged: syncMountedInteractions,
+		onModelsChanged: syncHydratedInteractions,
 		onPreviewModelsChanged: publishPreviewSnapshot,
 	});
 
@@ -157,9 +158,7 @@ export function useTwoHopVirtualGrid(
 				rowSlotAllocator,
 			}),
 		onSnapshotUpdated: (snapshot) => {
-			syncMountedInteractions(
-				snapshot.mountedBuild?.rowsInMountedRange ?? EMPTY_MOUNTED_ROWS,
-			);
+			syncMountedInteractions(snapshot.mountedBuild);
 			scheduleAnchorRestoration();
 			scheduleRangeEffects();
 		},
@@ -179,13 +178,23 @@ export function useTwoHopVirtualGrid(
 	}
 
 	function syncMountedInteractions(
-		rows: readonly MountedTwoHopRow[] = getMountedRows(),
+		mountedBuild: MountedTwoHopBuild | null,
+		force = false,
 	): void {
 		if (disposed) return;
-		interactionController.syncCards(
-			buildTwoHopInteractionBindings(rows, cardHydrator.getModel),
+		if (!force && mountedBuild === lastInteractionMountedBuild) return;
+		lastInteractionMountedBuild = mountedBuild;
+		const handlesChanged = interactionController.syncCards(
+			buildTwoHopInteractionBindings(
+				mountedBuild?.rowsInMountedRange ?? EMPTY_MOUNTED_ROWS,
+				cardHydrator.getModel,
+			),
 		);
-		interactionBindingRevision += 1;
+		if (handlesChanged) interactionBindingRevision += 1;
+	}
+
+	function syncHydratedInteractions(): void {
+		syncMountedInteractions(virtualList.getMountedBuild(), true);
 	}
 
 	function getInteractionHandle(physicalCellSlot: number): InteractionHandle {

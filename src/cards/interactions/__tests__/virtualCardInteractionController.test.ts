@@ -24,7 +24,9 @@ describe("virtualCardInteractionController", () => {
 		const handle = controller.getInteractionHandle("slot-0");
 
 		expect(controller.provider.resolveInteractionDescriptor(handle)).toBeNull();
-		controller.syncCards([{ slotId: "slot-0", descriptor }]);
+		expect(
+			controller.syncCards([{ slotId: "slot-0", descriptor }]),
+		).toBe(false);
 
 		expect(controller.getInteractionHandle("slot-0")).toBe(handle);
 		expect(controller.provider.resolveInteractionDescriptor(handle)).toBe(
@@ -39,7 +41,9 @@ describe("virtualCardInteractionController", () => {
 
 		controller.syncCards([{ slotId: "slot-0", descriptor: first }]);
 		const firstHandle = controller.getInteractionHandle("slot-0");
-		controller.syncCards([{ slotId: "slot-0", descriptor: second }]);
+		expect(
+			controller.syncCards([{ slotId: "slot-0", descriptor: second }]),
+		).toBe(true);
 		const secondHandle = controller.getInteractionHandle("slot-0");
 
 		expect(secondHandle).not.toBe(firstHandle);
@@ -58,7 +62,9 @@ describe("virtualCardInteractionController", () => {
 
 		controller.syncCards([{ slotId: "slot-0", descriptor: first }]);
 		const handle = controller.getInteractionHandle("slot-0");
-		controller.syncCards([{ slotId: "slot-0", descriptor: refreshed }]);
+		expect(
+			controller.syncCards([{ slotId: "slot-0", descriptor: refreshed }]),
+		).toBe(false);
 
 		expect(controller.getInteractionHandle("slot-0")).toBe(handle);
 		expect(controller.provider.resolveInteractionDescriptor(handle)).toBe(
@@ -72,7 +78,7 @@ describe("virtualCardInteractionController", () => {
 		controller.syncCards([{ slotId: "slot-0", descriptor }]);
 		const handle = controller.getInteractionHandle("slot-0");
 
-		controller.syncCards([]);
+		expect(controller.syncCards([])).toBe(true);
 
 		expect(controller.provider.resolveInteractionDescriptor(handle)).toBeNull();
 	});
@@ -112,7 +118,9 @@ describe("virtualCardInteractionController", () => {
 		controller.syncCards([{ slotId: "slot-0", descriptor }]);
 		const handle = controller.getInteractionHandle("slot-0");
 
-		controller.syncCards([{ slotId: "slot-0", descriptor: null }]);
+		expect(
+			controller.syncCards([{ slotId: "slot-0", descriptor: null }]),
+		).toBe(false);
 
 		expect(controller.getInteractionHandle("slot-0")).toBe(handle);
 		expect(controller.provider.resolveInteractionDescriptor(handle)).toBeNull();

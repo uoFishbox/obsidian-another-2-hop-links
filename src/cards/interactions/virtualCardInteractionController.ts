@@ -14,7 +14,8 @@ export interface VirtualCardInteractionBinding {
 export interface VirtualCardInteractionController {
 	readonly provider: InteractionDescriptorResolverProvider;
 	getInteractionHandle(slotId: string): InteractionHandle;
-	syncCards(cards: readonly VirtualCardInteractionBinding[]): void;
+	/** Returns true when the set of handles exposed to mounted DOM changed. */
+	syncCards(cards: readonly VirtualCardInteractionBinding[]): boolean;
 	clear(): void;
 }
 
@@ -46,14 +47,18 @@ export function createVirtualCardInteractionController(): VirtualCardInteraction
 		return binding.handle;
 	}
 
-	function removeSlot(slotId: string): void {
+	function removeSlot(slotId: string): boolean {
 		const binding = bindingBySlot.get(slotId);
-		if (!binding) return;
+		if (!binding) return false;
 		bindingBySlot.delete(slotId);
 		descriptorByHandle.delete(binding.handle);
+		return true;
 	}
 
-	function bindCard(slotId: string, descriptor: ItemInteractionDescriptor): void {
+	function bindCard(
+		slotId: string,
+		descriptor: ItemInteractionDescriptor,
+	): boolean {
 		const previous = bindingBySlot.get(slotId);
 		let binding: VirtualCardInteractionSlotBinding;
 		if (
@@ -70,13 +75,14 @@ export function createVirtualCardInteractionController(): VirtualCardInteraction
 		}
 		bindingBySlot.set(slotId, binding);
 		descriptorByHandle.set(binding.handle, descriptor);
+		return previous?.handle !== binding.handle;
 	}
 
-	function bindEmptySlot(slotId: string): void {
+	function bindEmptySlot(slotId: string): boolean {
 		const previous = bindingBySlot.get(slotId);
 		if (!previous) {
 			bindingBySlot.set(slotId, createSlotBinding(null));
-			return;
+			return true;
 		}
 
 		descriptorByHandle.delete(previous.handle);
@@ -84,6 +90,7 @@ export function createVirtualCardInteractionController(): VirtualCardInteraction
 			handle: previous.handle,
 			descriptor: null,
 		});
+		return false;
 	}
 
 	const provider: InteractionDescriptorResolverProvider = {
@@ -97,14 +104,19 @@ export function createVirtualCardInteractionController(): VirtualCardInteraction
 		getInteractionHandle,
 		syncCards(cards) {
 			const activeSlotIds = new Set<string>();
+			let handlesChanged = false;
 			for (const card of cards) {
 				activeSlotIds.add(card.slotId);
-				if (card.descriptor) bindCard(card.slotId, card.descriptor);
-				else bindEmptySlot(card.slotId);
+				handlesChanged = card.descriptor
+					? bindCard(card.slotId, card.descriptor) || handlesChanged
+					: bindEmptySlot(card.slotId) || handlesChanged;
 			}
 			for (const slotId of bindingBySlot.keys()) {
-				if (!activeSlotIds.has(slotId)) removeSlot(slotId);
+				if (!activeSlotIds.has(slotId)) {
+					handlesChanged = removeSlot(slotId) || handlesChanged;
+				}
 			}
+			return handlesChanged;
 		},
 		clear() {
 			bindingBySlot.clear();
