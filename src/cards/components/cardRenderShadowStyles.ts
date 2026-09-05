@@ -403,6 +403,10 @@ export const CARD_RENDER_SHADOW_CSS = String.raw`
 	width: 100%;
 }
 
+.twohop-virtual-row[hidden] {
+	display: none;
+}
+
 .twohop-virtual-row {
 	position: absolute;
 	left: 0;
