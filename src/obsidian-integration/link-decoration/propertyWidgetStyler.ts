@@ -146,7 +146,7 @@ export function createPropertyWidgetStyler(
 	}
 
 	/**
-	 * ロード時、Patcherがフックする前にレンダリングされた要素を捕捉する
+	 * Capture elements rendered during load before the Patcher hooks them.
 	 */
 	function scanAndRegisterAll(app: App): void {
 		app.workspace.iterateAllLeaves((leaf) => {

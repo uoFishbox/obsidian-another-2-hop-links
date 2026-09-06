@@ -56,18 +56,18 @@
 
 	const lowerExtension = $derived(extension?.toLowerCase());
 
-	/** ファイル拡張子を正規化（mdは除外） */
+	/** Normalize the file extension (excluding md). */
 	const normalizedExtension = $derived(
 		lowerExtension && lowerExtension !== "md" ? lowerExtension : undefined,
 	);
 
-	/** 拡張子に応じたアイコン名（ICONS のキー） */
+	/** Icon name for the extension (an ICONS key). */
 	const fileIconName = $derived.by((): IconName | null => {
 		if (!normalizedExtension) return null;
 		return getFileIconName(normalizedExtension);
 	});
 
-	/** 拡張子から表示するアイコン名を判定 */
+	/** Determine the icon name to display for an extension. */
 	function getFileIconName(ext: string): IconName {
 		if (isImageExtension(ext)) return "Image";
 		if (ext === "pdf") return "FileText";

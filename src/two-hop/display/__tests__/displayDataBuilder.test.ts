@@ -11,7 +11,7 @@ import * as grouping from "two-hop/display/tagGrouping";
 
 const defaultSettings: PluginSettings = DEFAULT_SETTINGS;
 
-// SortServiceのmock（入力をそのまま返す）
+// Mock SortService (returns the input unchanged)
 const mockSortService: ISortService = {
 	sort: vi.fn((items) => [...items]),
 };
@@ -513,7 +513,7 @@ describe("DisplayDataBuilder - buildDisplayData", () => {
 			expect(result.backlinks[0].rawText).toBe("backlink");
 			expect(result.tagGroups).toHaveLength(1);
 			expect(result.tagGroups[0].tag).toBe("#tag1");
-			expect(result.twoHopBranches).toHaveLength(0); // hop2 が空のため
+			expect(result.twoHopBranches).toHaveLength(0); // because hop2 is empty
 		});
 	});
 
@@ -745,7 +745,7 @@ describe("DisplayDataBuilder - buildDisplayData", () => {
 
 			// Assert
 			expect(result.twoHopBranches).toHaveLength(2);
-			// branch1 が先に来る（hop2.length = 2）
+			// branch1 comes first (hop2.length = 2)
 			expect(result.twoHopBranches[0].hop1.rawText).toBe("link1");
 			expect(result.twoHopBranches[1].hop1.rawText).toBe("link2");
 		});
@@ -800,7 +800,7 @@ describe("DisplayDataBuilder - buildDisplayData", () => {
 
 			const linkResult: TwoHopLinkResult = {
 				originFile: createMockTFile("origin.md"),
-				branches: [branch1, branch2], // branch1 は hop2 が 3 個、branch2 は 1 個
+				branches: [branch1, branch2], // branch1 has 3 hop2 items; branch2 has 1
 				backlinks: [],
 				taggedNotes: [],
 			};
@@ -821,10 +821,10 @@ describe("DisplayDataBuilder - buildDisplayData", () => {
 
 			// Assert
 			expect(result.twoHopBranches).toHaveLength(2);
-			// branch2 が先に来る（hop2.length = 1）
+			// branch2 comes first (hop2.length = 1)
 			expect(result.twoHopBranches[0].hop1.rawText).toBe("link2");
 			expect(result.twoHopBranches[0].hop2).toHaveLength(1);
-			// branch1 が後に来る（hop2.length = 3）
+			// branch1 comes later (hop2.length = 3)
 			expect(result.twoHopBranches[1].hop1.rawText).toBe("link1");
 			expect(result.twoHopBranches[1].hop2).toHaveLength(3);
 		});
@@ -1001,7 +1001,7 @@ describe("DisplayDataBuilder - buildDisplayData", () => {
 
 			// Assert
 			expect(result.tagGroups.length).toBeGreaterThan(0);
-			// #tag1 は 2 つのノートに共通、#tag2 は 1 つのノート
+			// #tag1 is shared by 2 notes; #tag2 is in 1 note
 			const tag1Group = result.tagGroups.find((g) => g.tag === "#tag1");
 			const tag2Group = result.tagGroups.find((g) => g.tag === "#tag2");
 
@@ -1295,7 +1295,7 @@ describe("DisplayDataBuilder - buildDisplayData", () => {
 			);
 
 			// Assert
-			// newLinks には未解決リンクが含まれる
+			// newLinks contains unresolved links
 			expect(result.newLinks).toHaveLength(2);
 			expect(
 				result.newLinks.some((l) => l.rawText === "unresolved-outgoing"),
@@ -1304,18 +1304,18 @@ describe("DisplayDataBuilder - buildDisplayData", () => {
 				result.newLinks.some((l) => l.rawText === "unresolved-backlink"),
 			).toBe(true);
 
-			// mergedItems には解決済みのリンクのみが含まれる
+			// mergedItems contains only resolved links
 			expect(result.mergedItems).toHaveLength(2);
 
-			// outgoing と backlinks は空
+			// outgoing and backlinks are empty
 			expect(result.outgoing).toHaveLength(0);
 			expect(result.backlinks).toHaveLength(0);
 
-			// twoHopBranches には hop2 を持つブランチのみ
+			// twoHopBranches contains only branches with hop2
 			expect(result.twoHopBranches).toHaveLength(1);
 			expect(result.twoHopBranches[0].hop1.rawText).toBe("resolved-outgoing");
 
-			// tagGroups が生成される
+			// tagGroups are generated
 			expect(result.tagGroups).toHaveLength(1);
 			expect(result.tagGroups[0].tag).toBe("#common");
 		});

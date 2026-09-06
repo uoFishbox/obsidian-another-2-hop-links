@@ -9,7 +9,7 @@ function compareTagGroups(a: TagGroup, b: TagGroup): number {
 export function groupNotesByTag(taggedNotes: readonly TaggedNote[]): TagGroup[] {
 	if (taggedNotes.length === 0) return [];
 
-	// タグごとにノートをマッピング
+	// Map notes by tag
 	const tagMap = new Map<string, TaggedNote[]>();
 
 	for (const note of taggedNotes) {

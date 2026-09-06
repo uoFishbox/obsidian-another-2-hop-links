@@ -50,7 +50,7 @@ export function decideDataUpdateAction(input: ReloadDecisionInput): DataUpdateAc
 		dependencies.relevantPaths,
 	);
 
-	// 旧形式や不完全な context は安全側に倒す
+	// Fall back safely for legacy or incomplete contexts
 	if (
 		context.affectedLookupKeys === undefined ||
 		context.affectedLinkSourcePaths === undefined ||

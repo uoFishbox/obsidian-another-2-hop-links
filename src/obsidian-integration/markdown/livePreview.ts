@@ -9,7 +9,6 @@ import { RangeSetBuilder, StateEffect } from "@codemirror/state";
 import { syntaxTree } from "@codemirror/language";
 import { type SyntaxNode, type NodeType } from "@lezer/common";
 import { editorInfoField, TFile } from "obsidian";
-import type { PluginHost } from "obsidian-integration/pluginHost";
 import { UNRESOLVED_LINK_ATTRIBUTE } from "obsidian-integration/link-decoration/unresolvedLinkAttribute";
 import type { LinkStatusService } from "obsidian-integration/link-decoration/linkStatusService";
 import { stripLinkAnchor } from "indexing/link-resolution/linkResolution";
@@ -39,7 +38,7 @@ interface CanvasNode {
 			file: TFile;
 		};
 	};
-	file?: TFile; // ファイルノードの場合
+	file?: TFile;
 }
 
 export const forceRedrawEffect = StateEffect.define<undefined>();
@@ -77,17 +76,12 @@ export function buildLivePreviewPlugin(linkStatusService: LinkStatusService) {
 				const editorInfo = view.state.field(editorInfoField) as any;
 
 				if (editorInfo.file instanceof TFile) {
-					// 通常のエディタ、またはファイルが割り当てられたCanvasノード
 					sourceFile = editorInfo.file;
 				} else if (editorInfo.node) {
-					// Canvasのテキストノードなどの場合
 					const node = editorInfo.node as CanvasNode;
 					if (node.file) {
-						// ファイルノード
 						sourceFile = node.file;
 					} else {
-						// テキストノードの場合、Canvasファイル自体をソースとみなす
-						// 安全にアクセスする
 						const canvasView = node.canvas?.view;
 						if (canvasView && canvasView.file instanceof TFile) {
 							sourceFile = canvasView.file;
@@ -137,7 +131,6 @@ export function buildLivePreviewPlugin(linkStatusService: LinkStatusService) {
 
 				let shouldDecorate = resolutionCache.get(lookupPath);
 				if (shouldDecorate === undefined) {
-					// LinkStatusServiceを使って装飾すべきか判断
 					shouldDecorate = linkStatusService.shouldDecorateLink(lookupPath);
 					resolutionCache.set(lookupPath, shouldDecorate);
 				}
@@ -232,10 +225,6 @@ export function buildLivePreviewPlugin(linkStatusService: LinkStatusService) {
 				return tokenClasses.has(className);
 			}
 
-			/**
-			 * ノードがWikiLinkのパス部分であるかを判定します。
-			 * メインのリンクテキストから始めるために、エイリアスとパイプを特に除外します。
-			 */
 			private isWikiLinkPath(node: SyntaxNode): boolean {
 				return (
 					this.hasTokenClass(node, Token.WikiLink) &&
@@ -244,9 +233,6 @@ export function buildLivePreviewPlugin(linkStatusService: LinkStatusService) {
 				);
 			}
 
-			/**
-			 * ノードがMarkdownリンクのURL部分であるかを判定します。
-			 */
 			private isMarkdownLinkUrl(node: SyntaxNode): boolean {
 				return this.hasTokenClass(node, Token.MarkdownLinkUrl);
 			}

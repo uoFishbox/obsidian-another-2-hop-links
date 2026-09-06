@@ -186,7 +186,8 @@ export function createViewUpdateOrchestrator(
 			return;
 		}
 
-		// 起動直後などで postProcessor 登録対象外だった既存プレビュー要素にも適用する
+		// Also apply this to existing preview elements that were not registered with
+		// the postProcessor, such as immediately after startup
 		const previewContainer = getPreviewContainerForReadingView(view);
 		if (
 			previewContainer &&

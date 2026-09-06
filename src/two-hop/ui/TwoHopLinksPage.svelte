@@ -161,7 +161,6 @@
 		contentSearchEnabled = currentSettings.enableContentSearch ?? false;
 	});
 
-	// フックを利用
 	const search = useSearchQuery({
 		initialValue: uiState?.searchInputValue,
 		onInputChange: (value) => {

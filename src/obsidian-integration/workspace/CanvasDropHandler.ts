@@ -46,7 +46,7 @@ export class CanvasDropManager {
 			return;
 		}
 
-		// 既に登録済みの場合はスキップ
+		// Skip if already registered
 		if (this.registeredListeners.has(canvasEl)) {
 			return;
 		}

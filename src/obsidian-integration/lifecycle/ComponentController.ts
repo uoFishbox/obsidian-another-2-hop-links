@@ -9,7 +9,6 @@ import { getLeafId } from "obsidian-integration/workspace/workspaceLeafIdentity"
 import * as ErrorHandler from "shared/errors/errorHandler";
 import type { PluginSettings } from "settings/model";
 import type { SortOption } from "cards/sorting";
-import type { TwoHopLinkResult } from "two-hop/model";
 import type { TwoHopState } from "two-hop/state/TwoHopState.svelte";
 import type { DisplayDataBuilder } from "two-hop/display/displayDataBuilder";
 import type { IIndexingService } from "indexing/index-service/IndexingService";
@@ -181,7 +180,7 @@ export class ComponentController implements IComponentManager {
 	}
 
 	/**
-	 * MarkdownViewからLeafを取得
+	 * Get the Leaf associated with the MarkdownView.
 	 */
 	private getLeafFromView(view: MarkdownView): WorkspaceLeaf | undefined {
 		const leaves = this.app.workspace.getLeavesOfType("markdown");
@@ -228,7 +227,7 @@ export class ComponentController implements IComponentManager {
 		target: ActiveInlineContainer,
 	): void {
 		const previous = this.mountedComponents.get(view) ?? [];
-		// Leafを取得してLeafIDを生成
+		// Get the Leaf and generate its Leaf ID
 		const leaf = this.getLeafFromView(view);
 		if (!leaf) {
 			console.warn("Could not find leaf for view");
@@ -280,7 +279,7 @@ export class ComponentController implements IComponentManager {
 		try {
 			const settings = this.getSettings();
 
-			// Viewに紐づいたキャッシュを取得
+			// Get the cache associated with the View
 			const lazyLoaderCache = this.getLazyLoaderCache(view);
 
 			applicationStore = this.getOrCreateApplicationStore(
@@ -311,12 +310,12 @@ export class ComponentController implements IComponentManager {
 				uiState: this.getInlineUiState(view, file.path),
 			});
 
-			// --- ライフサイクル管理 ---
-			// MarkdownRenderChildを使って、Viewが破棄されたとき(タブ閉じ等)に
-			// 自動的にクリーンアップ処理が走るようにする
+			// --- Lifecycle management ---
+			// Use MarkdownRenderChild so cleanup runs automatically when the View is
+			// destroyed (for example, when a tab is closed)
 			const lifecycleManager = new MarkdownRenderChild(container as HTMLElement);
 
-			// 既にクリーンアップされたかを追跡するフラグ（二重解放防止）
+			// Track whether cleanup has already run (prevents double release)
 			let isCleanedUp = false;
 
 			lifecycleManager.onunload = () => {
@@ -329,7 +328,7 @@ export class ComponentController implements IComponentManager {
 				this.twoHopStatePool.release(leafId, file.path);
 			};
 
-			// Viewに子要素として登録することで、Viewのライフサイクルと連動させる
+			// Register it as a child of the View so it follows the View lifecycle
 			view.addChild(lifecycleManager);
 			shouldReleaseStoreOnError = false;
 
@@ -352,23 +351,18 @@ export class ComponentController implements IComponentManager {
 		}
 	}
 
-	/**
-	 * Svelteコンポーネント単体のアンマウント処理
-	 */
 	private unmountComponent(component: SvelteComponentInstance | undefined): void {
 		if (!component) {
 			return;
 		}
 
 		try {
-			// Svelteのunmountを使用
 			unmount(component);
 		} catch (error) {
 			ErrorHandler.handleUnmountError(error);
 		}
 	}
 
-	// プラグインアンロード時に呼ばれる
 	destroy(): void {
 		this.app.workspace.iterateAllLeaves((leaf) => {
 			if (leaf.view instanceof MarkdownView) {
@@ -376,7 +370,7 @@ export class ComponentController implements IComponentManager {
 				const mountedList = this.mountedComponents.get(leaf.view);
 				if (mountedList) {
 					for (const mounted of mountedList) {
-						// MarkdownRenderChild経由でアンロードを発火させる
+						// Trigger unload through MarkdownRenderChild
 						mounted.lifecycleManager.unload();
 
 						if (mounted.container?.isConnected) {

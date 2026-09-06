@@ -59,12 +59,12 @@ export class TwoHopLinksView extends ItemView {
 	private renderFile(file: TFile, options: { force: boolean }): void {
 		const isFileTransition = this.currentFile?.path !== file.path;
 
-		// ファイルが同じ場合は再レンダリングをスキップ
+		// Skip re-rendering when the file is unchanged
 		if (!options.force && !isFileTransition && this.component) {
 			return;
 		}
 
-		// ファイル遷移時は LazyLoader キャッシュを破棄し、不要な参照保持を避ける
+		// On file navigation, discard the LazyLoader cache to avoid retaining unnecessary references
 		if (isFileTransition) {
 			this.lazyLoaderCache.clear();
 		}
@@ -112,8 +112,8 @@ export class TwoHopLinksView extends ItemView {
 	}
 
 	/**
-	 * ビューのコンテンツをクリアし、プレースホルダーを表示します。
-	 * hybridモードでUIを非表示にする際に使用されます。
+	 * Clear the view content and display a placeholder.
+	 * Used to hide the UI in hybrid mode.
 	 */
 	public clearContent(): void {
 		this.currentFile = undefined;

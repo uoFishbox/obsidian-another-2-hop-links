@@ -3,21 +3,14 @@ import type { MarkdownPostProcessorContext } from "obsidian";
 import type { StylingService } from "obsidian-integration/link-decoration/stylingService";
 
 /**
- * markdownPostProcessorでレンダリングされた要素を追跡し、
- * データ更新時に効率的に再処理するためのマネージャー。
+ * Track elements rendered by markdownPostProcessor
+ * and provide efficient reprocessing when data updates.
  */
 export class RenderedMdElementsRegistry {
 	private readonly renderedElements = new Map<string, Set<HTMLElement>>();
 
 	constructor(private readonly stylingService: StylingService) {}
 
-	/**
-	 * レンダリングされた要素を追跡対象として登録する。
-	 * Componentライフサイクルを利用して、要素がDOMから削除された際に自動で登録解除する。
-	 * @param sourcePath - ファイルのパス
-	 * @param el - レンダリングされたHTML要素
-	 * @param ctx - MarkdownPostProcessorContext
-	 */
 	public registerElement(
 		sourcePath: string,
 		el: HTMLElement,
@@ -29,7 +22,7 @@ export class RenderedMdElementsRegistry {
 		const elementsSet = this.renderedElements.get(sourcePath)!;
 		elementsSet.add(el);
 
-		// MarkdownRenderChildのライフサイクルにフックして、要素が破棄されたらSetから削除
+		// Hook into MarkdownRenderChild's lifecycle and remove the element from the Set when it is destroyed
 		const renderChild = new MarkdownRenderChild(el);
 		renderChild.onunload = () => {
 			this.removeElement(sourcePath, elementsSet, el);
@@ -38,8 +31,8 @@ export class RenderedMdElementsRegistry {
 	}
 
 	/**
-	 * 指定されたファイルのすべての登録済み要素に対して、リンク装飾を再適用する。
-	 * @param sourcePath - 再処理するファイルのパス
+	 * Reapply link decorations to all registered elements for the specified file.
+	 * sourcePath - File path to reprocess
 	 */
 	public reprocessDecorations(sourcePath: string): void {
 		const elements = this.renderedElements.get(sourcePath);
@@ -48,7 +41,7 @@ export class RenderedMdElementsRegistry {
 		}
 
 		for (const el of elements) {
-			// 要素がまだDOMに存在することを確認
+			// Confirm that the element is still in the DOM
 			if (!el.isConnected) {
 				this.removeElement(sourcePath, elements, el);
 				continue;

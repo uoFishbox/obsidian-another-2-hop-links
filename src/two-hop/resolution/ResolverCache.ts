@@ -17,9 +17,9 @@ interface CachedResolveResult {
 }
 
 /**
- * TwoHopLinkResolver の結果キャッシュを管理するクラス
- * - キャッシュの保存・取得
- * - データ更新に基づくキャッシュの無効化
+ * Manage the result cache for TwoHopLinkResolver.
+ * - Store and retrieve cached results
+ * - Invalidate the cache based on data updates
  */
 export class ResolverCache {
 	private readonly cache = new Map<string, CachedResolveResult>();
@@ -43,7 +43,7 @@ export class ResolverCache {
 	}
 
 	/**
-	 * 結果をキャッシュに保存する
+	 * Store a result in the cache.
 	 */
 	set(
 		filePath: string,
@@ -55,7 +55,7 @@ export class ResolverCache {
 			snapshot,
 		});
 
-		// キャッシュサイズ制限を超えた場合、最も古いエントリを削除
+		// Remove the oldest entry when the cache size limit is exceeded
 		if (this.cache.size > this.maxCacheSize) {
 			const oldestKey = this.cache.keys().next().value;
 			if (oldestKey) {
@@ -65,7 +65,7 @@ export class ResolverCache {
 	}
 
 	/**
-	 * データ更新に基づいてキャッシュを無効化する
+	 * Invalidate the cache based on data updates.
 	 */
 	invalidate(context?: DataUpdateContext): void {
 		if (!context || context.affectsAll) {
@@ -107,7 +107,7 @@ export class ResolverCache {
 	}
 
 	/**
-	 * すべてのキャッシュをクリアする
+	 * Clear all caches.
 	 */
 	clear(): void {
 		this.cache.clear();
@@ -120,7 +120,7 @@ export class ResolverCache {
 		if (!affectedValues || cachedValues.size === 0 || affectedValues.size === 0) {
 			return false;
 		}
-		// 小さい方のセットをイテレートして効率化
+		// Iterate over the smaller set for efficiency
 		let smaller = cachedValues;
 		let larger = affectedValues;
 		if (affectedValues.size < cachedValues.size) {

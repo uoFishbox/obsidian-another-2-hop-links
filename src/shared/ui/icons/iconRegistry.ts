@@ -1,17 +1,3 @@
-/**
- * Structured SVG icon definitions for inline rendering.
- *
- * All icons in this module replicate lucide-svelte icons at 24×24 viewBox
- * with the same default stroke attributes (stroke="currentColor",
- * stroke-width="2", stroke-linecap/linejoin="round").
- *
- * Icons are stored as structured element trees (`ICONS`) so they can be
- * rendered through real Svelte SVG elements (see `Icon.svelte`) without
- * `{@html}`. Rendering raw HTML strings forces the browser to parse HTML
- * on every cell creation/swap, which is a measurable cost on the no-preview
- * hot path (e.g. `LinkItem.svelte`).
- */
-
 export const svgAttrs = {
 	xmlns: "http://www.w3.org/2000/svg",
 	viewBox: "0 0 24 24",
@@ -21,13 +7,6 @@ export const svgAttrs = {
 	"stroke-linejoin": "round",
 } as const;
 
-/**
- * Discriminated union of the SVG element shapes used by the icons below.
- *
- * Attribute values are kept as strings to match the original lucide markup
- * verbatim. Only the attributes actually present on each element are stored;
- * omitted optional attributes are not rendered.
- */
 export type SvgElement =
 	| { tag: "path"; d: string }
 	| { tag: "circle"; cx: string; cy: string; r: string; fill?: string }
@@ -152,12 +131,6 @@ const ICONS_DATA = {
 	],
 } as const satisfies Record<string, readonly SvgElement[]>;
 
-/**
- * Re-exports the icon table with elements widened to `SvgElement` so optional
- * attributes (e.g. `fill` on a circle, `ry` on a rect) are uniformly
- * accessible while keeping the discriminated `tag` literal for narrowing.
- * Keys are preserved as the `IconName` union via a mapped type.
- */
 export const ICONS: {
 	readonly [K in keyof typeof ICONS_DATA]: readonly SvgElement[];
 } = ICONS_DATA;

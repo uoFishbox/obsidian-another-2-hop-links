@@ -96,7 +96,7 @@ export async function openFile(
 	key?: string,
 ): Promise<void> {
 	try {
-		// 指定された newLeaf オプションに基づいて Leaf を取得
+		// Get a Leaf based on the specified newLeaf option
 		const leaf = workspace.getLeaf(newLeaf);
 
 		if (leaf) {

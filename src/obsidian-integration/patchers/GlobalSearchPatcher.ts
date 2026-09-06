@@ -81,7 +81,7 @@ function patchGlobalSearch(plugin: PluginHost): void {
 							}
 						})();
 
-						// インデックス完了を待ってから判定するため、ここでは即 return する
+						// Return immediately here so the check waits for indexing to complete
 						return;
 					}
 				}

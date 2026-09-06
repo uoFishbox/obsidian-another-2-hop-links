@@ -92,7 +92,7 @@ describe("htmlVisibleTextContainsCaseInsensitive", () => {
 	});
 
 	it("does not decode HTML entities (consistent with stripHtmlTags)", () => {
-		// &lt; は literal として扱い、'< ' には match しない
+		// Treat &lt; as a literal and do not match '< '
 		const html = "<p>a &lt; b</p>";
 		expect(htmlVisibleTextContainsCaseInsensitive(html, "a &lt; b")).toBe(true);
 		expect(htmlVisibleTextContainsCaseInsensitive(html, "a < b")).toBe(false);

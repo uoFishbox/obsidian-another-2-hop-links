@@ -114,7 +114,7 @@ export class VaultEnvironmentBuilder {
 			(linkText: string) => this.resolveLinkTarget(linkText),
 		);
 
-		// addFile 後も resolved/unresolved の整合性を維持する
+		// Keep resolved/unresolved consistency after addFile
 		const { resolvedLinks, unresolvedLinks } = this.buildObsidianLinkMaps();
 		this.mockMetadataCache.resolvedLinks = resolvedLinks;
 		this.mockMetadataCache.unresolvedLinks = unresolvedLinks;
@@ -134,7 +134,7 @@ export class VaultEnvironmentBuilder {
 			getResourcePath: vi.fn(),
 		} as MockedObject<IVault>;
 
-		// resolvedLinks と unresolvedLinks を自動生成
+		// Generate resolvedLinks and unresolvedLinks automatically
 		const { resolvedLinks, unresolvedLinks } = this.buildObsidianLinkMaps();
 
 		this.mockMetadataCache = {
@@ -170,7 +170,7 @@ export class VaultEnvironmentBuilder {
 	}
 
 	/**
-	 * Obsidian の resolvedLinks/unresolvedLinks を模擬生成
+	 * Generate mock Obsidian resolvedLinks/unresolvedLinks.
 	 */
 	private buildObsidianLinkMaps(): {
 		resolvedLinks: ObsidianLinkMap;
@@ -190,10 +190,10 @@ export class VaultEnvironmentBuilder {
 				const targetPath = normalizeLinkToMarkdownPath(linkText);
 
 				if (this.files.has(targetPath)) {
-					// 解決済み
+					// Resolved
 					sourceResolved[targetPath] = (sourceResolved[targetPath] || 0) + 1;
 				} else {
-					// 未解決
+					// Unresolved
 					sourceUnresolved[linkText] = (sourceUnresolved[linkText] || 0) + 1;
 				}
 			}

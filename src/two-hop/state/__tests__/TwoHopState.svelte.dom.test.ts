@@ -575,7 +575,7 @@ describe("TwoHopState (Runes)", () => {
 		resolveLoad(completeResult);
 		await loadPromise;
 
-		// showTagsSection: false の場合、complete 段階でも displayData は変化しない
+		// displayData does not change even at the complete stage when showTagsSection: false
 		expect(store.displayData).toBe(displayDataAfterTwohop);
 		expect(store.data).toBe(completeResult);
 	});
@@ -672,7 +672,7 @@ describe("TwoHopState (Runes)", () => {
 		resolveLoad(completeResult);
 		await loadPromise;
 
-		// complete 段階で taggedNotes が追加され、displayData が更新される
+		// taggedNotes are added at the complete stage and displayData is updated
 		expect(store.displayData).not.toBe(displayDataAfterTwohop);
 		expect(store.displayData.tagGroups).toHaveLength(1);
 		expect(store.displayData.tagGroups[0].notes).toHaveLength(2);

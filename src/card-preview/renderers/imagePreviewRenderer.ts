@@ -31,7 +31,7 @@ export async function getFrontmatterImage(
 		return { type: "image", content: toObsidianResourceUrl(imageUrl) };
 	}
 
-	// 内部リンクの場合
+	// For internal links
 	const imageFileLink = imageUrl.match(/^\[\[([^\]]+)\]\]$/);
 	if (imageFileLink) {
 		const imageFile = resolveFile(imageFileLink[1], metadataCache);

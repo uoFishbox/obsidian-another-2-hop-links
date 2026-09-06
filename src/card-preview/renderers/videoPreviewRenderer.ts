@@ -1,7 +1,7 @@
 import type { TFile } from "obsidian";
 import type { PreviewData } from "../types";
 
-// 同時生成数を制限するための簡易キュー（ブラウザのデコーダー枯渇を防ぐ）
+// Simple queue to limit concurrent generations (prevents browser decoder exhaustion)
 const MAX_CONCURRENT_GENERATIONS = 3;
 let activeGenerations = 0;
 interface VideoThumbnailResult {

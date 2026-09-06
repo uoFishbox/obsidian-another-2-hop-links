@@ -14,7 +14,7 @@ export function initPropertyPatcher(
 	plugin: PluginHost,
 	propertyStyleManager: PropertyWidgetStyler,
 ): void {
-	// ObsidianのUIの準備が整ってからパッチを適用する
+	// Apply the patch after the Obsidian UI is ready
 	plugin.app.workspace.onLayoutReady(() => {
 		patchPropertyWidgets(plugin, propertyStyleManager);
 	});
@@ -26,8 +26,8 @@ function patchPropertyWidgets(
 ): void {
 	const widgets = plugin.app.metadataTypeManager.registeredTypeWidgets;
 
-	// 再描画フレームでの再スタイリングが重複しないように、
-	// 要素単位でスケジュールを管理するWeakSetを関数スコープに配置
+	// Place a WeakSet in function scope to avoid duplicate restyling in the same
+	// render frame, and manage scheduling per element
 	const scheduledElements = new WeakSet<Element>();
 
 	for (const widget of Object.values(widgets)) {
@@ -71,7 +71,7 @@ function patchPropertyWidgets(
 						return component;
 					}
 
-					// マネージャーに登録し、初回にスタイリング
+					// Register with the manager and style it initially
 					propertyStyleManager.register(el, sourceFile);
 					propertyStyleManager.styleElement(el, sourceFile);
 
@@ -100,7 +100,7 @@ function patchPropertyWidgets(
 				return function (this: unknown, ...args: unknown[]) {
 					const result = oldSave.call(this, ...args);
 
-					// `this` はウィジェットインスタンスを指す
+					// `this` refers to the widget instance
 					const widgetInstance = asWidgetInstance(this);
 					const el = widgetInstance?.el;
 					const sourcePath = widgetInstance?.sourcePath;

@@ -112,12 +112,12 @@ function collectVisibleHtmlText(html: string): string {
 }
 
 /**
- * rendered HTML の visible text 内に needle が含まれるかを判定する。
- * タグを除いた短い preview 文字列へ変換し、ネイティブ文字列検索を使う。
+ * Determine whether needle is included in the visible text of rendered HTML.
+ * Convert it to a short preview string with tags removed and use native string search.
  *
- * **注意**: rendered HTML 専用。raw markdown には使わないこと。
- * raw markdown の backtick 内 `<tag>` は visible text だが、
- * この関数は `<` をタグ開始と見なして skip してしまう。
+ * **Note**: For rendered HTML only. Do not use with raw markdown.
+ * A `<tag>` inside backticks in raw markdown is visible text, but
+ * this function skips it because it treats `<` as the start of a tag.
  */
 export function htmlVisibleTextContainsCaseInsensitive(
 	html: string,

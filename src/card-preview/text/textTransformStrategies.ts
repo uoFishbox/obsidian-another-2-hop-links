@@ -28,13 +28,13 @@ function extractEmbedUrlCandidate(
 	wikiEmbedTarget: string | undefined,
 ): string | null {
 	if (markdownEmbedTarget) {
-		// ![](<url> "title") の title 部分を除外する
+		// Exclude the title portion of ![](<url> "title")
 		const candidate = markdownEmbedTarget.trim().match(/^(\S+)/)?.[1];
 		return candidate ?? null;
 	}
 
 	if (wikiEmbedTarget) {
-		// ![[url|alias]] の alias を除外する
+		// Exclude the alias portion of ![[url|alias]]
 		const pipeIndex = wikiEmbedTarget.indexOf("|");
 		const candidate = (
 			pipeIndex === -1 ? wikiEmbedTarget : wikiEmbedTarget.slice(0, pipeIndex)

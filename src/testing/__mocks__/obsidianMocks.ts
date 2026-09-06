@@ -127,7 +127,7 @@ export class Menu {
 	}
 }
 
-// リンクパス取得関数のmock
+// Mock link-path extraction function
 export function getLinkpath(linkText: string): string {
 	// [[link#section|alias]] → link#section
 	// [[link|alias]] → link
@@ -140,11 +140,11 @@ export function getLinkpath(linkText: string): string {
 	return linkText.split("#")[0];
 }
 
-// パス正規化関数のmock
+// Mock path-normalization function
 export function normalizePath(path: string): string {
-	// バックスラッシュをスラッシュに変換
-	// 連続するスラッシュを1つにまとめる
-	// 先頭と末尾のスラッシュを削除
+	// Convert backslashes to slashes
+	// Collapse consecutive slashes into one
+	// Remove leading and trailing slashes
 	return path
 		.replace(/\\/g, "/")
 		.replace(/\/+/g, "/")

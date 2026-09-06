@@ -73,15 +73,15 @@ function patchWorkspaceOpenLinkText(plugin: PluginHost): void {
 				}
 
 				try {
-					// 1. リンクを正規化して解決可能かチェック
-					// [[note#heading]] / [[note^block]] でも note 側で判定する
+					// 1. Normalize the link and check whether it can be resolved
+					// Also determine it from the note side for [[note#heading]] / [[note^block]]
 					const rawLinkPath = getLinkpath(linktext);
 					const destFile = plugin.app.metadataCache.getFirstLinkpathDest(
 						rawLinkPath,
 						sourcePath,
 					);
 
-					// 解決先が存在しない（未解決リンク）場合のみ処理を行う
+					// Process only when the target does not exist (unresolved link)
 					if (!destFile) {
 						const indexingService = plugin.indexingService;
 
@@ -98,7 +98,7 @@ function patchWorkspaceOpenLinkText(plugin: PluginHost): void {
 								);
 
 							if (hasMultipleBacklinks) {
-								// 実際に作成されるパスを計算
+								// Calculate the path that will actually be created
 								const expectedPath = resolveExpectedPath(
 									plugin.app,
 									linktext,
@@ -164,7 +164,7 @@ function patchWorkspaceOpenLinkText(plugin: PluginHost): void {
 									plugin.app.workspace.revealLeaf(leaf);
 								}
 
-								// 処理を中断（新規作成を行わない）
+								// Abort processing (do not create a new file)
 								return;
 							}
 						}
@@ -174,10 +174,10 @@ function patchWorkspaceOpenLinkText(plugin: PluginHost): void {
 						"[Cosense card links] Error in openLinkText patch:",
 						e,
 					);
-					// エラー時は安全のため元の処理を実行する
+					// On error, run the original operation for safety
 				}
 
-				// 条件に合致しない、またはエラー時は元のメソッドを実行
+				// Run the original method when the condition does not match or an error occurs
 				return next.call(this, linktext, sourcePath, newLeaf, openViewState);
 			},
 	});
@@ -241,7 +241,7 @@ async function replaceMatchingPreCreationLeaves(
 			return;
 		}
 
-		// 現在アクティブなLeafかどうかを判定し、アクティブな場合はフォーカスを維持する
+		// Determine whether this is the currently active Leaf and preserve focus if it is active
 		const isActiveLeaf = plugin.app.workspace.activeLeaf === leaf;
 
 		replacementTasks.push(

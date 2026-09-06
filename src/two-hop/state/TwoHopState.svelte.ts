@@ -122,7 +122,7 @@ export class TwoHopState {
 		this.loader = new TwoHopLinksLoader(resolveTwoHopLinks);
 		this.preprocessedDisplayDataCache = createPreprocessedDisplayDataCache();
 
-		// 大きなオブジェクトは深いプロキシを避け、union 全体の再代入だけで更新する
+		// Avoid deep proxies for large objects; update by reassigning the entire union
 		this.mutableLoadState = $state.raw<TwoHopLoadState>({
 			type: "loading",
 			phase: "initial",
@@ -132,7 +132,7 @@ export class TwoHopState {
 		this.loadingPhase = $derived(getLoadingPhase(this.loadState));
 		this.data = $derived(getLoadedTwoHopData(this.loadState)?.data);
 		this.error = $derived(getLoadError(this.loadState));
-		// data/settings 依存の前処理を先に計算し、sortOption 変更時は再利用する
+		// Compute data/settings-dependent preprocessing first and reuse it when sortOption changes
 		this.preprocessedDisplayData = $derived.by(
 			(): PreprocessedDisplayData =>
 				computePreprocessedDisplayDataState(
@@ -143,7 +143,7 @@ export class TwoHopState {
 				),
 		);
 
-		// ソート段のみを sortOption 依存で再計算する
+		// Recompute only the sort stage when sortOption changes
 		this.computedDisplayData = $derived.by((): ComputedDisplayData => {
 			if (
 				this.uiState.sortOption === "relevance" ||
@@ -163,19 +163,19 @@ export class TwoHopState {
 	}
 
 	/**
-	 * IndexingService のデータ更新イベントを購読
-	 * データが更新されたら現在のファイルを再読み込み
+	 * Subscribe to IndexingService data update events.
+	 * Reload the current file when data is updated.
 	 */
 	subscribeToDataUpdates(unsubscribe: () => void): void {
 		this.unsubscribeDataUpdate = unsubscribe;
 	}
 
 	/**
-	 * データ更新イベントハンドラ。
+	 * Data update event handler.
 	 *
-	 * current file に紐づく通常ページでは、関連する index 更新だけを reload する。
-	 * EmptyViewAllNotes のような current file を持たない global list では、
-	 * display data reload ではなく updateVersion だけを進める。
+	 * On normal pages tied to a current file, reload only the affected index updates.
+	 * On global lists without a current file, such as EmptyViewAllNotes,
+	 * advance only updateVersion instead of reloading display data.
 	 */
 	async handleDataUpdate(context?: DataUpdateContext): Promise<void> {
 		const currentFile = this.loader.getCurrentFile();
@@ -209,13 +209,8 @@ export class TwoHopState {
 			}
 			return;
 		}
-
-		// kind === "none" は何もしない
 	}
 
-	/**
-	 * クリーンアップ
-	 */
 	destroy(): void {
 		this.loader.reset();
 		if (this.unsubscribeDataUpdate) {
@@ -224,7 +219,6 @@ export class TwoHopState {
 		}
 	}
 
-	// Link data management
 	load(file: TFile, options: { force?: boolean } = {}): Promise<void> {
 		const activeLoad = this.activeLoad;
 		if (!options.force && activeLoad?.filePath === file.path) {
@@ -262,7 +256,7 @@ export class TwoHopState {
 				phase: "initial",
 			};
 		} else if (this.error) {
-			// 背景更新では既存データを維持したまま、前回のエラー表示だけクリアする
+			// Preserve existing data during a background update and only clear the previous error display
 			const previousData = getLoadedTwoHopData(this.mutableLoadState);
 			if (previousData) {
 				this.mutableLoadState = {

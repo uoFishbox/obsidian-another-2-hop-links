@@ -129,7 +129,7 @@ export class PreCreationView extends AbstractSvelteListView<IndexedLink> {
 		if (!expectedPath) {
 			return "Create unresolved file";
 		}
-		// フルパスを表示（.md 拡張子は除去）
+		// Display the full path (remove the .md extension)
 		const displayPath = expectedPath.endsWith(".md")
 			? expectedPath.slice(0, -3)
 			: expectedPath;
@@ -214,7 +214,7 @@ export class PreCreationView extends AbstractSvelteListView<IndexedLink> {
 	}
 
 	private refreshLeafHeader(): void {
-		// View の setState 後にタイトル再評価を確実に走らせる
+		// Ensure the title is re-evaluated after View.setState
 		const leaf = this.leaf as WorkspaceLeaf & {
 			updateHeader?: () => void;
 		};
@@ -222,19 +222,19 @@ export class PreCreationView extends AbstractSvelteListView<IndexedLink> {
 	}
 
 	/**
-	 * インラインタイトルの編集内容を linktext に反映する。
-	 * newName にパス区切りが含まれている場合は、完全なパスとして扱う。
-	 * そうでない場合は、既存のパスの最後のセグメントのみを置き換える。
+	 * Apply inline-title edits to linktext.
+	 * If newName contains a path separator, treat it as a complete path.
+	 * Otherwise, replace only the last segment of the existing path.
 	 */
 	private updateLinktextFromTitle(newName: string): void {
 		if (!newName) {
 			return;
 		}
-		// newName にパス区切りが含まれている場合は、完全なパスとして扱う
+		// If newName contains a path separator, treat it as a complete path
 		if (newName.includes("/")) {
 			this.linktext = newName;
 		} else {
-			// パス区切りが含まれていない場合は、既存のパスの最後のセグメントのみを置き換える
+			// If there is no path separator, replace only the last segment of the existing path
 			const slashIdx = this.linktext.lastIndexOf("/");
 			if (slashIdx !== -1) {
 				// "path/to/OldName" → "path/to/NewName"
@@ -411,7 +411,7 @@ export class PreCreationView extends AbstractSvelteListView<IndexedLink> {
 		return false;
 	}
 
-	/** ソースファイルを解決する（LinkContext 用）。見つからない場合は null */
+	/** Resolve the source file for LinkContext. Return null if it cannot be found. */
 	private resolveSourceFile(): TFile | null {
 		if (!this.sourcePath) {
 			return null;
@@ -422,13 +422,13 @@ export class PreCreationView extends AbstractSvelteListView<IndexedLink> {
 	protected render(): void {
 		const container = this.prepareRenderContainer();
 
-		// タイトルはパスの最後のセグメント（ファイル名部分）のみを表示・編集
+		// Display and edit only the last segment of the path (the file name)
 		const titleText = this.expectedPath
 			? (() => {
 					const path = this.expectedPath.endsWith(".md")
 						? this.expectedPath.slice(0, -3)
 						: this.expectedPath;
-					// パスの最後のセグメントのみを抽出
+					// Extract only the last segment of the path
 					return getPathBasename(path);
 				})()
 			: "Unresolved link target";
@@ -440,7 +440,7 @@ export class PreCreationView extends AbstractSvelteListView<IndexedLink> {
 		const scrollerEl = frame.scrollerEl;
 		this.setScrollerElement(scrollerEl);
 
-		// Obsidian の inline-title を模倣した編集可能タイトル
+		// Editable title that mimics Obsidian's inline-title
 		this.inlineTitleEl = frame.titleEl;
 		this.inlineTitleEl.contentEditable = "true";
 		this.inlineTitleEl.spellcheck = false;
@@ -453,7 +453,7 @@ export class PreCreationView extends AbstractSvelteListView<IndexedLink> {
 		this.originalTitleText = titleText;
 		this.titleCancelled = false;
 
-		// 編集時: linktext / expectedPath を更新してボタン状態を同期
+		// During editing: update linktext / expectedPath to synchronize button state
 		this.inlineTitleEl.addEventListener("input", () => {
 			const newName = this.inlineTitleEl?.textContent?.trim() ?? "";
 			this.updateLinktextFromTitle(newName);
@@ -493,15 +493,15 @@ export class PreCreationView extends AbstractSvelteListView<IndexedLink> {
 			if (currentTitle === this.originalTitleText) {
 				return;
 			}
-			// expectedPath が空、または作成中の場合は何もしない
+			// Do nothing if expectedPath is empty or creation is in progress
 			if (!this.expectedPath || this.isCreating) {
 				return;
 			}
-			// ファイルを作成
+			// Create the file
 			void this.handleCreateAndOpen();
 		});
 
-		// 説明 + アクション（metadata-container 相当の位置に配置）
+		// Description + actions (placed where metadata-container would be)
 		const infoEl = frame.infoEl;
 
 		if (this.expectedPath) {
@@ -531,7 +531,7 @@ export class PreCreationView extends AbstractSvelteListView<IndexedLink> {
 		});
 		this.createButtonEl.focus();
 
-		// 被リンクセクションは通常エディタと同様 .cm-scroller 直下（.cm-sizer の後）に配置
+		// Place the backlinks section directly under .cm-scroller (after .cm-sizer), as in the normal editor
 		this.mountBacklinksSection(scrollerEl);
 	}
 
@@ -539,7 +539,7 @@ export class PreCreationView extends AbstractSvelteListView<IndexedLink> {
 		const backlinks = this.getItems();
 		this.setCurrentItems(backlinks);
 
-		// ソースファイルが解決できない場合は path: "" のダミーを使用
+		// Use a dummy with path: "" if the source file cannot be resolved
 		const sourceFile = this.resolveSourceFile() ?? ({ path: "" } as TFile);
 
 		const config: ListConfig<CardItem> = {
@@ -602,7 +602,7 @@ export class PreCreationView extends AbstractSvelteListView<IndexedLink> {
 					this.app.fileManager.renameFile(createdFile, newPath),
 				waitForIndexIdle: () => this.plugin.indexingService.awaitIdle(),
 			});
-			// 現在のleafでファイルを開く
+			// Open the file in the current leaf
 			await this.leaf.openFile(file, { active: true });
 		} catch (error) {
 			console.error(

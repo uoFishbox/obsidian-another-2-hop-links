@@ -88,7 +88,7 @@ export class DisplayModeController {
 		this.deactivateMode(this.activeMode);
 		this.activeMode = this.settingsManager.settings.displayMode;
 		this.activateMode(this.activeMode);
-		// 設定変更直後にも現在のアクティブビューに対する表示対象を再評価する
+		// Re-evaluate the display target for the current active view immediately after a settings change
 		this.handleActiveLeafChangeByMode(
 			this.activeMode,
 			this.app.workspace.activeLeaf?.view,
@@ -96,7 +96,7 @@ export class DisplayModeController {
 	}
 
 	public handleActiveLeafChange(): void {
-		// アクティブリーフがサイドバー自体の場合は何もしない
+		// Do nothing when the active leaf is the sidebar itself
 		if (this.app.workspace.activeLeaf?.view instanceof TwoHopLinksView) {
 			return;
 		}
@@ -182,7 +182,7 @@ export class DisplayModeController {
 		if (leaf !== null) {
 			await leaf.setViewState({
 				type: TWO_HOP_LINKS_VIEW_TYPE,
-				active: false, // フォーカスは奪わない
+				active: false, // Do not steal focus
 			});
 		}
 	}

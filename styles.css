@@ -170,8 +170,8 @@
 	padding: var(--size-4-3);
 }
 
-/* pre-create ビューは view-content のパディングをリセットし、
-   cm-sizer 内のパディングに任せる（本物のエディタと同様） */
+/* The pre-create view resets view-content padding and delegates it to
+   the padding inside cm-sizer (as in the real editor). */
 .workspace-leaf-content[data-type="cosense-card-links-pre-create-view"] > .view-content,
 .workspace-leaf-content[data-type="cosense-card-links-tag-notes-view"] > .view-content {
 	padding: 0;
@@ -188,24 +188,24 @@
 	padding: var(--file-margins);
 }
 
-/* markdown-source-view ラッパー（.cosense-card-links-pre-create を兼用） */
+/* markdown-source-view wrapper (also used by .cosense-card-links-pre-create) */
 .cosense-card-links-pre-create {
 	height: 100%;
 }
 
-/* inline-title の placeholder 表示 */
+/* inline-title placeholder display */
 .cosense-card-links-pre-create .inline-title:empty::before {
 	content: attr(placeholder);
 	color: var(--text-faint);
 	pointer-events: none;
 }
 
-/* フォーカス時のアウトラインを除去（Obsidian 本来と同様） */
+/* Remove the outline on focus (same as native Obsidian behavior) */
 .cosense-card-links-pre-create .inline-title:focus {
 	outline: none;
 }
 
-/* タイトルの透明度を薄くする */
+/* Reduce title opacity */
 .cosense-card-links-pre-create .inline-title {
 	opacity: 0.6;
 }
@@ -226,7 +226,7 @@
 	min-width: 0;
 }
 
-/* 説明文 + ボタンエリア（metadata-container 相当） */
+/* Description + button area (equivalent to metadata-container) */
 .cosense-card-links-pre-create__info {
 	display: flex;
 	flex-direction: column;
@@ -238,7 +238,7 @@
 	color: var(--text-muted);
 }
 
-/* fake cm-content は選択・コピーのみ可（編集不可） */
+/* fake cm-content allows selection and copying only (not editing) */
 .cosense-card-links-pre-create .cm-content {
 	cursor: default;
 	user-select: text;
@@ -249,12 +249,12 @@
 }
 
 /* ---------------------------------------------------------------
-   pre-create バックリンクセクション
-   通常エディタの .cosense-card-links__container +
-   .cosense-card-links__root を模倣する
+   pre-create backlinks section
+   Mimic the normal editor's .cosense-card-links__container +
+   .cosense-card-links__root
    --------------------------------------------------------------- */
 
-/* container 相当: 上マージン・幅・パディング */
+/* Equivalent to container: top margin, width, and padding */
 .cosense-card-links__temp-view {
 	width: 100%;
 	margin: var(--ccl-container-margin-top) auto 0 auto;
@@ -298,10 +298,10 @@
 }
 
 /* -----------------------------------------
-  backlinkが1つだけの未解決リンクのスタイル
+  link style for a single unresolved link
 */
 
-/* テキストの色*/
+/* Text color */
 span[data-twohop-link-state="special-unresolved"] > .is-unresolved,
 .markdown-rendered .internal-link.is-unresolved[data-twohop-link-state="special-unresolved"],
 /* property */
@@ -312,7 +312,7 @@ span[data-twohop-link-state="special-unresolved"] > .is-unresolved,
 .multi-select-container .multi-select-pill.internal-link.is-unresolved[data-twohop-link-state="special-unresolved"],
 .metadata-link-inner.internal-link.is-unresolved[data-twohop-link-state="special-unresolved"],
 .multi-select-container .multi-select-pill-content.internal-link[data-twohop-link-state="special-unresolved"],
-.multi-select-pill-content[data-twohop-link-state="special-unresolved"] span, /* propertyのリンクをファイルを削除して未解決リンクになった時、エディタ内のプロパティだけ構造が変わって描画される問題に対処。(サイドバーのproperty viewでは問題は発生しない) */
+.multi-select-pill-content[data-twohop-link-state="special-unresolved"] span, /* When a property link becomes unresolved after its file is deleted, only the property structure in the editor changes during rendering. Handle this issue. (It does not occur in the sidebar's property view.) */
 
 .cm-hmd-internal-link.cm-quote span[data-twohop-link-state="special-unresolved"],
 .cm-hmd-internal-link.cm-quote span[data-twohop-link-state="special-unresolved"] a,
@@ -320,7 +320,7 @@ span[data-twohop-link-state="special-unresolved"] > .is-unresolved,
 	color: var(--ccl-single-backlink-unresolved);
 }
 
-/* リンクのpipe とエイリアス名の色 */
+/* Color of the link pipe and alias name */
 .cm-content .cm-link-alias-pipe[data-twohop-link-state="special-unresolved"],
 .cm-content
 	.cm-link-alias-pipe[data-twohop-link-state="special-unresolved"]
@@ -331,14 +331,14 @@ span[data-twohop-link-state="special-unresolved"] > .is-unresolved,
 	color: var(--ccl-single-backlink-unresolved);
 }
 
-/* 下線の色 */
+/* Underline color */
 .markdown-rendered .cm-hmd-internal-link[data-twohop-link-state="special-unresolved"],
 .cm-content .cm-hmd-internal-link[data-twohop-link-state="special-unresolved"],
 .markdown-rendered .cm-string.cm-url[data-twohop-link-state="special-unresolved"],
 .markdown-rendered .internal-link.is-unresolved[data-twohop-link-state="special-unresolved"],
 .metadata-content .internal-link.is-unresolved[data-twohop-link-state="special-unresolved"],
 .metadata-property-value .internal-link.is-unresolved[data-twohop-link-state="special-unresolved"],
-.multi-select-pill.internal-link[data-twohop-link-state="special-unresolved"] /* propertyのリンクをファイルを削除して未解決リンクになった時、エディタ内のプロパティだけ構造が変わって描画される問題に対処 (サイドバーのproperty viewでは問題は発生しない) */ {
+.multi-select-pill.internal-link[data-twohop-link-state="special-unresolved"] /* When a property link becomes unresolved after its file is deleted, only the property structure in the editor changes during rendering. Handle this issue. (It does not occur in the sidebar's property view.) */ {
 	text-decoration-color: var(--ccl-single-backlink-unresolved);
 }
 
@@ -374,8 +374,8 @@ span[data-twohop-link-state="special-unresolved"] > .is-unresolved,
 	visibility: hidden;
 }
 
-/*! --- 非常に重要 --- */
-/* .view-contentがrootScroller側へsquashされ、その広いpaint/hit-test stateをスクロールごとにLayerizeすることがボトルネックになる。.view-contentにcompositing boundaryを強制すると更新範囲が局所化され、スクロールパフォーマンスが大幅に改善される。.cm-scroller, .markdown-preview-viewも同様。 */
+/*! --- Very important --- */
+/* .view-content is squashed onto rootScroller, and layerizing its large paint/hit-test state on every scroll is the bottleneck. Forcing a compositing boundary on .view-content localizes the update area and significantly improves scroll performance. The same applies to .cm-scroller and .markdown-preview-view. */
 .workspace-leaf-content[data-type="cosense-card-links-view"] > .view-content,
 .workspace-leaf-content[data-type="cosense-card-links-pre-create-view"] > .view-content,
 .workspace-leaf-content[data-type="cosense-card-links-tag-notes-view"] > .view-content,

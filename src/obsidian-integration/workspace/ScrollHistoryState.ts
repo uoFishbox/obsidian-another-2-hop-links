@@ -11,28 +11,28 @@ export class ScrollManager {
 	private history = new Map<string, ScrollState>();
 
 	/**
-	 * 指定されたLeafの履歴をクリアする
-	 * ファイル切り替え時などに呼び出す
+	 * Clear the history for the specified Leaf.
+	 * Called when switching files, etc.
 	 */
 	public clearHistory(leafId: string): void {
 		this.history.delete(leafId);
 	}
 
 	/**
-	 * スクロール位置をトグルする
+	 * Toggle the scroll position.
 	 */
 	public toggleScroll(view: MarkdownView): void {
 		const leafId = view.leaf.id;
 		const container = view.containerEl.querySelector(`.${CONTAINER_CLASS}`);
 
-		// コンテナが存在しない（設定で非表示など）場合は何もしない
+		// Do nothing if the container does not exist (for example, it is hidden by settings)
 		if (!container) return;
 
 		if (this.history.has(leafId)) {
-			// --- 履歴がある場合: 元の位置に戻る ---
+			// --- When history exists: return to the previous position ---
 			this.restorePosition(view, leafId);
 		} else {
-			// --- 履歴がない場合: 現在位置を保存して下にスクロール ---
+			// --- When no history exists: save the current position and scroll down ---
 			this.saveAndScrollToContainer(view, leafId, container);
 		}
 	}
@@ -46,7 +46,7 @@ export class ScrollManager {
 		let scrollTop = 0;
 		let cursor: EditorPosition | undefined;
 
-		// 現在の位置を取得
+		// Get the current position
 		if (mode === "source") {
 			scrollTop = view.editor.getScrollInfo().top;
 			cursor = view.editor.getCursor();
@@ -54,13 +54,13 @@ export class ScrollManager {
 			scrollTop = view.previewMode.getScroll();
 		}
 
-		// 履歴に保存
+		// Save to history
 		this.history.set(leafId, { scrollTop, cursor });
 
-		// コンテナまでスクロール
+		// Scroll to the container
 		container.scrollIntoView({ block: "start" });
 
-		// 検索バーにフォーカスを当てる
+		// Focus the search bar
 		const searchInput = container.querySelector(
 			".twohop-search-input",
 		) as HTMLInputElement | null;
@@ -78,16 +78,16 @@ export class ScrollManager {
 		if (mode === "source") {
 			this.restoreSourceModePosition(view, state);
 		} else {
-			// プレビューモードの復元
+			// Restore preview mode
 			view.previewMode.applyScroll(state.scrollTop);
 		}
 
-		// 履歴を消費して削除
+		// Consume and remove the history
 		this.history.delete(leafId);
 	}
 
 	private restoreSourceModePosition(view: MarkdownView, state: ScrollState): void {
-		// setCursor/focusでスクロールが再調整されるため、最後にscrollTopを適用する
+		// Apply scrollTop last because setCursor/focus readjusts the scroll position
 		view.editor.focus();
 		if (state.cursor) {
 			view.editor.setCursor(state.cursor);
@@ -97,7 +97,7 @@ export class ScrollManager {
 			view.editor.scrollTo(0, state.scrollTop);
 		};
 
-		// 同期で一度適用し、次フレームでも再適用して自動スクロールの上書きを防ぐ
+		// Apply once synchronously, then again on the next frame to prevent auto-scroll from overriding it
 		applySavedScrollTop();
 		const ownerWindow = view.containerEl.ownerDocument.defaultView;
 		if (ownerWindow?.requestAnimationFrame) {

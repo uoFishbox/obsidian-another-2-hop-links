@@ -1,7 +1,7 @@
 import { type App, parseLinktext } from "obsidian";
 
 /**
- * openLinkText が実際に作成するファイルパスを先読みして返す。
+ * Pre-resolve and return the file path that openLinkText will actually create.
  */
 export function resolveExpectedPath(
 	app: App,
@@ -19,18 +19,18 @@ export function resolveExpectedPath(
 	let dirPath: string;
 
 	if (linkPath.contains("/")) {
-		// linktextにディレクトリが含まれる場合、その構造を使用
+		// Use the directory structure when linktext includes a directory
 		const slash = linkPath.lastIndexOf("/");
 		fileName = linkPath.slice(slash + 1);
 		dirPath = linkPath.slice(0, slash);
 	} else {
-		// ディレクトリがない場合、getNewFileParentを使用
+		// Use getNewFileParent when there is no directory
 		fileName = linkPath;
 		const parentFolder = app.fileManager.getNewFileParent(sourcePath, linkPath);
 		dirPath = parentFolder.isRoot() ? "" : parentFolder.path;
 	}
 
-	// .canvas か .base はそのまま。それ以外（.txtや拡張子なし）は .md になる
+	// Keep .canvas and .base as-is; add .md to other files (.txt or files without an extension)
 	const specialExtensions = [".canvas", ".base"];
 	const hasSpecialExt = specialExtensions.some((ext) =>
 		fileName.toLowerCase().endsWith(ext),
