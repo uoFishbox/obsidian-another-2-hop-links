@@ -92,7 +92,7 @@ const isFiniteRect = (rect: DOMRect): boolean =>
 	Number.isFinite(rect.bottom) &&
 	Number.isFinite(rect.height);
 
-export interface IsStableVirtualListMeasurementParams {
+export interface ValidVirtualListScrollMetricsParams {
 	hasRenderableContent: boolean;
 	rootRect: DOMRect;
 	viewportHeight: number;
@@ -100,23 +100,23 @@ export interface IsStableVirtualListMeasurementParams {
 	sectionTop: number;
 }
 
-export function isStableVirtualListMeasurement({
+export function hasValidVirtualListScrollMetrics({
 	hasRenderableContent,
 	rootRect,
 	viewportHeight,
 	scrollTop,
 	sectionTop,
-}: IsStableVirtualListMeasurementParams): boolean {
+}: ValidVirtualListScrollMetricsParams): boolean {
 	if (!hasRenderableContent) {
 		return true;
 	}
-	const hasStableViewportHeight = viewportHeight > 0;
-	const hasStableRootRect = isFiniteRect(rootRect) && rootRect.height > 0;
-	const hasStableScrollMetrics =
+	const hasValidViewportHeight = viewportHeight > 0;
+	const hasValidRootRect = isFiniteRect(rootRect) && rootRect.height > 0;
+	const hasFiniteScrollMetrics =
 		Number.isFinite(scrollTop) &&
 		Number.isFinite(viewportHeight) &&
 		Number.isFinite(sectionTop);
-	return hasStableViewportHeight && hasStableRootRect && hasStableScrollMetrics;
+	return hasValidViewportHeight && hasValidRootRect && hasFiniteScrollMetrics;
 }
 
 export interface ResolveVirtualListLayoutStabilityParams {
@@ -128,9 +128,9 @@ export interface ResolveVirtualListLayoutStabilityParams {
 
 export interface VirtualListLayoutStability {
 	rawContainerWidth: number;
-	hasStableWidth: boolean;
-	hasStableRootRect: boolean;
-	isStable: boolean;
+	hasValidWidth: boolean;
+	hasValidRootRect: boolean;
+	isLayoutGeometryStable: boolean;
 }
 
 export function resolveVirtualListLayoutStability({
@@ -140,23 +140,24 @@ export function resolveVirtualListLayoutStability({
 	hasRenderableContent,
 }: ResolveVirtualListLayoutStabilityParams): VirtualListLayoutStability {
 	const rawContainerWidth = measuredWidth ?? rootRect.width ?? rootEl.clientWidth;
-	const hasStableWidth =
+	const hasValidWidth =
 		Number.isFinite(rawContainerWidth) &&
 		(rawContainerWidth > 0 || rootEl.clientWidth > 0);
-	const hasStableRootRect =
+	const hasValidRootRect =
 		isFiniteRect(rootRect) && (!hasRenderableContent || rootRect.height > 0);
 
 	return {
 		rawContainerWidth,
-		hasStableWidth,
-		hasStableRootRect,
-		isStable: !hasRenderableContent || (hasStableWidth && hasStableRootRect),
+		hasValidWidth,
+		hasValidRootRect,
+		isLayoutGeometryStable:
+			!hasRenderableContent || (hasValidWidth && hasValidRootRect),
 	};
 }
 
-export function isStableCachedVirtualListMeasurementFromMetrics(
+export function hasValidCachedVirtualListScrollMetrics(
 	hasRenderableContent: boolean,
-	hasStableCachedScrollMetrics: boolean,
+	hasValidCachedScrollMetrics: boolean,
 	cachedViewportHeight: number,
 	scrollTop: number,
 	viewportHeight: number,
@@ -165,11 +166,11 @@ export function isStableCachedVirtualListMeasurementFromMetrics(
 	if (!hasRenderableContent) {
 		return true;
 	}
-	const hasStableViewportHeight = viewportHeight > 0;
+	const hasValidViewportHeight = viewportHeight > 0;
 	return (
-		hasStableCachedScrollMetrics &&
+		hasValidCachedScrollMetrics &&
 		cachedViewportHeight > 0 &&
-		hasStableViewportHeight &&
+		hasValidViewportHeight &&
 		Number.isFinite(scrollTop) &&
 		Number.isFinite(viewportHeight) &&
 		Number.isFinite(cachedSectionTop)

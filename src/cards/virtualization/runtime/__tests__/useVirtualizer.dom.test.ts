@@ -217,7 +217,7 @@ const createRuntimeHarness = (
 		resolveLayoutMeasurement: (nextMeasurement) => ({
 			context: rowModel,
 			measurement: nextMeasurement,
-			isStable: true,
+			isLayoutGeometryStable: true,
 		}),
 		frameCoordinator: createTestFrameCoordinator(),
 		...overrides,
@@ -233,7 +233,7 @@ const createRuntimeHarness = (
 	const initializedRuntime = runtime as TestRuntime;
 	initializedRuntime.measurement.sectionTop = 0;
 	initializedRuntime.measurement.viewportHeight = 100;
-	initializedRuntime.measurement.hasStableScrollMetrics = true;
+	initializedRuntime.measurement.hasValidScrollMetrics = true;
 	return {
 		runtime: initializedRuntime,
 		rootEl,
@@ -279,7 +279,7 @@ describe("useVirtualizer", () => {
 		expect(result.kind).toBe("measured");
 		expect(runtime.measurement.sectionTop).toBe(10 + scrollTop);
 		expect(runtime.measurement.viewportHeight).toBe(window.innerHeight);
-		expect(runtime.measurement.hasStableScrollMetrics).toBe(true);
+		expect(runtime.measurement.hasValidScrollMetrics).toBe(true);
 		expect(onSnapshotUpdated).toHaveBeenCalledOnce();
 	});
 
@@ -297,7 +297,7 @@ describe("useVirtualizer", () => {
 		expect(result.kind).toBe("measured");
 		expect(runtime.measurement.viewportHeight).toBe(120);
 		expect(runtime.measurement.sectionTop).toBe(20);
-		expect(runtime.measurement.hasStableScrollMetrics).toBe(true);
+		expect(runtime.measurement.hasValidScrollMetrics).toBe(true);
 		expect(runtime.getSnapshot()?.ranges).toEqual({
 			mounted: { start: 0, end: 10 },
 			previewVisible: { start: 2, end: 8 },
@@ -376,7 +376,7 @@ describe("useVirtualizer", () => {
 	});
 
 	it("notifies stable scroll idle inside coverage without resolving or publishing ranges", () => {
-		const onStableMeasurement = vi.fn();
+		const onRangePublished = vi.fn();
 		const {
 			runtime,
 			findVisibleRangeInto,
@@ -389,13 +389,13 @@ describe("useVirtualizer", () => {
 				mountedCoverageBand: { min: 20, max: 80 },
 				previewCoverageBand: { min: 30, max: 70 },
 			},
-			{ onStableMeasurement },
+			{ onRangePublished },
 		);
 		runtime.runScrollMeasurement(ACTIVE_SCROLL_METRICS);
 		const mountedResolutionCount = findVisibleRangeInto.mock.calls.length;
 		const rangedResolutionCount = findVisibleRangesInto.mock.calls.length;
 		const snapshotPublicationCount = onSnapshotUpdated.mock.calls.length;
-		onStableMeasurement.mockClear();
+		onRangePublished.mockClear();
 
 		const result = runtime.runScrollMeasurement(
 			{
@@ -411,8 +411,8 @@ describe("useVirtualizer", () => {
 		expect(findVisibleRangeInto).toHaveBeenCalledTimes(mountedResolutionCount);
 		expect(findVisibleRangesInto).toHaveBeenCalledTimes(rangedResolutionCount);
 		expect(onSnapshotUpdated).toHaveBeenCalledTimes(snapshotPublicationCount);
-		expect(onStableMeasurement).toHaveBeenCalledOnce();
-		expect(onStableMeasurement).toHaveBeenCalledWith(
+		expect(onRangePublished).toHaveBeenCalledOnce();
+		expect(onRangePublished).toHaveBeenCalledWith(
 			expect.objectContaining({
 				scrollTop: 60,
 				viewportHeight: 100,

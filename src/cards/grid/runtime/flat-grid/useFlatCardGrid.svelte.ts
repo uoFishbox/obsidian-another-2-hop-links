@@ -1,4 +1,4 @@
-import { untrack, getContext, onDestroy, type Snippet } from "svelte";
+import { untrack, getContext, onDestroy } from "svelte";
 import type {
 	NavigationDirection,
 	SequentialNavigationDirection,
@@ -13,15 +13,9 @@ import {
 } from "./mountedRows";
 import type { FlatGridRowModel } from "./rowModel";
 import { createFlatGridModelMemo } from "./modelMemo";
-import type { VirtualListStableMeasurementContext } from "cards/virtualization/public";
-import {
-	createResolvedCardLayoutSettingsMemo,
-	type CardLayoutSettings,
-} from "cards/layout/cardLayoutCssVars";
-import {
-	createSectionPaginationState,
-	type SectionPaginationApplicationStore,
-} from "cards/grid/pagination/sectionPagination";
+import type { PublishedVirtualRangeContext } from "cards/virtualization/public";
+import { createResolvedCardLayoutSettingsMemo } from "cards/layout/cardLayoutCssVars";
+import { createSectionPaginationState } from "cards/grid/pagination/sectionPagination";
 import { useVirtualizer } from "cards/virtualization/public";
 import type { FlatGridLogicalCell } from "./logicalCell";
 import type { VirtualNavigationTarget } from "cards/virtualization/public";
@@ -33,81 +27,19 @@ import {
 	type FlatGridLayout,
 } from "cards/grid/layout/flatGridMeasurement";
 import { DISABLED_PREVIEW_SURFACE } from "card-preview/runtime/previewRuntime";
-import type { CardPreviewRequest } from "card-preview/pipeline/cardPreviewRequest";
-import type {
-	InteractionHandle,
-	ItemInteractionDescriptor,
-} from "cards/interactions/interactionTypes";
-import { createVirtualCardInteractionController } from "cards/interactions/virtualCardInteractionController";
 import { useAppContext } from "cards/context/linkContext";
 import type { VirtualFrameCoordinator } from "shared/ui/scheduling/frameCoordinator";
 import { DEFAULT_SETTINGS } from "settings/model";
-import {
-	createFlatGridCardBindingsMemo,
-	isMountedFlatGridItemCell,
-} from "./mountedCardBindings";
-import type { FlatListScrollState } from "cards/list/model/listViewUiState";
-import { createPreviewPrefetchRangeTracker } from "card-preview/prefetch/previewPrefetchRange";
+import { isMountedFlatGridItemCell } from "./mountedCardBindings";
 import { createFlatGridInfiniteScrollController } from "./infiniteScroll";
 import { createFlatGridScrollStateController } from "./scrollState";
 import { createCardGridVisibilityPolicyResolver } from "cards/grid/model/cardGridVisibilityPolicy";
-
-/** Props passed to flat virtual list item render snippets. */
-export interface FlatCardGridItemRenderArgs<T> {
-	item: T;
-	index: number;
-	scrollContainerEl: HTMLElement | null;
-	rowIndex: number;
-	activationCandidateId: string;
-	readonly previewKey: string;
-	readonly interactionHandle: InteractionHandle;
-}
-
-type FlatCardGridApplicationSettings = CardLayoutSettings;
-
-interface FlatCardGridApplicationStore extends SectionPaginationApplicationStore {
-	settings?: FlatCardGridApplicationSettings;
-}
-
-export interface FlatCardGridProps<T> {
-	items?: readonly T[];
-	/**
-	 * Stable unique identity for one logical list item. The value must remain
-	 * unchanged when the item moves to another index.
-	 */
-	getItemId: (item: T, index: number) => string;
-	/**
-	 * Change this token when items are mutated in place. Array replacement is
-	 * detected automatically.
-	 */
-	itemsRevision?: unknown;
-	/**
-	 * Change this token when getItemId behavior changes without replacing the
-	 * resolver function.
-	 */
-	itemIdRevision?: unknown;
-	header?: Snippet;
-	item?: Snippet<[FlatCardGridItemRenderArgs<T>]>;
-	empty?: Snippet;
-	initialVisibleCount?: number | undefined;
-	loadMoreIncrement?: number;
-	sectionId?: string;
-	applicationStore?: FlatCardGridApplicationStore;
-	className?: string;
-	paginationMode?: "button" | "infinite-scroll";
-	infiniteScrollRootMargin?: string;
-	/** Scroll position restored once after the first stable layout measurement. */
-	initialScrollState?: FlatListScrollState;
-	/** Persists stable scroll and pagination measurements outside the grid. */
-	onScrollStateChange?: (state: FlatListScrollState) => void;
-	/** Resolves immutable preview input for the surface-owned slot controller. */
-	resolveItemPreviewRequest?: (item: T, index: number) => CardPreviewRequest | null;
-	/** Resolves the current item descriptor without card-owned effects. */
-	resolveItemInteractionDescriptor?: (
-		item: T,
-		index: number,
-	) => ItemInteractionDescriptor | null;
-}
+import { createFlatGridCardSurfaceRuntime } from "./cardSurfaceRuntime";
+import type {
+	FlatCardGridApplicationStore,
+	FlatCardGridItemRenderArgs,
+	FlatCardGridProps,
+} from "./flatCardGridContract";
 
 const EMPTY_MOUNTED_ROWS: readonly MountedFlatGridRow<never>[] = [];
 
@@ -146,7 +78,6 @@ export function useFlatCardGrid<T>(
 	const previewSurface =
 		appContext?.previewRuntime?.createSurface(previewSurfaceOptions) ??
 		DISABLED_PREVIEW_SURFACE;
-	const interactionController = createVirtualCardInteractionController();
 	const resolveCardGridVisibilityPolicy = createCardGridVisibilityPolicyResolver();
 	const resolveVisibilityPolicy = (nextLayout: FlatGridLayout) =>
 		resolveCardGridVisibilityPolicy(nextLayout.rowStride);
@@ -167,8 +98,6 @@ export function useFlatCardGrid<T>(
 	let interactionShadowRoot = $state<ShadowRoot | null>(null);
 	let infiniteScrollSentinelEl = $state<HTMLDivElement | null>(null);
 	let layout = $state.raw(DEFAULT_FLAT_GRID_LAYOUT);
-	const previewPrefetchRangeTracker = createPreviewPrefetchRangeTracker();
-	const resolveFlatGridCardBindings = createFlatGridCardBindingsMemo<T>();
 	const resolveConfiguredCardLayout = createResolvedCardLayoutSettingsMemo();
 	const configuredCardLayout = $derived.by(() =>
 		resolveConfiguredCardLayout(applicationStore?.settings),
@@ -215,34 +144,21 @@ export function useFlatCardGrid<T>(
 			layout: nextLayout,
 		});
 	const rowModel = $derived(resolveFlatGridRowModel(layout));
+	const cardSurfaceRuntime = createFlatGridCardSurfaceRuntime({
+		previewSurface,
+		getRowCount: () => rowModel.rowCount,
+		getPreviewCardDimensions: () => ({
+			widthPx: layout.cellWidth,
+			heightPx: layout.rowHeight,
+		}),
+		getPreviewRequestResolver: () => props.resolveItemPreviewRequest,
+		getInteractionDescriptorResolver: () => props.resolveItemInteractionDescriptor,
+	});
 	const publishMountedCardBindings = (
 		mountedBuild: MountedFlatGridBuild<T> | null,
 		visibleRange: RowRange,
 	): void => {
-		const prefetchRange = previewPrefetchRangeTracker.resolve(
-			visibleRange,
-			rowModel.rowCount,
-		);
-		const bindingsResult = resolveFlatGridCardBindings({
-			mountedBuild,
-			previewCardDimensions: {
-				widthPx: layout.cellWidth,
-				heightPx: layout.rowHeight,
-			},
-			resolvePreviewRequest: props.resolveItemPreviewRequest,
-			resolveInteractionDescriptor: props.resolveItemInteractionDescriptor,
-		});
-		previewSurface.publish({
-			bindings: bindingsResult.bindings.previewBindings,
-			visibleRange,
-			prefetchRange,
-			active: true,
-		});
-		if (bindingsResult.changed) {
-			interactionController.syncCards(
-				bindingsResult.bindings.interactionBindings,
-			);
-		}
+		cardSurfaceRuntime.publish(mountedBuild, visibleRange);
 	};
 	const virtualList = useVirtualizer<
 		FlatGridLogicalCell<T>,
@@ -283,10 +199,10 @@ export function useFlatCardGrid<T>(
 			return {
 				context: layoutMeasurement.layout,
 				measurement: nextMeasurement,
-				isStable: layoutMeasurement.hasStableLayout,
+				isLayoutGeometryStable: layoutMeasurement.isLayoutGeometryStable,
 			};
 		},
-		onStableMeasurement: handleStableMeasurement,
+		onRangePublished: handleRangePublished,
 		frameCoordinator,
 	});
 	const measurement = virtualList.measurement;
@@ -302,7 +218,7 @@ export function useFlatCardGrid<T>(
 		getRootEl: () => sectionRootEl,
 		getScrollContainerEl: () => measurement.scrollContainerEl,
 		getSectionTop: () => measurement.sectionTop,
-		hasStableScrollMetrics: () => measurement.hasStableScrollMetrics,
+		hasValidScrollMetrics: () => measurement.hasValidScrollMetrics,
 		getVisibleCount: () => visibleCount,
 		publish: (state) => props.onScrollStateChange?.(state),
 		suppressNextNativeScroll: virtualList.suppressNextNativeScroll,
@@ -390,8 +306,7 @@ export function useFlatCardGrid<T>(
 
 	onDestroy(() => {
 		scrollStateController.persist();
-		previewSurface.dispose();
-		interactionController.clear();
+		cardSurfaceRuntime.dispose();
 	});
 
 	const loadNextPage = () => {
@@ -402,9 +317,7 @@ export function useFlatCardGrid<T>(
 		paginationState.loadMore(flatPaginationSectionId, itemCount);
 	};
 
-	function handleStableMeasurement(
-		context: VirtualListStableMeasurementContext,
-	): void {
+	function handleRangePublished(context: PublishedVirtualRangeContext): void {
 		if (scrollStateController.restorePending(context)) return;
 
 		if (!context.isScrollActive) {
@@ -451,8 +364,8 @@ export function useFlatCardGrid<T>(
 			rowIndex: mountedCell.rowIndex,
 			activationCandidateId: mountedCell.key,
 			previewKey: String(mountedCell.key),
-			interactionHandle: interactionController.getInteractionHandle(
-				String(mountedCell.physicalCellSlot),
+			interactionHandle: cardSurfaceRuntime.getInteractionHandle(
+				mountedCell.physicalCellSlot,
 			),
 		};
 	};
@@ -505,10 +418,10 @@ export function useFlatCardGrid<T>(
 			return measurement.scrollContainerEl;
 		},
 		get interactionDescriptorResolverProvider() {
-			return interactionController;
+			return cardSurfaceRuntime.interactionDescriptorResolverProvider;
 		},
 		get previewSurface() {
-			return previewSurface;
+			return cardSurfaceRuntime.previewSurface;
 		},
 		get shouldUseInfiniteScroll() {
 			return shouldUseInfiniteScroll;

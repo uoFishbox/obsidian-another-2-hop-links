@@ -4,7 +4,7 @@ export {
 	type VirtualizerMeasurementState,
 	type VirtualListLayoutMeasurementResolution,
 	type VirtualMeasurement,
-	type VirtualListStableMeasurementContext,
+	type PublishedVirtualRangeContext,
 } from "./runtime/useVirtualizer.svelte";
 export {
 	createResidentRowSlotAllocator,

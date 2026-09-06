@@ -5,7 +5,7 @@ import type { RowRange } from "../model/ranges";
 import type { VirtualRanges, VirtualRowModel } from "../model/types";
 import type { VirtualVisibilityPolicy } from "../model/ranges";
 import type {
-	VirtualListStableMeasurementContext,
+	PublishedVirtualRangeContext,
 	VirtualMeasurement,
 	VirtualMeasurementApplicationResult,
 	VirtualMeasurementResult,
@@ -20,7 +20,7 @@ import {
 } from "./virtualMeasurementRuntime";
 
 export type {
-	VirtualListStableMeasurementContext,
+	PublishedVirtualRangeContext,
 	VirtualMeasurement,
 	VirtualMeasurementApplicationResult,
 	VirtualMeasurementResult,
@@ -55,7 +55,7 @@ export interface UseVirtualizerOptions<
 		rootEl: HTMLElement,
 		runtimeMeasurement: VirtualizerMeasurementState,
 	): VirtualListLayoutMeasurementResolution<TContext>;
-	onStableMeasurement?(context: VirtualListStableMeasurementContext): void;
+	onRangePublished?(context: PublishedVirtualRangeContext): void;
 	onObservedWidthChange?(width: number): void;
 	/** Maximum retries while layout metrics are temporarily unstable. */
 	unstableMeasurementRetryLimit?: number;
@@ -79,7 +79,7 @@ export function useVirtualizer<
 	buildMountedRows,
 	onSnapshotUpdated,
 	resolveLayoutMeasurement,
-	onStableMeasurement,
+	onRangePublished,
 	onObservedWidthChange,
 	unstableMeasurementRetryLimit = DEFAULT_UNSTABLE_MEASUREMENT_RETRY_LIMIT,
 	frameCoordinator,
@@ -87,7 +87,7 @@ export function useVirtualizer<
 	const measurement = $state<VirtualizerMeasurementState>({
 		sectionTop: 0,
 		viewportHeight: 0,
-		hasStableScrollMetrics: false,
+		hasValidScrollMetrics: false,
 		measuredWidth: null,
 		scrollContainerEl: null,
 	});
@@ -117,7 +117,7 @@ export function useVirtualizer<
 		resolveRowModel,
 		resolveVisibilityPolicy,
 		resolveLayoutMeasurement,
-		onStableMeasurement,
+		onRangePublished,
 		onObservedWidthChange,
 		unstableMeasurementRetryLimit,
 		frameCoordinator,

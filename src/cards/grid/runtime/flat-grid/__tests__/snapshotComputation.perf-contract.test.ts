@@ -71,8 +71,8 @@ const measureWorkload = (cardCount: number) => {
 			scrollTop: SCROLL_TOP,
 			viewportHeight: VIEWPORT_HEIGHT,
 			sectionTop: 0,
-			isStableMeasurement: true,
-			hasStableVisibleRange: previous !== null,
+			hasValidScrollMetrics: true,
+			hasPublishedVisibleRange: previous !== null,
 			currentMountedRange: previous?.ranges.mounted ?? {
 				start: 0,
 				end: 0,

@@ -77,8 +77,8 @@ const compute = (params: {
 		scrollTop: params.scrollTop ?? 0,
 		viewportHeight: 100,
 		sectionTop: 0,
-		isStableMeasurement: true,
-		hasStableVisibleRange: params.previous !== undefined,
+		hasValidScrollMetrics: true,
+		hasPublishedVisibleRange: params.previous !== undefined,
 		currentMountedRange: params.previous?.ranges.mounted ?? {
 			start: 0,
 			end: 0,

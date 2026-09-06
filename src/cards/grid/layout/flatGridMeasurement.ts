@@ -29,7 +29,7 @@ export interface ResolveFlatGridLayoutMeasurementParams {
 export interface FlatGridLayoutMeasurement {
 	layout: FlatGridLayout;
 	hasRenderableContent: boolean;
-	hasStableLayout: boolean;
+	isLayoutGeometryStable: boolean;
 }
 
 export const isSameFlatGridLayout = (
@@ -79,6 +79,6 @@ export function resolveFlatGridLayoutMeasurement({
 	return {
 		layout,
 		hasRenderableContent: hasRenderableItems,
-		hasStableLayout: layoutStability.isStable,
+		isLayoutGeometryStable: layoutStability.isLayoutGeometryStable,
 	};
 }

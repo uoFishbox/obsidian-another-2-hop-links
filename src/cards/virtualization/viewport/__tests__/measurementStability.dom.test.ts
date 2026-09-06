@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-	isStableCachedVirtualListMeasurementFromMetrics,
-	isStableVirtualListMeasurement,
+	hasValidCachedVirtualListScrollMetrics,
+	hasValidVirtualListScrollMetrics,
 	resolveVirtualListLayoutStability,
 } from "../measurement";
 import { createDomRect, setNumericProperty } from "testing/helpers/DOMObserverMock";
@@ -9,7 +9,7 @@ import { createDomRect, setNumericProperty } from "testing/helpers/DOMObserverMo
 describe("virtual list measurement stability", () => {
 	it("treats empty content as stable without requiring layout metrics", () => {
 		expect(
-			isStableVirtualListMeasurement({
+			hasValidVirtualListScrollMetrics({
 				hasRenderableContent: false,
 				rootRect: createDomRect({ top: 0, width: 0, height: 0 }),
 				viewportHeight: 0,
@@ -18,7 +18,7 @@ describe("virtual list measurement stability", () => {
 			}),
 		).toBe(true);
 		expect(
-			isStableCachedVirtualListMeasurementFromMetrics(
+			hasValidCachedVirtualListScrollMetrics(
 				false,
 				false,
 				0,
@@ -31,7 +31,7 @@ describe("virtual list measurement stability", () => {
 
 	it("requires finite live and cached metrics for renderable content", () => {
 		expect(
-			isStableVirtualListMeasurement({
+			hasValidVirtualListScrollMetrics({
 				hasRenderableContent: true,
 				rootRect: createDomRect({ top: 0, width: 320, height: 240 }),
 				viewportHeight: 600,
@@ -40,17 +40,10 @@ describe("virtual list measurement stability", () => {
 			}),
 		).toBe(true);
 		expect(
-			isStableCachedVirtualListMeasurementFromMetrics(
-				true,
-				true,
-				600,
-				10,
-				600,
-				20,
-			),
+			hasValidCachedVirtualListScrollMetrics(true, true, 600, 10, 600, 20),
 		).toBe(true);
 		expect(
-			isStableVirtualListMeasurement({
+			hasValidVirtualListScrollMetrics({
 				hasRenderableContent: true,
 				rootRect: createDomRect({ top: 0, width: 320, height: 0 }),
 				viewportHeight: 600,
@@ -59,14 +52,7 @@ describe("virtual list measurement stability", () => {
 			}),
 		).toBe(false);
 		expect(
-			isStableCachedVirtualListMeasurementFromMetrics(
-				true,
-				false,
-				600,
-				10,
-				600,
-				20,
-			),
+			hasValidCachedVirtualListScrollMetrics(true, false, 600, 10, 600, 20),
 		).toBe(false);
 	});
 
@@ -87,9 +73,9 @@ describe("virtual list measurement stability", () => {
 			}),
 		).toEqual({
 			rawContainerWidth: 0,
-			hasStableWidth: true,
-			hasStableRootRect: true,
-			isStable: true,
+			hasValidWidth: true,
+			hasValidRootRect: true,
+			isLayoutGeometryStable: true,
 		});
 	});
 
@@ -107,7 +93,7 @@ describe("virtual list measurement stability", () => {
 				}),
 				measuredWidth: undefined,
 				hasRenderableContent: false,
-			}).isStable,
+			}).isLayoutGeometryStable,
 		).toBe(true);
 
 		expect(
@@ -120,7 +106,7 @@ describe("virtual list measurement stability", () => {
 				}),
 				measuredWidth: undefined,
 				hasRenderableContent: true,
-			}).isStable,
+			}).isLayoutGeometryStable,
 		).toBe(false);
 	});
 });

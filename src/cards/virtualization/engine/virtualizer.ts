@@ -29,7 +29,7 @@ export interface VirtualizerEngine<
 	recompute(params: { rowModel: TRowModel }): void;
 	setEmpty(params: { rowModel: TRowModel }): void;
 	getSnapshot(): VirtualListSnapshot<TCell, TMountedBuild> | null;
-	hasStableVisibleRange(): boolean;
+	hasPublishedVisibleRange(): boolean;
 	dispose(): void;
 }
 
@@ -72,7 +72,7 @@ export function createVirtualizerEngine<
 	TMountedBuild
 >): VirtualizerEngine<TCell, TRowModel, TContext, TMountedBuild> {
 	let latestSnapshot: VirtualListSnapshot<TCell, TMountedBuild> | null = null;
-	let stableVisibleRange = false;
+	let hasPublishedVisibleRange = false;
 	const rowSlotAllocator = createResidentRowSlotAllocator();
 
 	const buildMountedRowsForEngine = (params: {
@@ -115,8 +115,8 @@ export function createVirtualizerEngine<
 			scrollTop: nextMeasurement.scrollTop,
 			viewportHeight: nextMeasurement.viewportHeight,
 			sectionTop: nextMeasurement.sectionTop,
-			isStableMeasurement: nextMeasurement.isStableMeasurement,
-			hasStableVisibleRange: stableVisibleRange,
+			hasValidScrollMetrics: nextMeasurement.hasValidScrollMetrics,
+			hasPublishedVisibleRange,
 			currentMountedRange: previousSnapshot?.ranges.mounted ?? {
 				start: 0,
 				end: 0,
@@ -158,7 +158,7 @@ export function createVirtualizerEngine<
 			};
 		}
 
-		stableVisibleRange = true;
+		hasPublishedVisibleRange = true;
 		return {
 			kind: "stable",
 			range: nextSnapshot.ranges.mounted,
@@ -197,7 +197,7 @@ export function createVirtualizerEngine<
 		recompute,
 		setEmpty,
 		getSnapshot: () => latestSnapshot,
-		hasStableVisibleRange: () => stableVisibleRange,
+		hasPublishedVisibleRange: () => hasPublishedVisibleRange,
 		dispose: () => rowSlotAllocator.dispose(),
 	};
 }

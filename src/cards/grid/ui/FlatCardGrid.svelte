@@ -1,10 +1,8 @@
 <script lang="ts" generics="T">
 	import CardGridSurface from "cards/grid/surface/CardGridSurface.svelte";
 	import CardGridLoadMoreButton from "cards/grid/ui/CardGridLoadMoreButton.svelte";
-	import {
-		useFlatCardGrid,
-		type FlatCardGridProps,
-	} from "cards/grid/runtime/flat-grid/useFlatCardGrid.svelte";
+	import { useFlatCardGrid } from "cards/grid/runtime/flat-grid/useFlatCardGrid.svelte";
+	import type { FlatCardGridProps } from "cards/grid/runtime/flat-grid/flatCardGridContract";
 	import { provideVirtualPreviewSurface } from "card-preview/ui/virtualPreviewSurfaceContext";
 	import { provideVirtualFrameCoordinator } from "shared/ui/scheduling/frameCoordinatorContext.svelte";
 

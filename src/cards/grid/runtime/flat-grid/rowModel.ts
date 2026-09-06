@@ -137,7 +137,10 @@ export function createFlatGridRowModel<T>(
 		out.max =
 			mounted.end >= rowCount
 				? totalHeight
-				: (mounted.end - requiredOverscanRows) * rowStride - viewportHeight + 1;
+				: // Coverage is an open interval; keep the exact next-row boundary outside it.
+					(mounted.end - requiredOverscanRows) * rowStride -
+					viewportHeight +
+					1;
 		if (out.min >= out.max) {
 			writeInvalidCoverageBand(out);
 		}

@@ -32,13 +32,47 @@ Virtualization code must not import `cards/grid`, `two-hop`,
 - `runtime/measurementLifecycle.ts` owns measurement types, task scheduling,
   initial stabilization, published coverage, and the measurement epoch.
 - `runtime/useVirtualizer.svelte.ts` owns Svelte publication and composition.
-- `viewport/measurement.ts` owns DOM metric reads and stability checks.
+- `viewport/measurement.ts` owns DOM metric reads and metric/layout validity checks.
 - `viewport/observer/scrollMeasurement.ts` owns scroll sessions, the coverage
   gate, observer measurement dispatch, and their shared state contract.
 - `viewport/observer/observerDependencies.ts` owns dependency discovery,
-  shared resize registration, and structure-mutation filtering.
-- `viewport/observer/scrollerRegistry.ts` owns shared observer registration and
-  exposes the DOM observation facade.
+  generic resize registration, and structure-mutation filtering.
+- `viewport/observer/sharedViewportResizeObservers.ts` owns Window-scoped shared
+  root and layout-dependency `ResizeObserver` pools.
+- `viewport/observer/viewportDependencyObservers.ts` owns position/structure
+  dependency reconciliation and mutation-driven scheduling.
+- `viewport/observer/scrollerRegistry.ts` owns subscriber binding,
+  scroll-container migration, and the DOM observation facade.
+
+## Measurement state flow
+
+```text
+native scroll / resize / structure mutation
+                    │
+                    ▼
+       scrollerRegistry + scroll session
+                    │
+        ┌───────────┴───────────┐
+        │ covered scrollTop     │ coverage miss / layout change
+        ▼                       ▼
+  no range work        DOM measurement transaction
+                                │
+                     hasValidScrollMetrics?
+                                │
+                    range resolver → engine
+                                │
+                    snapshot publication
+                                │
+                  physical slot rebinding → DOM
+```
+
+The runtime deliberately names four independent conditions:
+
+- `hasValidScrollMetrics`: DOM metrics can be used to resolve ranges.
+- `isLayoutGeometryStable`: feature layout geometry can be committed.
+- `hasPublishedVisibleRange`: the engine has published a non-bootstrap range.
+- `VirtualMeasurementApplicationResult`: range application was `applied`,
+  `rejected`, or `skipped`.
 
 ## Performance invariants
 

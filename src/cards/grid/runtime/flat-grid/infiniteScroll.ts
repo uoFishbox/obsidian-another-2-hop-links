@@ -1,5 +1,5 @@
 import { tick } from "svelte";
-import type { VirtualListStableMeasurementContext } from "cards/virtualization/public";
+import type { PublishedVirtualRangeContext } from "cards/virtualization/public";
 import { scheduleAnimationFrame } from "shared/ui/scheduling/frame";
 
 const MAX_CHAINED_INFINITE_SCROLL_LOADS = 2;
@@ -32,14 +32,14 @@ export interface FlatGridInfiniteScrollOptions {
 	getScrollContainerEl(): HTMLElement | null;
 	getRootMargin(): string;
 	getContentHeight(): number;
-	getPreloadMetrics(): VirtualListStableMeasurementContext | null;
+	getPreloadMetrics(): PublishedVirtualRangeContext | null;
 	shouldLoad(): boolean;
 	loadNextPage(): void;
 }
 
 export interface FlatGridInfiniteScrollController {
 	observe(sentinelEl: HTMLDivElement): () => void;
-	considerLoading(context?: VirtualListStableMeasurementContext): void;
+	considerLoading(context?: PublishedVirtualRangeContext): void;
 }
 
 function parseBottomRootMarginPx(rootMargin: string): number {
@@ -71,7 +71,7 @@ export function createFlatGridInfiniteScrollController(
 	let cachedBottomRootMarginPx = 0;
 
 	function isContentBottomInPreloadRange(
-		metrics: VirtualListStableMeasurementContext,
+		metrics: PublishedVirtualRangeContext,
 	): boolean {
 		const rootMargin = options.getRootMargin();
 		if (rootMargin !== cachedRootMargin) {
@@ -109,7 +109,7 @@ export function createFlatGridInfiniteScrollController(
 		}, rootEl?.ownerDocument.defaultView);
 	}
 
-	function considerLoading(context?: VirtualListStableMeasurementContext): void {
+	function considerLoading(context?: PublishedVirtualRangeContext): void {
 		if (!options.getRootEl() || !options.shouldLoad()) return;
 
 		const preloadMetrics = context ?? options.getPreloadMetrics();

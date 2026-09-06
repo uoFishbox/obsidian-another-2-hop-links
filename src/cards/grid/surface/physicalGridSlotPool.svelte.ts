@@ -50,7 +50,7 @@ export function createPhysicalGridSlotPool<
 	let topologyColumns = 0;
 	let sourceRowsBySlot: Array<CardGridMountedRow<TMountedCell> | undefined> = [];
 	let activeSlotIndices: number[] = [];
-	let nextActiveSlotIndices: number[] = [];
+	let nextActiveSlotIndicesScratch: number[] = [];
 	let syncGeneration = 0;
 	let seenGenerationBySlot: number[] = [];
 
@@ -59,7 +59,7 @@ export function createPhysicalGridSlotPool<
 		topologyColumns = columns;
 		sourceRowsBySlot = [];
 		activeSlotIndices = [];
-		nextActiveSlotIndices = [];
+		nextActiveSlotIndicesScratch = [];
 		syncGeneration = 0;
 		seenGenerationBySlot = [];
 	}
@@ -94,14 +94,14 @@ export function createPhysicalGridSlotPool<
 		ensureCapacity(requiredCapacity);
 
 		syncGeneration += 1;
-		nextActiveSlotIndices.length = 0;
+		nextActiveSlotIndicesScratch.length = 0;
 		for (const sourceRow of mountedRows) {
 			const slotIndex = sourceRow.physicalRowSlot;
 			const slot = rows[slotIndex];
 			if (!slot) continue;
 
 			seenGenerationBySlot[slotIndex] = syncGeneration;
-			nextActiveSlotIndices.push(slotIndex);
+			nextActiveSlotIndicesScratch.push(slotIndex);
 			if (sourceRowsBySlot[slotIndex] === sourceRow && slot.active) continue;
 
 			sourceRowsBySlot[slotIndex] = sourceRow;
@@ -114,9 +114,9 @@ export function createPhysicalGridSlotPool<
 			rows[slotIndex]?.setActive(false);
 		}
 
-		const previousActiveSlotIndices = activeSlotIndices;
-		activeSlotIndices = nextActiveSlotIndices;
-		nextActiveSlotIndices = previousActiveSlotIndices;
+		const previousActiveSlotIndicesScratch = activeSlotIndices;
+		activeSlotIndices = nextActiveSlotIndicesScratch;
+		nextActiveSlotIndicesScratch = previousActiveSlotIndicesScratch;
 	}
 
 	return {

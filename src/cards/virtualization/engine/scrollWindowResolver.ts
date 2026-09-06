@@ -73,12 +73,12 @@ export function createVirtualScrollWindowRangeResolver<
 	};
 	// Row models write ranges in place, so the writable scratch stays private and
 	// only value-stable published snapshots are exposed on the measurement.
-	const rangesScratch: MutableVirtualRanges = {
+	const mutableRangesScratch: MutableVirtualRanges = {
 		mounted: { start: 0, end: 0 },
 		previewVisible: { start: 0, end: 0 },
 	};
 	const scrollWindowMeasurement: MutableScrollWindowMeasurement = {
-		ranges: rangesScratch,
+		ranges: mutableRangesScratch,
 		mountedCoverageScrollTopBand: undefined,
 		previewCoverageScrollTopBand: undefined,
 	};
@@ -158,8 +158,11 @@ export function createVirtualScrollWindowRangeResolver<
 		rangeParams.viewportHeight = viewportHeight;
 		rangeParams.mountedOverscanPx = visibilityPolicy.mountedOverscanPx;
 		rangeParams.previewOverscanPx = visibilityPolicy.previewOverscanPx ?? 0;
-		measurementRowModel.findVisibleRangesInto(rangesScratch, rangeParams);
-		lastPublishedRanges = publishStableRanges(rangesScratch, lastPublishedRanges);
+		measurementRowModel.findVisibleRangesInto(mutableRangesScratch, rangeParams);
+		lastPublishedRanges = publishStableRanges(
+			mutableRangesScratch,
+			lastPublishedRanges,
+		);
 		scrollWindowMeasurement.ranges = lastPublishedRanges;
 		scrollWindowMeasurement.mountedCoverageScrollTopBand =
 			updateCoverageScrollTopBand(

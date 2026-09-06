@@ -1,7 +1,7 @@
 import type { FlatListScrollState } from "cards/list/model/listViewUiState";
 import type {
 	ProgrammaticScrollSnapshot,
-	VirtualListStableMeasurementContext,
+	PublishedVirtualRangeContext,
 } from "cards/virtualization/public";
 import { getOptionalOwnerWindow } from "shared/ui/dom/realmSafeDom";
 
@@ -10,7 +10,7 @@ export interface FlatGridScrollStateOptions {
 	getRootEl(): HTMLElement | null;
 	getScrollContainerEl(): HTMLElement | null;
 	getSectionTop(): number;
-	hasStableScrollMetrics(): boolean;
+	hasValidScrollMetrics(): boolean;
 	getVisibleCount(): number;
 	publish(state: FlatListScrollState): void;
 	suppressNextNativeScroll(scrollTop: number): void;
@@ -18,9 +18,9 @@ export interface FlatGridScrollStateOptions {
 }
 
 export interface FlatGridScrollStateController {
-	getCurrentMetrics(): VirtualListStableMeasurementContext | null;
-	restorePending(context: VirtualListStableMeasurementContext): boolean;
-	publishCurrent(context: VirtualListStableMeasurementContext): void;
+	getCurrentMetrics(): PublishedVirtualRangeContext | null;
+	restorePending(context: PublishedVirtualRangeContext): boolean;
+	publishCurrent(context: PublishedVirtualRangeContext): void;
 	persist(): void;
 }
 
@@ -30,7 +30,7 @@ export function createFlatGridScrollStateController(
 ): FlatGridScrollStateController {
 	let pendingRestore = options.initialState;
 
-	function getCurrentMetrics(): VirtualListStableMeasurementContext | null {
+	function getCurrentMetrics(): PublishedVirtualRangeContext | null {
 		const scrollContainerEl = options.getScrollContainerEl();
 		const ownerWindow = getOptionalOwnerWindow(
 			scrollContainerEl ?? options.getRootEl(),
@@ -49,7 +49,7 @@ export function createFlatGridScrollStateController(
 		};
 	}
 
-	function restorePending(context: VirtualListStableMeasurementContext): boolean {
+	function restorePending(context: PublishedVirtualRangeContext): boolean {
 		const restoreState = pendingRestore;
 		if (!restoreState) return false;
 
@@ -85,7 +85,7 @@ export function createFlatGridScrollStateController(
 		return true;
 	}
 
-	function publishCurrent(context: VirtualListStableMeasurementContext): void {
+	function publishCurrent(context: PublishedVirtualRangeContext): void {
 		options.publish({
 			localScrollTop: Math.max(0, context.scrollTop - context.sectionTop),
 			visibleCount: options.getVisibleCount(),
@@ -93,7 +93,7 @@ export function createFlatGridScrollStateController(
 	}
 
 	function persist(): void {
-		if (pendingRestore || !options.hasStableScrollMetrics()) return;
+		if (pendingRestore || !options.hasValidScrollMetrics()) return;
 		const context = getCurrentMetrics();
 		if (context) publishCurrent(context);
 	}

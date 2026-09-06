@@ -157,8 +157,8 @@ export function computeVirtualRanges<TCell>(params: {
 	scrollTop: number;
 	viewportHeight: number;
 	sectionTop: number;
-	isStableMeasurement: boolean;
-	hasStableVisibleRange: boolean;
+	hasValidScrollMetrics: boolean;
+	hasPublishedVisibleRange: boolean;
 	currentMountedRange: RowRange;
 	bootstrapRows: number;
 	mountedOverscanPx: number;
@@ -174,10 +174,10 @@ export function computeVirtualRanges<TCell>(params: {
 		return { kind: "empty", ranges: EMPTY_VIRTUAL_RANGES };
 	}
 
-	if (!params.isStableMeasurement) {
+	if (!params.hasValidScrollMetrics) {
 		const shouldUseBootstrapRange =
 			params.rowModel.rowCount > 0 &&
-			(!params.hasStableVisibleRange ||
+			(!params.hasPublishedVisibleRange ||
 				params.currentMountedRange.start >= params.rowModel.rowCount ||
 				params.currentMountedRange.end > params.rowModel.rowCount ||
 				isEmptyRange(params.currentMountedRange));

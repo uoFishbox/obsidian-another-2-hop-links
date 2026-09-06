@@ -24,8 +24,8 @@ describe("createInitialMeasurementLifecycle", () => {
 			getWindow: () => ownerWindow,
 		});
 		const lifecycle = createInitialMeasurementLifecycle({
-			measurement: { hasStableScrollMetrics: false },
-			hasStableVisibleRange: () => false,
+			measurement: { hasValidScrollMetrics: false },
+			hasPublishedVisibleRange: () => false,
 			runLayoutMeasurement: vi.fn(),
 			scheduleLayoutMeasurement,
 			getRootEl: () => ({}) as HTMLElement,
@@ -60,8 +60,8 @@ describe("createInitialMeasurementLifecycle", () => {
 			getWindow: () => ownerWindow,
 		});
 		const lifecycle = createInitialMeasurementLifecycle({
-			measurement: { hasStableScrollMetrics: false },
-			hasStableVisibleRange: () => false,
+			measurement: { hasValidScrollMetrics: false },
+			hasPublishedVisibleRange: () => false,
 			runLayoutMeasurement: vi.fn(),
 			scheduleLayoutMeasurement,
 			getRootEl: () => ({}) as HTMLElement,
@@ -92,8 +92,8 @@ describe("createInitialMeasurementLifecycle", () => {
 		});
 		const runLayoutMeasurement = vi.fn();
 		const lifecycle = createInitialMeasurementLifecycle({
-			measurement: { hasStableScrollMetrics: false },
-			hasStableVisibleRange: () => false,
+			measurement: { hasValidScrollMetrics: false },
+			hasPublishedVisibleRange: () => false,
 			runLayoutMeasurement,
 			scheduleLayoutMeasurement: vi.fn(),
 			getRootEl: () => ({}) as HTMLElement,
@@ -137,8 +137,8 @@ describe("createInitialMeasurementLifecycle", () => {
 		};
 		const runLayoutMeasurement = vi.fn();
 		const lifecycle = createInitialMeasurementLifecycle({
-			measurement: { hasStableScrollMetrics: false },
-			hasStableVisibleRange: () => false,
+			measurement: { hasValidScrollMetrics: false },
+			hasPublishedVisibleRange: () => false,
 			runLayoutMeasurement,
 			scheduleLayoutMeasurement: vi.fn(),
 			getRootEl: () => ({}) as HTMLElement,

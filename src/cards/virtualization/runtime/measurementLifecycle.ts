@@ -18,7 +18,7 @@ export interface VirtualMeasurement {
 	readonly scrollTop: number;
 	readonly viewportHeight: number;
 	readonly sectionTop: number;
-	readonly isStableMeasurement: boolean;
+	readonly hasValidScrollMetrics: boolean;
 	readonly isScrollActive: boolean;
 	/** Observer scroll generation represented by this measurement. */
 	readonly scrollGeneration: number;
@@ -34,9 +34,9 @@ export type VirtualMeasurementResult =
 			readonly reason: "no-root" | "no-window";
 	  };
 
-export type VirtualMeasurementApplicationResult = "stable" | "unstable" | "skipped";
+export type VirtualMeasurementApplicationResult = "applied" | "rejected" | "skipped";
 
-export interface VirtualListStableMeasurementContext {
+export interface PublishedVirtualRangeContext {
 	scrollTop: number;
 	viewportHeight: number;
 	sectionTop: number;
@@ -47,8 +47,8 @@ export interface VirtualListStableMeasurementContext {
 const INITIAL_STABILIZATION_TASK_KEY = "virtual-list:initial-stabilization";
 
 export interface InitialMeasurementLifecycleOptions {
-	measurement: { readonly hasStableScrollMetrics: boolean };
-	hasStableVisibleRange(): boolean;
+	measurement: { readonly hasValidScrollMetrics: boolean };
+	hasPublishedVisibleRange(): boolean;
 	runLayoutMeasurement(): void;
 	scheduleLayoutMeasurement(): void;
 	getRootEl(): HTMLElement | null;
@@ -70,7 +70,7 @@ export interface InitialMeasurementLifecycle {
 
 export function createInitialMeasurementLifecycle({
 	measurement,
-	hasStableVisibleRange,
+	hasPublishedVisibleRange,
 	runLayoutMeasurement,
 	scheduleLayoutMeasurement,
 	getRootEl,
@@ -85,8 +85,8 @@ export function createInitialMeasurementLifecycle({
 	let cancelledByScroll = false;
 	let remainingFrames = 0;
 
-	const hasStableMeasurement = (): boolean =>
-		measurement.hasStableScrollMetrics && hasStableVisibleRange();
+	const hasCompletedInitialMeasurement = (): boolean =>
+		measurement.hasValidScrollMetrics && hasPublishedVisibleRange();
 
 	const releaseObservedLayoutSuppression = (): void => {
 		suppressObservedLayoutMeasurement = false;
@@ -108,7 +108,7 @@ export function createInitialMeasurementLifecycle({
 
 	const runStabilizationPass = (): void => {
 		if (completed || cancelledByScroll) return;
-		if (hasStableMeasurement()) {
+		if (hasCompletedInitialMeasurement()) {
 			completed = true;
 			return;
 		}
@@ -116,7 +116,7 @@ export function createInitialMeasurementLifecycle({
 
 		passCount += 1;
 		runLayoutMeasurement();
-		if (hasStableMeasurement()) {
+		if (hasCompletedInitialMeasurement()) {
 			completed = true;
 			return;
 		}
@@ -147,7 +147,7 @@ export function createInitialMeasurementLifecycle({
 		) {
 			return;
 		}
-		if (hasStableMeasurement()) {
+		if (hasCompletedInitialMeasurement()) {
 			completed = true;
 			return;
 		}
@@ -190,7 +190,7 @@ export function createInitialMeasurementLifecycle({
 		},
 		scheduleStabilization,
 		cancelBecauseScrollStarted(): void {
-			if (hasStableMeasurement()) {
+			if (hasCompletedInitialMeasurement()) {
 				completed = true;
 				cancelStabilization();
 				return;
