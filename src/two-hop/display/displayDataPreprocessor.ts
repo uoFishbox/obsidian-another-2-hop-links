@@ -361,8 +361,7 @@ export function preprocessTagDisplayData(
 	}
 
 	if (settings.dedupeCards) {
-		const result = deduplicateTaggedNotes(initialState, taggedNotes);
-		taggedNotes = result.items;
+		taggedNotes = deduplicateTaggedNotes(initialState, taggedNotes);
 	}
 
 	return {

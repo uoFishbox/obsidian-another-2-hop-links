@@ -2,11 +2,6 @@ export interface DedupState {
 	readonly usedKeys: ReadonlySet<string>;
 }
 
-export interface DedupResult<T> {
-	readonly state: DedupState;
-	readonly items: readonly T[];
-}
-
 export interface UsageTracker {
 	tryMarkUsed(key: string): boolean;
 	getState(): DedupState;

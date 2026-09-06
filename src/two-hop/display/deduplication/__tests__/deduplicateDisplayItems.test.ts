@@ -89,6 +89,52 @@ describe("deduplicateLinks", () => {
 		]);
 	});
 
+	test("consumes interleaved duplicate branches in canonical order without mutating inputs", () => {
+		const sharedFromA = createLink("a-target.md", "shared.md");
+		const sharedFromB = createLink("b-target.md", "shared.md");
+		const onlyB = createLink("b-target.md", "only-b.md");
+		const firstA = Object.freeze(createBranch("A.md"));
+		const branchB = Object.freeze(
+			createBranch("B.md", Object.freeze([sharedFromB, onlyB])),
+		);
+		const laterA = Object.freeze(
+			createBranch("a.md", Object.freeze([sharedFromA, sharedFromA])),
+		);
+		const branches = Object.freeze([firstA, branchB, laterA]);
+		const state = { usedKeys: new Set(["f:prior.md"]) };
+
+		const result = deduplicateLinks(state, branches, Object.freeze([]));
+
+		expect(result.data.branches).toEqual([firstA, branchB]);
+		expect(result.data.twoHopBranches).toEqual([
+			{ hop1: firstA.hop1, hop2: [sharedFromA] },
+			{ hop1: branchB.hop1, hop2: [onlyB] },
+		]);
+		expect(result.data.twoHopBranches[0].hop1).toBe(firstA.hop1);
+		expect(result.data.twoHopBranches[0].hop2[0]).toBe(sharedFromA);
+		expect(branchB.hop2).toEqual([sharedFromB, onlyB]);
+		expect(laterA.hop2).toEqual([sharedFromA, sharedFromA]);
+		expect(state.usedKeys).toEqual(new Set(["f:prior.md"]));
+		expect(result.state.usedKeys).toEqual(
+			new Set(["f:prior.md", "f:a.md", "f:b.md", "f:shared.md", "f:only-b.md"]),
+		);
+	});
+
+	test("keeps hop2 from a blocked resolved branch when an unresolved duplicate is displayed", () => {
+		const firstHop2 = createLink("target.md", "first.md");
+		const laterHop2 = createLink("target.md", "later.md");
+		const resolved = createBranch("shared.md", [firstHop2]);
+		const unresolved = createBranch("shared.md", [laterHop2], true);
+		const state = { usedKeys: new Set(["f:shared.md"]) };
+
+		const result = deduplicateLinks(state, [resolved, unresolved], []);
+
+		expect(result.data.branches).toEqual([unresolved]);
+		expect(result.data.twoHopBranches).toEqual([
+			{ hop1: resolved.hop1, hop2: [firstHop2, laterHop2] },
+		]);
+	});
+
 	test("computes branch keys once per input branch", () => {
 		const getBranchKeys = vi.spyOn(keyGenerator, "getBranchKeys");
 		const branches = [createBranch("one.md"), createBranch("one.md")];
@@ -143,7 +189,7 @@ describe("deduplicateTaggedNotes", () => {
 			duplicate,
 		]);
 
-		expect(result.items).toEqual([first]);
+		expect(result).toEqual([first]);
 		expect(state.usedKeys).toEqual(new Set(["f:link.md"]));
 	});
 
@@ -154,8 +200,8 @@ describe("deduplicateTaggedNotes", () => {
 			createTaggedNote("tag.md", "custom:key"),
 		]);
 
-		expect(result.items).toEqual([]);
-		expect(result.state).toBe(state);
+		expect(result).toEqual([]);
+		expect(state.usedKeys).toEqual(new Set(["custom:key"]));
 	});
 
 	test("returns an empty input by reference without changing state", () => {
@@ -164,7 +210,21 @@ describe("deduplicateTaggedNotes", () => {
 
 		const result = deduplicateTaggedNotes(state, notes);
 
-		expect(result.items).toBe(notes);
-		expect(result.state).toBe(state);
+		expect(result).toBe(notes);
+		expect(state.usedKeys.size).toBe(0);
+	});
+
+	test("reuses unique input and only looks up prior keys without enumerating them", () => {
+		const usedKeys = new Set(["f:prior.md"]);
+		const iterator = vi.spyOn(usedKeys, Symbol.iterator);
+		const notes = Object.freeze([
+			createTaggedNote("one.md"),
+			createTaggedNote("two.md"),
+		]);
+
+		expect(deduplicateTaggedNotes({ usedKeys }, notes)).toBe(notes);
+		expect(iterator).not.toHaveBeenCalled();
+		expect(usedKeys.size).toBe(1);
+		expect(usedKeys.has("f:prior.md")).toBe(true);
 	});
 });

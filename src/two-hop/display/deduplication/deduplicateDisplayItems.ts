@@ -1,17 +1,12 @@
 import type { TaggedNote, IndexedLink } from "indexing/model";
 import type { TwoHopLinkBranch } from "two-hop/model";
-import type {
-	DedupResult,
-	DedupState,
-} from "two-hop/display/deduplication/usageTracker";
+import type { DedupState } from "two-hop/display/deduplication/usageTracker";
 import * as keyGenerator from "cards/identity/usageKeys";
 import { createUsageTracker } from "./usageTracker";
 
 interface CanonicalBranchEntry {
 	hop1: IndexedLink;
-	hop2: IndexedLink[];
-	hop2UsageKeys: string[];
-	seenHop2UsageKeys: Set<string>;
+	hop2Groups: TwoHopLinkBranch["hop2"][];
 }
 
 export interface DeduplicatedLinkData {
@@ -27,7 +22,7 @@ export interface DeduplicatedLinkResult {
 
 /**
  * Deduplicates link sections in branch, backlink, then hop2 precedence order.
- * Branch keys and merged hop2 entries are collected in one branch walk.
+ * Groups hop2 arrays by first branch appearance before consuming their keys.
  */
 export function deduplicateLinks(
 	state: DedupState,
@@ -80,34 +75,32 @@ export function deduplicateLinks(
 	};
 }
 
-/** Deduplicates tagged notes after all previously consumed sections. */
+/** Filters tagged notes against prior sections and each other without copying or changing state. */
 export function deduplicateTaggedNotes(
 	state: DedupState,
 	taggedNotes: readonly TaggedNote[],
-): DedupResult<TaggedNote> {
+): readonly TaggedNote[] {
 	if (taggedNotes.length === 0) {
-		return { state, items: taggedNotes };
+		return taggedNotes;
 	}
 
-	const tracker = createUsageTracker(state);
+	const seenTagKeys = new Set<string>();
 	let filteredItems: TaggedNote[] | undefined;
 
 	for (let index = 0; index < taggedNotes.length; index += 1) {
 		const taggedNote = taggedNotes[index];
 		const usageKey =
 			taggedNote.usageKey ?? keyGenerator.getTaggedNoteKey(taggedNote);
-		if (!tracker.tryMarkUsed(usageKey)) {
+		if (state.usedKeys.has(usageKey) || seenTagKeys.has(usageKey)) {
 			filteredItems ??= taggedNotes.slice(0, index);
 			continue;
 		}
 
+		seenTagKeys.add(usageKey);
 		filteredItems?.push(taggedNote);
 	}
 
-	return {
-		state: tracker.getState(),
-		items: filteredItems ?? taggedNotes,
-	};
+	return filteredItems ?? taggedNotes;
 }
 
 function mergeCanonicalBranch(
@@ -119,20 +112,12 @@ function mergeCanonicalBranch(
 	if (!entry) {
 		entry = {
 			hop1: branch.hop1,
-			hop2: [],
-			hop2UsageKeys: [],
-			seenHop2UsageKeys: new Set<string>(),
+			hop2Groups: [],
 		};
 		canonicalBranches.set(displayKey, entry);
 	}
 
-	for (const link of branch.hop2) {
-		const usageKey = keyGenerator.getLinkUsageKey(link);
-		if (entry.seenHop2UsageKeys.has(usageKey)) continue;
-		entry.seenHop2UsageKeys.add(usageKey);
-		entry.hop2.push(link);
-		entry.hop2UsageKeys.push(usageKey);
-	}
+	if (branch.hop2.length > 0) entry.hop2Groups.push(branch.hop2);
 }
 
 function consumeCanonicalHop2(
@@ -143,9 +128,12 @@ function consumeCanonicalHop2(
 
 	for (const entry of canonicalBranches.values()) {
 		const filteredHop2: IndexedLink[] = [];
-		for (let index = 0; index < entry.hop2.length; index += 1) {
-			if (!tryMarkUsed(entry.hop2UsageKeys[index])) continue;
-			filteredHop2.push(entry.hop2[index]);
+		// Consume a whole canonical branch before the next, even for interleaved duplicates.
+		for (const hop2 of entry.hop2Groups) {
+			for (const link of hop2) {
+				if (!tryMarkUsed(keyGenerator.getLinkUsageKey(link))) continue;
+				filteredHop2.push(link);
+			}
 		}
 
 		if (filteredHop2.length === 0) continue;
