@@ -34,18 +34,22 @@ export function buildMountedTwoHopRows(
 	params: BuildMountedTwoHopRowsParams,
 ): MountedTwoHopBuild {
 	const { rowModel, rowSlotAllocator } = params;
-	const mountedRows = buildMountedGridRows<TwoHopVirtualCell, MountedTwoHopCell>({
+	const rowsInMountedRange = buildMountedGridRows<
+		TwoHopVirtualCell,
+		MountedTwoHopCell
+	>({
 		rowModel,
 		rowRange: params.rowRange,
 		rowSlotAllocator,
-		previousRows: params.previousBuild?.rowsInMountedRange,
-		canReusePreviousRows: params.previousBuild?.rowModel === rowModel,
-		bindCell: ({ cell, physicalCellSlot }) =>
-			createMountedTwoHopCell(cell, physicalCellSlot),
+		previousRows:
+			params.previousBuild?.rowModel === rowModel
+				? params.previousBuild.rowsInMountedRange
+				: undefined,
+		bindCell: createMountedTwoHopCell,
 	});
 
 	return {
-		rowsInMountedRange: mountedRows.rowsInMountedRange,
+		rowsInMountedRange,
 		rowModel,
 	};
 }

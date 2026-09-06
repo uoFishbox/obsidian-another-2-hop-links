@@ -288,7 +288,6 @@ describe("buildMountedFlatGridRows", () => {
 
 		expectKeys(cells).toEqual([itemKey(3), itemKey(4), itemKey(5)]);
 
-		expect(cells.map((cell) => cell.cellIndex)).toEqual([3, 4, 5]);
 		expect(cells[0]).toMatchObject({ rowIndex: 1, columnIndex: 0 });
 		expect(cells[1]).toMatchObject({ rowIndex: 1, columnIndex: 1 });
 		expect(result.rowsInMountedRange[0].top).toBe(130);

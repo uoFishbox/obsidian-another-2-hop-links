@@ -11,10 +11,6 @@ export interface MountedGridRow<TCell extends MountedVirtualCell> {
 	readonly bindings: readonly (TCell | null)[];
 }
 
-export interface MountedGridRows<TCell extends MountedVirtualCell> {
-	readonly rowsInMountedRange: MountedGridRow<TCell>[];
-}
-
 export interface BuildMountedGridRowsParams<
 	TLogicalCell,
 	TCell extends MountedVirtualCell,
@@ -22,23 +18,20 @@ export interface BuildMountedGridRowsParams<
 	readonly rowModel: VirtualRowModel<TLogicalCell>;
 	readonly rowRange: RowRange;
 	readonly rowSlotAllocator: ResidentRowSlotAllocator;
-	/** Previous contiguous logical rows. Omit when physical slot topology changed. */
+	/** Contiguous rows from the same immutable row model; omit after model changes. */
 	readonly previousRows?: readonly MountedGridRow<TCell>[];
-	/** Reuse an unchanged previous row shell without resolving its logical row. */
-	readonly canReusePreviousRows?: boolean;
-	bindCell(params: {
-		readonly cell: TLogicalCell;
-		readonly previous?: TCell;
-		readonly rowIndex: number;
-		readonly columnIndex: number;
-		readonly physicalCellSlot: number;
-	}): TCell;
+	bindCell(
+		cell: TLogicalCell,
+		physicalCellSlot: number,
+		rowIndex: number,
+		columnIndex: number,
+	): TCell;
 }
 
 /** Builds resident grid rows directly from the shared virtual row-model contract. */
 export function buildMountedGridRows<TLogicalCell, TCell extends MountedVirtualCell>(
 	params: BuildMountedGridRowsParams<TLogicalCell, TCell>,
-): MountedGridRows<TCell> {
+): MountedGridRow<TCell>[] {
 	const { rowModel, rowSlotAllocator } = params;
 	const columns = Math.max(1, rowModel.layout.columns);
 	const rowRange = clampRange(params.rowRange, rowModel.rowCount);
@@ -61,20 +54,13 @@ export function buildMountedGridRows<TLogicalCell, TCell extends MountedVirtualC
 		const previousRow = previousRows?.[rowIndex - previousFirstRowIndex];
 		const matchingPreviousRow =
 			previousRow?.rowIndex === rowIndex ? previousRow : undefined;
-		if (
-			params.canReusePreviousRows &&
-			matchingPreviousRow?.physicalRowSlot === physicalRowSlot
-		) {
+		if (matchingPreviousRow?.physicalRowSlot === physicalRowSlot) {
 			rowsInMountedRange.push(matchingPreviousRow);
 			continue;
 		}
 
 		const row = rowModel.getRow(rowIndex);
 		if (!row) continue;
-		const previousBindings =
-			matchingPreviousRow?.bindings.length === columns
-				? matchingPreviousRow.bindings
-				: undefined;
 		const bindings: (TCell | null)[] = [];
 		for (let columnIndex = 0; columnIndex < columns; columnIndex += 1) {
 			if (columnIndex >= row.cellCount) {
@@ -88,13 +74,7 @@ export function buildMountedGridRows<TLogicalCell, TCell extends MountedVirtualC
 			}
 			const physicalCellSlot = physicalRowSlot * columns + columnIndex;
 			bindings.push(
-				params.bindCell({
-					cell,
-					previous: previousBindings?.[columnIndex] ?? undefined,
-					rowIndex,
-					columnIndex,
-					physicalCellSlot,
-				}),
+				params.bindCell(cell, physicalCellSlot, rowIndex, columnIndex),
 			);
 		}
 
@@ -112,7 +92,7 @@ export function buildMountedGridRows<TLogicalCell, TCell extends MountedVirtualC
 		columns,
 	});
 
-	return { rowsInMountedRange };
+	return rowsInMountedRange;
 }
 
 export interface ResidentRowSlotRange {

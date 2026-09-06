@@ -66,7 +66,6 @@ function buildRows(params: {
 	readonly rowModel: VirtualRowModel<TestLogicalCell>;
 	readonly rowRange?: RowRange;
 	readonly previousRows?: readonly TestRow[];
-	readonly canReusePreviousRows?: boolean;
 	readonly allocator?: ReturnType<typeof createResidentRowSlotAllocator>;
 	readonly transformBinding?: (binding: TestMountedCell) => TestMountedCell;
 }) {
@@ -74,12 +73,10 @@ function buildRows(params: {
 	const bindCell = vi.fn(
 		(
 			cell: TestLogicalCell,
-			previous: TestMountedCell | undefined,
 			columnIndex: number,
 			physicalCellSlot: number,
 		): TestMountedCell => ({
-			...(previous ?? {}),
-			key: previous?.key ?? logicalCellKey(`cell:${cell.label}`),
+			key: logicalCellKey(`cell:${cell.label}`),
 			rowIndex: 0,
 			columnIndex,
 			physicalCellSlot,
@@ -91,10 +88,9 @@ function buildRows(params: {
 		rowRange: params.rowRange ?? { start: 0, end: 1 },
 		rowSlotAllocator: allocator,
 		previousRows: params.previousRows,
-		canReusePreviousRows: params.canReusePreviousRows,
-		bindCell: ({ cell, previous, rowIndex, columnIndex, physicalCellSlot }) => {
+		bindCell: (cell, physicalCellSlot, rowIndex, columnIndex) => {
 			const binding = {
-				...bindCell(cell, previous, columnIndex, physicalCellSlot),
+				...bindCell(cell, columnIndex, physicalCellSlot),
 				rowIndex,
 			};
 			return params.transformBinding?.(binding) ?? binding;
@@ -106,7 +102,7 @@ function buildRows(params: {
 describe("buildMountedGridRows", () => {
 	it("keeps one binding per physical column", () => {
 		const { build } = buildRows({ rowModel: createRowModel([2]) });
-		const row = build.rowsInMountedRange[0];
+		const row = build[0];
 
 		expect(row?.bindings).toHaveLength(4);
 		expect(row?.bindings.map((binding) => binding?.label ?? null)).toEqual([
@@ -126,52 +122,38 @@ describe("buildMountedGridRows", () => {
 		const rebuilt = buildRows({
 			rowModel: createRowModel([2]),
 			allocator,
-			previousRows: initial.build.rowsInMountedRange,
-			canReusePreviousRows: false,
 		});
 
-		expect(rebuilt.build.rowsInMountedRange[0]).not.toBe(
-			initial.build.rowsInMountedRange[0],
-		);
+		expect(rebuilt.build[0]).not.toBe(initial.build[0]);
 		expect(rebuilt.bindCell).toHaveBeenCalledTimes(2);
-		expect(rebuilt.bindCell.mock.calls.every(([, previous]) => previous)).toBe(
-			true,
-		);
+		expect(rebuilt.build[0]?.bindings).toEqual(initial.build[0]?.bindings);
 	});
 
-	it("reuses occupied bindings and creates only columns transitioning from empty", () => {
+	it("rebuilds occupied columns without changing previously published rows", () => {
 		const allocator = createResidentRowSlotAllocator();
 		const full = buildRows({ rowModel: createRowModel([4]), allocator });
 		const partial = buildRows({
 			rowModel: createRowModel([2]),
 			allocator,
-			previousRows: full.build.rowsInMountedRange,
 		});
 		const restored = buildRows({
 			rowModel: createRowModel([4]),
 			allocator,
-			previousRows: partial.build.rowsInMountedRange,
 		});
 
 		expect(partial.bindCell).toHaveBeenCalledTimes(2);
-		expect(partial.bindCell.mock.calls.every(([, previous]) => previous)).toBe(
+		expect(partial.build[0]?.bindings.map((binding) => binding !== null)).toEqual([
 			true,
-		);
-		expect(
-			partial.build.rowsInMountedRange[0]?.bindings.map(
-				(binding) => binding !== null,
-			),
-		).toEqual([true, true, false, false]);
+			true,
+			false,
+			false,
+		]);
 
 		expect(restored.bindCell).toHaveBeenCalledTimes(4);
-		expect(
-			restored.bindCell.mock.calls.map(([, previous]) => previous !== undefined),
-		).toEqual([true, true, false, false]);
-		expect(
-			restored.build.rowsInMountedRange[0]?.bindings.every(
-				(binding) => binding !== null,
-			),
-		).toBe(true);
+		expect(full.build[0]?.bindings.every((binding) => binding !== null)).toBe(true);
+		expect(restored.build[0]?.bindings.every((binding) => binding !== null)).toBe(
+			true,
+		);
 	});
 
 	it("keeps mounted rows in logical order while physical slots rotate", () => {
@@ -186,16 +168,11 @@ describe("buildMountedGridRows", () => {
 			rowModel: model,
 			rowRange: { start: 2, end: 6 },
 			allocator,
-			previousRows: initial.build.rowsInMountedRange,
-			canReusePreviousRows: true,
+			previousRows: initial.build,
 		});
 
-		expect(
-			shifted.build.rowsInMountedRange.map((row) => row.physicalRowSlot),
-		).toEqual([2, 3, 0, 1]);
-		expect(shifted.build.rowsInMountedRange.map((row) => row.rowIndex)).toEqual([
-			2, 3, 4, 5,
-		]);
+		expect(shifted.build.map((row) => row.physicalRowSlot)).toEqual([2, 3, 0, 1]);
+		expect(shifted.build.map((row) => row.rowIndex)).toEqual([2, 3, 4, 5]);
 	});
 
 	it("reuses unchanged resident row shells without resolving their row model", () => {
@@ -211,16 +188,11 @@ describe("buildMountedGridRows", () => {
 			rowModel: model,
 			rowRange: { start: 0, end: 2 },
 			allocator,
-			previousRows: initial.build.rowsInMountedRange,
-			canReusePreviousRows: true,
+			previousRows: initial.build,
 		});
 
-		expect(reused.build.rowsInMountedRange[0]).toBe(
-			initial.build.rowsInMountedRange[0],
-		);
-		expect(reused.build.rowsInMountedRange[1]).toBe(
-			initial.build.rowsInMountedRange[1],
-		);
+		expect(reused.build[0]).toBe(initial.build[0]);
+		expect(reused.build[1]).toBe(initial.build[1]);
 		expect(getRow).not.toHaveBeenCalled();
 	});
 

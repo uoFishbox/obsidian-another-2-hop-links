@@ -10,11 +10,7 @@ export {
 	createResidentRowSlotAllocator,
 	type ResidentRowSlotAllocator,
 } from "./engine/mountedGridRows";
-export {
-	buildMountedGridRows,
-	type MountedGridRow,
-	type MountedGridRows,
-} from "./engine/mountedGridRows";
+export { buildMountedGridRows, type MountedGridRow } from "./engine/mountedGridRows";
 export type { VirtualListSnapshot } from "./engine/snapshotComputation";
 export type {
 	MutableStableScrollTopBand,
