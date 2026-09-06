@@ -101,6 +101,9 @@
 		) ?? SORT_FIELDS[0],
 	);
 	const isDescending = $derived(sortOption === sortField.desc);
+	const sortDirectionIcon = $derived(
+		isDescending ? "arrow-down-wide-narrow" : "arrow-down-narrow-wide",
+	);
 	const sortDirectionLabel = $derived(
 		sortField === RELEVANCE_FIELD
 			? isDescending
@@ -297,23 +300,7 @@
 			title={sortDirectionLabel}
 			onclick={toggleSortDirection}
 		>
-			<svg
-				xmlns="http://www.w3.org/2000/svg"
-				width="18"
-				height="18"
-				viewBox="0 0 24 24"
-				fill="none"
-				stroke="currentColor"
-				stroke-width="2"
-				stroke-linecap="round"
-				stroke-linejoin="round"
-				class="svg-icon"
-				aria-hidden="true"
-				focusable="false"
-			>
-				<path d="M12 5h9M12 12h6M12 19h3M5 5v14" />
-				<path d={isDescending ? "m2 16 3 3 3-3" : "m2 8 3-3 3 3"} />
-			</svg>
+			<span aria-hidden="true" use:renderSortFieldIcon={sortDirectionIcon}></span>
 		</button>
 		<button
 			type="button"

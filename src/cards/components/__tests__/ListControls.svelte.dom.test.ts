@@ -187,6 +187,13 @@ describe("ListControls", () => {
 		const view = render(ListControls, {
 			props: { sortOption: "file-size", onSortChange },
 		});
+		expect(
+			screen
+				.getByRole("button", {
+					name: "昇順（クリックで降順に切り替え）",
+				})
+				.querySelector('[aria-hidden="true"]'),
+		).toHaveAttribute("data-icon", "arrow-down-narrow-wide");
 		await fireEvent.click(
 			screen.getByRole("button", { name: "昇順（クリックで降順に切り替え）" }),
 		);
@@ -195,6 +202,13 @@ describe("ListControls", () => {
 		expect(onSortChange).toHaveBeenLastCalledWith("modified-date");
 
 		await view.rerender({ sortOption: "file-size-reverse" });
+		expect(
+			screen
+				.getByRole("button", {
+					name: "降順（クリックで昇順に切り替え）",
+				})
+				.querySelector('[aria-hidden="true"]'),
+		).toHaveAttribute("data-icon", "arrow-down-wide-narrow");
 		await fireEvent.click(
 			screen.getByRole("button", { name: "降順（クリックで昇順に切り替え）" }),
 		);
