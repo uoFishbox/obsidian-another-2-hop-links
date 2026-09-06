@@ -310,7 +310,7 @@ export const CARD_RENDER_SHADOW_CSS = String.raw`
 .cosense-card-links__box-preview--image img {
 	width: 100%;
 	height: auto;
-	border-radius: var(--radius-s);
+	border-radius: var(--image-radius);
 	-webkit-user-drag: none;
 }
 
