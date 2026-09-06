@@ -29,6 +29,8 @@
 	scrollContainerEl={list.scrollContainerEl}
 	resolveNavigationTarget={list.resolveNavigationTarget}
 	resolveSequentialNavigationTarget={list.resolveSequentialNavigationTarget}
+	onMoveFocusAboveGrid={props.onMoveFocusAboveGrid}
+	shouldMoveFocusAboveGrid={list.shouldMoveFocusAboveGrid}
 	flushVirtualScrollMeasurement={list.flushVirtualScrollMeasurement}
 	interactionDescriptorResolverProvider={list.interactionDescriptorResolverProvider}
 	getCellDataTestId={(mountedCell) =>

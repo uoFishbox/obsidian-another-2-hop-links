@@ -570,6 +570,14 @@ describe("SearchableItemList integration", () => {
 		const firstItem = getAllSearchableItems()[0];
 		expectComposedFocus(firstItem);
 
+		await fireEvent.keyDown(firstItem, { key: "ArrowUp" });
+		await flushAsyncUi();
+		expectComposedFocus(input);
+
+		await fireEvent.keyDown(input, { key: "ArrowDown" });
+		await flushAsyncUi();
+		expectComposedFocus(firstItem);
+
 		const secondItem = getAllSearchableItems()[1];
 		await fireEvent.keyDown(firstItem, { key: "ArrowDown" });
 		await flushAsyncUi();

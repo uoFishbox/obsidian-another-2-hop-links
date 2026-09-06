@@ -102,6 +102,11 @@ interface CardSurfaceNavigationOptions {
 			columnIndex: number;
 		},
 	) => VirtualSequentialNavigationTarget | null;
+	onMoveFocusAboveGrid?: () => boolean | Promise<boolean>;
+	shouldMoveFocusAboveGrid?: (
+		currentKey: string,
+		currentPosition: { rowIndex: number; columnIndex: number },
+	) => boolean;
 	flushVirtualScrollMeasurement?: (snapshot: ProgrammaticScrollSnapshot) => void;
 }
 
@@ -197,6 +202,20 @@ export const createCardSurfaceNavigation = (
 		const { rowIndex, columnIndex } = registeredCell.metadata;
 		if (rowIndex === undefined || columnIndex === undefined) {
 			return false;
+		}
+		const isAboveGridBoundary =
+			rowIndex === 0 ||
+			options.shouldMoveFocusAboveGrid?.(registeredCell.metadata.logicalKey, {
+				rowIndex,
+				columnIndex,
+			}) === true;
+		if (
+			direction === "up" &&
+			isAboveGridBoundary &&
+			options.onMoveFocusAboveGrid &&
+			(await options.onMoveFocusAboveGrid())
+		) {
+			return true;
 		}
 
 		const target = options.resolveNavigationTarget?.(

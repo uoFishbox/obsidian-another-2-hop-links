@@ -370,6 +370,7 @@
 	});
 
 	let resultsContainerEl = $state<HTMLDivElement | null>(null);
+	let searchInputEl = $state<HTMLInputElement | null>(null);
 	let resultsMinHeight = $derived(
 		preserveResultsHeightOnSearch && searchEnabled && search.normalized
 			? "100vh"
@@ -379,6 +380,13 @@
 	async function moveFocusToResults(direction: "up" | "down") {
 		await tick();
 		focusResultEdge(resultsContainerEl, direction);
+	}
+
+	function moveFocusToSearchInput(): boolean {
+		if (!searchInputEl) return false;
+		searchInputEl.focus({ preventScroll: true });
+		searchInputEl.scrollIntoView({ block: "nearest", inline: "nearest" });
+		return true;
 	}
 </script>
 
@@ -400,6 +408,7 @@
 	showContentSearchToggle={allowContentSearch}
 	searchPlaceholder={config.searchPlaceholder ?? "Search..."}
 	{autofocus}
+	bind:searchInputEl
 />
 
 <div
@@ -428,6 +437,7 @@
 			{loadMoreIncrement}
 			paginationMode={config.paginationMode ?? "button"}
 			initialScrollState={uiState?.scrollState}
+			onMoveFocusAboveGrid={moveFocusToSearchInput}
 			onScrollStateChange={(scrollState) => {
 				if (!uiState) return;
 				const currentInputQuery = uiState.searchInputValue.trim().toLowerCase();

@@ -313,6 +313,13 @@ function querySectionHeader(label: string): HTMLElement | null {
 	);
 }
 
+function expectComposedFocus(element: HTMLElement): void {
+	const root = element.getRootNode();
+	expect(
+		root instanceof ShadowRoot ? root.activeElement : document.activeElement,
+	).toBe(element);
+}
+
 describe("TwoHopLinksPage behavior", () => {
 	beforeEach(() => {
 		searchResponseHarness.reset();
@@ -370,6 +377,34 @@ describe("TwoHopLinksPage behavior", () => {
 		expect(queryCard("outgoing-parent")).toBeInTheDocument();
 		expect(queryCard("backlink-note")).toBeInTheDocument();
 		expect(queryCard("tagged-note")).toBeInTheDocument();
+	});
+
+	it("moves focus from the top card row to search with ArrowUp in a one-column two-hop grid", async () => {
+		const file = createMockTFile("notes/target.md");
+		const parentFile = createMockTFile("notes/outgoing-parent.md");
+		const displayData = {
+			...createDisplayData(),
+			outgoing: [createBranch(file, parentFile, [], "outgoing-parent")],
+		};
+		const settings = {
+			...DEFAULT_SETTINGS,
+			cardMaxColumns: 1,
+			useMergedLinksSection: false,
+			showTagsSection: false,
+		};
+
+		const view = renderRoot(displayData, settings, file);
+		await showEntireVirtualSurface(320);
+		const input = view.getByRole("searchbox", { name: "Find cards" });
+		const firstCard = queryCard("outgoing-parent");
+		expect(firstCard).not.toBeNull();
+
+		firstCard!.focus();
+		expectComposedFocus(firstCard!);
+		await fireEvent.keyDown(firstCard!, { key: "ArrowUp" });
+		await flushAsyncUi();
+
+		expectComposedFocus(input);
 	});
 
 	it("hides the two-hop section when only its parent matches the search", async () => {

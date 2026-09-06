@@ -47,6 +47,11 @@
 			direction: SequentialNavigationDirection,
 			currentPosition: { rowIndex: number; columnIndex: number },
 		) => VirtualSequentialNavigationTarget | null;
+		onMoveFocusAboveGrid?: () => boolean | Promise<boolean>;
+		shouldMoveFocusAboveGrid?: (
+			currentKey: string,
+			currentPosition: { rowIndex: number; columnIndex: number },
+		) => boolean;
 		flushVirtualScrollMeasurement?: (snapshot: ProgrammaticScrollSnapshot) => void;
 	}
 
@@ -72,6 +77,8 @@
 		slotBodyRevision = undefined,
 		resolveNavigationTarget,
 		resolveSequentialNavigationTarget,
+		onMoveFocusAboveGrid,
+		shouldMoveFocusAboveGrid,
 		flushVirtualScrollMeasurement,
 	}: CardGridSurfaceProps<TMountedCell> = $props();
 
@@ -88,6 +95,8 @@
 			interactionDescriptorResolverProvider,
 		resolveNavigationTarget,
 		resolveSequentialNavigationTarget,
+		onMoveFocusAboveGrid,
+		shouldMoveFocusAboveGrid,
 		flushVirtualScrollMeasurement,
 	});
 	const {

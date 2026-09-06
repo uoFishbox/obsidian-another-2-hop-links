@@ -396,6 +396,7 @@
 	let rootEl = $state<HTMLDivElement | null>(null);
 	let previewSurfaceActive = $state(false);
 	let resultsContainerEl = $state<HTMLDivElement | null>(null);
+	let searchInputEl = $state<HTMLInputElement | null>(null);
 	let resultsMinHeight = $derived(search.normalized ? "100vh" : null);
 
 	$effect(() => {
@@ -460,6 +461,13 @@
 		return true;
 	}
 
+	function moveFocusToSearchInput(): boolean {
+		if (!searchInputEl) return false;
+		searchInputEl.focus({ preventScroll: true });
+		searchInputEl.scrollIntoView({ block: "nearest", inline: "nearest" });
+		return true;
+	}
+
 	async function moveFocusToResults(direction: "up" | "down") {
 		await tick();
 
@@ -510,6 +518,7 @@
 			allowRelevanceSort={true}
 			onSortChange={(opt) => applicationUiState.setSortOption(opt)}
 			onMoveFocusToResults={moveFocusToResults}
+			bind:searchInputEl
 		/>
 	{/if}
 	<div
@@ -530,6 +539,7 @@
 				{resolveItemCardModel}
 				{previewDependencies}
 				previewActive={previewSurfaceActive}
+				onMoveFocusAboveGrid={moveFocusToSearchInput}
 			/>
 			{#if isSearchLoading}
 				<div class="cosense-card-links__search-status" aria-live="polite">

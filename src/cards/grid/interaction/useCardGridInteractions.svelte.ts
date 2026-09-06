@@ -47,6 +47,11 @@ export interface CardSurfaceInteractionParams {
 			columnIndex: number;
 		},
 	) => VirtualSequentialNavigationTarget | null;
+	onMoveFocusAboveGrid?: () => boolean | Promise<boolean>;
+	shouldMoveFocusAboveGrid?: (
+		currentKey: string,
+		currentPosition: { rowIndex: number; columnIndex: number },
+	) => boolean;
 	flushVirtualScrollMeasurement?: (snapshot: ProgrammaticScrollSnapshot) => void;
 }
 
@@ -60,6 +65,8 @@ export function createCardSurfaceInteractions({
 	getInteractionDescriptorResolverProvider,
 	resolveNavigationTarget,
 	resolveSequentialNavigationTarget,
+	onMoveFocusAboveGrid,
+	shouldMoveFocusAboveGrid,
 	flushVirtualScrollMeasurement,
 }: CardSurfaceInteractionParams) {
 	const interactionRegistry = createInteractionRegistry();
@@ -112,6 +119,8 @@ export function createCardSurfaceInteractions({
 			cellBindingRegistry,
 			resolveNavigationTarget,
 			resolveSequentialNavigationTarget,
+			onMoveFocusAboveGrid,
+			shouldMoveFocusAboveGrid,
 			flushVirtualScrollMeasurement,
 			flushMountedState,
 		});

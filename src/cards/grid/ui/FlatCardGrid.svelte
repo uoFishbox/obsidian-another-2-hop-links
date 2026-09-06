@@ -32,6 +32,7 @@
 		slotBodyRevision={list.slotBindingRevision}
 		resolveNavigationTarget={list.resolveNavigationTarget}
 		resolveSequentialNavigationTarget={list.resolveSequentialNavigationTarget}
+		onMoveFocusAboveGrid={props.onMoveFocusAboveGrid}
 		flushVirtualScrollMeasurement={list.flushVirtualScrollMeasurement}
 		interactionDescriptorResolverProvider={list.interactionDescriptorResolverProvider}
 	>

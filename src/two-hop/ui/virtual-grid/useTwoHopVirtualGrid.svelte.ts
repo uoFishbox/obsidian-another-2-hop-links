@@ -57,6 +57,8 @@ export interface TwoHopVirtualGridProps {
 	readonly loadMoreSection?: (sectionId: string) => void;
 	readonly previewActive?: boolean;
 	readonly cardModelRevision: unknown;
+	/** Moves focus from the first card row to the controls above the grid. */
+	readonly onMoveFocusAboveGrid?: () => boolean | Promise<boolean>;
 	readonly resolveItemCardModel: (
 		item: TwoHopItemModel,
 		revision: unknown,
@@ -321,6 +323,31 @@ export function useTwoHopVirtualGrid(
 		);
 	}
 
+	function shouldMoveFocusAboveGrid(
+		currentKey: string,
+		currentPosition: { rowIndex: number; columnIndex: number },
+	): boolean {
+		const currentCell = rowModel
+			.getRow(currentPosition.rowIndex)
+			?.getCell(currentPosition.columnIndex);
+		if (
+			!currentCell ||
+			currentCell.logicalKey !== currentKey ||
+			currentCell.kind !== "item"
+		) {
+			return false;
+		}
+
+		for (let rowIndex = 0; rowIndex < currentPosition.rowIndex; rowIndex += 1) {
+			const row = rowModel.getRow(rowIndex);
+			if (!row) continue;
+			for (let columnIndex = 0; columnIndex < row.cellCount; columnIndex += 1) {
+				if (row.getCell(columnIndex)?.kind === "item") return false;
+			}
+		}
+		return true;
+	}
+
 	function resolveSequentialNavigationTarget(
 		currentKey: string,
 		direction: SequentialNavigationDirection,
@@ -374,6 +401,7 @@ export function useTwoHopVirtualGrid(
 		getInteractionHandle,
 		resolveNavigationTarget,
 		resolveSequentialNavigationTarget,
+		shouldMoveFocusAboveGrid,
 		flushVirtualScrollMeasurement,
 		loadMore(sectionId: string): void {
 			props.loadMoreSection?.(sectionId);

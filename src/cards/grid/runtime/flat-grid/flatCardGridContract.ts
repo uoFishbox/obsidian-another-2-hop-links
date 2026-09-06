@@ -48,6 +48,7 @@ export interface FlatCardGridProps<T> {
 	initialScrollState?: FlatListScrollState;
 	/** Persists published scroll and pagination measurements outside the grid. */
 	onScrollStateChange?: (state: FlatListScrollState) => void;
+	onMoveFocusAboveGrid?: () => boolean | Promise<boolean>;
 	/** Resolves immutable preview input for the surface-owned slot controller. */
 	resolveItemPreviewRequest?: (item: T, index: number) => CardPreviewRequest | null;
 	/** Resolves the current item descriptor without card-owned effects. */

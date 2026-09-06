@@ -72,6 +72,7 @@
 		showSearchInput?: boolean;
 		showContentSearchToggle?: boolean;
 		searchPlaceholder?: string;
+		searchInputEl?: HTMLInputElement | null;
 	}
 
 	let {
@@ -88,6 +89,7 @@
 		showSearchInput = true,
 		showContentSearchToggle = true,
 		searchPlaceholder = "Search...",
+		searchInputEl = $bindable<HTMLInputElement | null>(null),
 	}: Props = $props();
 
 	const sortFields: readonly SortField[] = $derived(
@@ -230,6 +232,7 @@
 		<div class="twohop-header-search">
 			<div class="search-input-container global-search-input-container">
 				<input
+					bind:this={searchInputEl}
 					enterkeyhint="search"
 					type="search"
 					class="twohop-search-input"
