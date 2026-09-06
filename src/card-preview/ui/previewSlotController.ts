@@ -2,10 +2,6 @@ import type { PreviewData } from "card-preview/types";
 import type { CardPreviewRequest } from "card-preview/pipeline/cardPreviewRequest";
 import type { CardPreviewAttachment, CardPreviewRenderer } from "./cardPreviewRenderer";
 
-interface PreviewHostAppearance {
-	readonly contentType?: PreviewData["type"];
-}
-
 export interface PreviewSlotController {
 	attachHost(element: HTMLElement): { dispose(): void };
 	bind(request: CardPreviewRequest | null): void;
@@ -15,15 +11,6 @@ export interface PreviewSlotController {
 	clear(): void;
 	dispose(): void;
 }
-
-type SlotOperation =
-	| { readonly state: "idle" }
-	| {
-			readonly state: "rendering";
-			readonly cancel: () => void;
-	  };
-
-type SlotActivity = "idle" | "active";
 
 type SlotContent =
 	| { readonly state: "empty" }
@@ -41,8 +28,6 @@ type SlotContent =
 			readonly host: HTMLElement;
 	  };
 
-const EMPTY_APPEARANCE: PreviewHostAppearance = {};
-
 /** Owns rendering and retained DOM for one logical card preview. */
 export function createPreviewSlotController(
 	createRenderer: () => CardPreviewRenderer,
@@ -51,38 +36,34 @@ export function createPreviewSlotController(
 	let revision = 0;
 	let host: HTMLElement | undefined;
 	let hostGeneration = 0;
-	let activity: SlotActivity = "idle";
-	let operation: SlotOperation = { state: "idle" };
+	let active = false;
+	let cancelRender: (() => void) | undefined;
 	let content: SlotContent = { state: "empty" };
 	let detachedContent: DocumentFragment | undefined;
 	let failedRenderKey: string | undefined;
 	let renderer: CardPreviewRenderer | undefined;
 	let disposed = false;
-	let appliedAppearance = EMPTY_APPEARANCE;
+	let appliedContentType: PreviewData["type"] | undefined;
 
 	function advanceRevision(): number {
 		revision += 1;
 		return revision;
 	}
 
-	function deriveAppearance(): PreviewHostAppearance {
-		const committed = content.state === "committed" ? content : undefined;
-		return {
-			contentType: committed?.contentType,
-		};
-	}
-
 	function syncHostAppearance(): void {
-		const next = deriveAppearance();
-		if (isSamePreviewHostAppearance(appliedAppearance, next)) return;
-		if (host) applyPreviewHostAppearance(host, appliedAppearance, next);
-		appliedAppearance = next;
+		const nextContentType =
+			content.state === "committed" ? content.contentType : undefined;
+		if (appliedContentType === nextContentType) return;
+		if (host) {
+			applyPreviewHostAppearance(host, appliedContentType, nextContentType);
+		}
+		appliedContentType = nextContentType;
 	}
 
 	function cancelOperation(): void {
-		const current = operation;
-		operation = { state: "idle" };
-		if (current.state === "rendering") current.cancel();
+		const cancel = cancelRender;
+		cancelRender = undefined;
+		cancel?.();
 	}
 
 	function releaseContentLease(): void {
@@ -154,7 +135,7 @@ export function createPreviewSlotController(
 			if (!retained && previousHost) clearDom();
 			host = element;
 			resetPreviewHostAppearance(element);
-			appliedAppearance = EMPTY_APPEARANCE;
+			appliedContentType = undefined;
 			if (!restoreDetachableContent(element) && content.state !== "empty") {
 				clearDom();
 			}
@@ -172,7 +153,7 @@ export function createPreviewSlotController(
 				if (!retained) clearDom();
 				resetPreviewHostAppearance(element);
 				host = undefined;
-				appliedAppearance = EMPTY_APPEARANCE;
+				appliedContentType = undefined;
 			},
 		};
 	}
@@ -194,14 +175,13 @@ export function createPreviewSlotController(
 	}
 
 	function setActive(nextActive: boolean): void {
-		if ((activity === "active") === nextActive) return;
-		if (nextActive) {
-			activity = "active";
+		if (active === nextActive) return;
+		active = nextActive;
+		if (active) {
 			failedRenderKey = undefined;
 			syncHostAppearance();
 			return;
 		}
-		activity = "idle";
 		if (content.state !== "committed" || content.attachment !== "detachable") {
 			advanceRevision();
 			cancelOperation();
@@ -212,10 +192,10 @@ export function createPreviewSlotController(
 	function needsActivation(): boolean {
 		if (
 			disposed ||
-			activity !== "active" ||
+			!active ||
 			!request ||
 			!host ||
-			operation.state === "rendering" ||
+			cancelRender ||
 			failedRenderKey === request.renderKey
 		) {
 			return false;
@@ -247,7 +227,7 @@ export function createPreviewSlotController(
 			released = true;
 			cleanup?.();
 		};
-		operation = { state: "rendering", cancel };
+		cancelRender = cancel;
 
 		try {
 			cleanup = renderer(expectedHost, expectedRequest, {
@@ -258,8 +238,9 @@ export function createPreviewSlotController(
 							expectedHost,
 							expectedHostGeneration,
 						)
-					)
+					) {
 						return;
+					}
 					const previousRelease =
 						content.state === "committed" ? content.release : undefined;
 					content = {
@@ -271,7 +252,7 @@ export function createPreviewSlotController(
 						release: attachment === "host-bound" ? cancel : undefined,
 					};
 					failedRenderKey = undefined;
-					operation = { state: "idle" };
+					if (cancelRender === cancel) cancelRender = undefined;
 					previousRelease?.();
 					if (attachment === "detachable") cancel();
 					syncHostAppearance();
@@ -283,9 +264,10 @@ export function createPreviewSlotController(
 							expectedHost,
 							expectedHostGeneration,
 						)
-					)
+					) {
 						return;
-					operation = { state: "idle" };
+					}
+					if (cancelRender === cancel) cancelRender = undefined;
 					if (
 						content.state === "committed" &&
 						content.host === expectedHost
@@ -308,17 +290,13 @@ export function createPreviewSlotController(
 				},
 			});
 		} catch (error) {
-			if (operation.state === "rendering") {
-				operation = { state: "idle" };
-			}
+			if (cancelRender === cancel) cancelRender = undefined;
 			cancel();
 			throw error;
 		}
 		if (released) cleanup?.();
 		if (!isCurrent(expectedRevision, expectedHost, expectedHostGeneration)) {
-			if (operation.state === "rendering") {
-				operation = { state: "idle" };
-			}
+			if (cancelRender === cancel) cancelRender = undefined;
 			cancel();
 		}
 	}
@@ -328,7 +306,7 @@ export function createPreviewSlotController(
 		cancelOperation();
 		request = undefined;
 		failedRenderKey = undefined;
-		activity = "idle";
+		active = false;
 		clearDom();
 		syncHostAppearance();
 	}
@@ -357,24 +335,16 @@ function resetPreviewHostAppearance(element: HTMLElement): void {
 	}
 }
 
-function isSamePreviewHostAppearance(
-	left: PreviewHostAppearance,
-	right: PreviewHostAppearance,
-): boolean {
-	return left.contentType === right.contentType;
-}
-
 function applyPreviewHostAppearance(
 	element: HTMLElement,
-	previous: PreviewHostAppearance,
-	next: PreviewHostAppearance,
+	previous: PreviewData["type"] | undefined,
+	next: PreviewData["type"] | undefined,
 ): void {
-	if (previous.contentType !== next.contentType) {
-		for (const type of ["text", "image", "empty", "dom"] as const) {
-			element.classList.toggle(
-				`cosense-card-links__box-preview--${type}`,
-				next.contentType === type,
-			);
-		}
+	if (previous === next) return;
+	for (const type of ["text", "image", "empty", "dom"] as const) {
+		element.classList.toggle(
+			`cosense-card-links__box-preview--${type}`,
+			next === type,
+		);
 	}
 }

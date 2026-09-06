@@ -1,9 +1,5 @@
 import type { PluginSettings } from "settings/model";
 
-/** Fixed search-snippet seek policy after the corresponding settings were removed. */
-export const SEARCH_PREVIEW_SEEK_THRESHOLD_CHARS = 0;
-export const SEARCH_PREVIEW_SEEK_BUFFER_CHARS = 15;
-
 /** Settings which can change generated or rendered card preview content. */
 export interface PreviewRenderSettings {
 	readonly cardWidthPx: number;

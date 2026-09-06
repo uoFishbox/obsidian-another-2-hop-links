@@ -3,9 +3,10 @@ import { getContentSnippet } from "../snippetExtractor";
 import { highlightSearchMatchesInHtml } from "../searchHighlighter";
 import type { PluginSettings } from "settings/model";
 import { DEFAULT_SETTINGS } from "settings/model";
-import { SEARCH_PREVIEW_SEEK_BUFFER_CHARS } from "card-preview/pipeline/previewRenderSettings";
 
 const defaultSettings: PluginSettings = DEFAULT_SETTINGS;
+
+const SEARCH_PREVIEW_SEEK_BUFFER_CHARS = 15;
 
 describe("getContentSnippet", () => {
 	describe("basic text processing", () => {

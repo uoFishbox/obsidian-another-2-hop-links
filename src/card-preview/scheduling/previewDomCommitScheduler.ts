@@ -1,31 +1,21 @@
 import { DEFAULT_PREVIEW_DOM_COMMITS_PER_SECOND } from "./previewSchedulingConfig";
-import { isScrollActivityActive } from "shared/ui/scroll/scrollActivity";
+import {
+	isScrollActivityActive,
+	subscribeScrollActivity,
+} from "shared/ui/scroll/scrollActivity";
 import type { VirtualFrameCoordinator } from "shared/ui/scheduling/frameCoordinator";
-import {
-	canConsumePreviewScheduleToken,
-	consumePreviewScheduleToken,
-	createEmptyPreviewScheduleTokenState,
-	refillPreviewScheduleTokens,
-	type PreviewScheduleTokenState,
-} from "./previewScheduleTokenBucket";
-import { createPreviewKeyedQueue, type PreviewKeyedQueue } from "./previewKeyedQueue";
-import {
-	createPreviewFrameDriver,
-	type PreviewFrameDriver,
-} from "./previewFrameDriver";
-import {
-	ensurePreviewScrollActivitySubscription,
-	readPreviewSchedulingTime,
-	readPreviewTokenAvailabilityDelayMs,
-	releasePreviewScrollActivitySubscriptionIfIdle,
-	resolvePositivePreviewRate,
-} from "./previewSchedulerCore";
 
 const MAX_QUEUE_ENTRIES_PER_DRAIN = 256;
-const SCROLLING_REEVALUATION_DELAY_MS = (1000 / 60) * 2;
+const MAX_TOKEN_REFILL_ELAPSED_MS = 250;
+const TOKEN_CREDIT_EPSILON = 1e-9;
+const EXPECTED_PREVIEW_FRAME_INTERVAL_MS = 1000 / 60;
+const SCROLLING_REEVALUATION_DELAY_MS = EXPECTED_PREVIEW_FRAME_INTERVAL_MS * 2;
+
+type PreviewDomCommitPolicyMode = "idle" | "scrolling";
+type PreviewDomCommitLane = "idle" | "post-paint";
 
 interface PreviewDomCommitPolicy {
-	readonly mode: "idle" | "scrolling";
+	readonly mode: PreviewDomCommitPolicyMode;
 	readonly ratePerSecond: number;
 	readonly creditCapacity: number;
 	readonly initialCredits?: number;
@@ -81,10 +71,18 @@ export interface PreviewDomCommitScope {
 }
 
 interface PreviewDomCommitScopeState {
-	readonly queue: PreviewKeyedQueue<QueuedPreviewDomCommitTask>;
-	readonly driver: PreviewFrameDriver;
+	readonly coordinator: VirtualFrameCoordinator;
+	readonly taskKey: string;
 	readonly getCommitsPerSecond: () => number;
-	tokenState: PreviewScheduleTokenState;
+	readonly pendingByKey: Map<string, QueuedPreviewDomCommitTask>;
+	queueEntries: QueuedPreviewDomCommitTask[];
+	queueHead: number;
+	delayHandle: number | null;
+	delayWindow: Window | null;
+	scheduledLane: PreviewDomCommitLane | null;
+	availableCredits: number;
+	lastRefillTimestamp: number | null;
+	policyMode: PreviewDomCommitPolicyMode | null;
 	disposed: boolean;
 }
 
@@ -123,9 +121,23 @@ function getDefaultCommitsPerSecond(): number {
 	return DEFAULT_PREVIEW_DOM_COMMITS_PER_SECOND;
 }
 
+function readPreviewSchedulingTime(ownerWindow?: Window | null): number {
+	if (typeof ownerWindow?.performance?.now === "function") {
+		return ownerWindow.performance.now();
+	}
+	if (typeof globalThis.performance?.now === "function") {
+		return globalThis.performance.now();
+	}
+	return Date.now();
+}
+
+function resolvePositivePreviewRate(value: number, fallback: number): number {
+	return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
 function hasAnyPendingTask(state: PreviewDomCommitSchedulerState): boolean {
 	for (const scopeState of state.scopes) {
-		if (!scopeState.disposed && scopeState.queue.size > 0) return true;
+		if (!scopeState.disposed && scopeState.pendingByKey.size > 0) return true;
 	}
 	return false;
 }
@@ -133,7 +145,114 @@ function hasAnyPendingTask(state: PreviewDomCommitSchedulerState): boolean {
 function releaseScrollActivitySubscriptionIfIdle(
 	state: PreviewDomCommitSchedulerState,
 ): void {
-	releasePreviewScrollActivitySubscriptionIfIdle(state, hasAnyPendingTask(state));
+	if (hasAnyPendingTask(state)) return;
+	state.unsubscribeScrollActivity?.();
+	state.unsubscribeScrollActivity = undefined;
+}
+
+function clearQueue(scopeState: PreviewDomCommitScopeState): void {
+	scopeState.pendingByKey.clear();
+	scopeState.queueEntries.length = 0;
+	scopeState.queueHead = 0;
+}
+
+function compactQueue(scopeState: PreviewDomCommitScopeState): void {
+	if (
+		scopeState.queueHead < 64 &&
+		scopeState.queueEntries.length <= scopeState.pendingByKey.size * 2 + 16
+	) {
+		return;
+	}
+	scopeState.queueEntries = scopeState.queueEntries
+		.slice(scopeState.queueHead)
+		.filter((task) => scopeState.pendingByKey.get(task.targetKey) === task);
+	scopeState.queueHead = 0;
+}
+
+function dequeueTask(
+	scopeState: PreviewDomCommitScopeState,
+): QueuedPreviewDomCommitTask | undefined {
+	if (scopeState.queueHead >= scopeState.queueEntries.length) return undefined;
+	const task = scopeState.queueEntries[scopeState.queueHead];
+	scopeState.queueHead += 1;
+	return task;
+}
+
+function cancelScopeSchedule(scopeState: PreviewDomCommitScopeState): void {
+	if (scopeState.scheduledLane !== null) {
+		scopeState.coordinator.cancel(scopeState.scheduledLane, scopeState.taskKey);
+		scopeState.scheduledLane = null;
+	}
+	if (scopeState.delayHandle === null) return;
+	if (scopeState.delayWindow) {
+		scopeState.delayWindow.clearTimeout(scopeState.delayHandle);
+	} else {
+		globalThis.clearTimeout(scopeState.delayHandle);
+	}
+	scopeState.delayHandle = null;
+	scopeState.delayWindow = null;
+}
+
+function isScopeScheduled(scopeState: PreviewDomCommitScopeState): boolean {
+	return scopeState.delayHandle !== null || scopeState.scheduledLane !== null;
+}
+
+function resolveSchedulingWindow(state: PreviewDomCommitSchedulerState): Window | null {
+	return state.getWindow?.() ?? (typeof window === "undefined" ? null : window);
+}
+
+function scheduleOnCoordinator(
+	state: PreviewDomCommitSchedulerState,
+	scopeState: PreviewDomCommitScopeState,
+	lane: PreviewDomCommitLane,
+): void {
+	if (scopeState.disposed) return;
+	const scheduled = scopeState.coordinator.schedule(lane, scopeState.taskKey, () => {
+		scopeState.scheduledLane = null;
+		if (scopeState.disposed) return;
+		drainScope(
+			state,
+			scopeState,
+			readPreviewSchedulingTime(resolveSchedulingWindow(state)),
+		);
+	});
+	if (scheduled) scopeState.scheduledLane = lane;
+}
+
+function scheduleScope(
+	state: PreviewDomCommitSchedulerState,
+	scopeState: PreviewDomCommitScopeState,
+	delayMs = 0,
+	scrolling = isScrollActivityActive(),
+): void {
+	if (
+		scopeState.disposed ||
+		scopeState.pendingByKey.size === 0 ||
+		isScopeScheduled(scopeState)
+	) {
+		return;
+	}
+
+	const lane: PreviewDomCommitLane = scrolling ? "post-paint" : "idle";
+	const normalizedDelayMs = Math.max(0, delayMs);
+	if (normalizedDelayMs === 0) {
+		scheduleOnCoordinator(state, scopeState, lane);
+		return;
+	}
+
+	const ownerWindow = resolveSchedulingWindow(state);
+	const onDelayElapsed = (): void => {
+		scopeState.delayHandle = null;
+		scopeState.delayWindow = null;
+		scheduleOnCoordinator(state, scopeState, lane);
+	};
+	scopeState.delayWindow = ownerWindow;
+	scopeState.delayHandle = ownerWindow
+		? ownerWindow.setTimeout(onDelayElapsed, normalizedDelayMs)
+		: (globalThis.setTimeout(
+				onDelayElapsed,
+				normalizedDelayMs,
+			) as unknown as number);
 }
 
 function settleTask(
@@ -144,10 +263,12 @@ function settleTask(
 	if (task.settled) return;
 	task.settled = true;
 	const scopeState = task.scopeState;
-	scopeState.queue.delete(task.targetKey, task);
-	if (scopeState.queue.size === 0) {
-		scopeState.queue.clear();
-		scopeState.driver.cancel();
+	if (scopeState.pendingByKey.get(task.targetKey) === task) {
+		scopeState.pendingByKey.delete(task.targetKey);
+	}
+	if (scopeState.pendingByKey.size === 0) {
+		clearQueue(scopeState);
+		cancelScopeSchedule(scopeState);
 	}
 	task.resolve(result);
 	releaseScrollActivitySubscriptionIfIdle(state);
@@ -161,56 +282,102 @@ function rejectTask(
 	if (task.settled) return;
 	task.settled = true;
 	const scopeState = task.scopeState;
-	scopeState.queue.delete(task.targetKey, task);
-	if (scopeState.queue.size === 0) {
-		scopeState.queue.clear();
-		scopeState.driver.cancel();
+	if (scopeState.pendingByKey.get(task.targetKey) === task) {
+		scopeState.pendingByKey.delete(task.targetKey);
+	}
+	if (scopeState.pendingByKey.size === 0) {
+		clearQueue(scopeState);
+		cancelScopeSchedule(scopeState);
 	}
 	task.reject(error);
 	releaseScrollActivitySubscriptionIfIdle(state);
 }
 
 function ensureScrollActivitySubscription(state: PreviewDomCommitSchedulerState): void {
-	ensurePreviewScrollActivitySubscription(state, (isActive) => {
+	if (state.unsubscribeScrollActivity) return;
+	state.unsubscribeScrollActivity = subscribeScrollActivity((isActive) => {
 		for (const scopeState of state.scopes) {
-			scopeState.driver.cancel();
-			scheduleScope(scopeState, 0, isActive);
+			cancelScopeSchedule(scopeState);
+			scheduleScope(state, scopeState, 0, isActive);
 		}
 	});
 }
 
-function scheduleScope(
+function refillTokens(
 	scopeState: PreviewDomCommitScopeState,
-	delayMs = 0,
-	scrolling = isScrollActivityActive(),
+	timestamp: number,
+	policy: PreviewDomCommitPolicy,
+	ratePerSecond: number,
 ): void {
-	if (
-		scopeState.disposed ||
-		scopeState.queue.size === 0 ||
-		scopeState.driver.isScheduled()
-	) {
+	if (scopeState.lastRefillTimestamp === null) {
+		scopeState.availableCredits = Math.min(
+			policy.creditCapacity,
+			Math.max(0, policy.initialCredits ?? policy.creditCapacity),
+		);
+		scopeState.lastRefillTimestamp = timestamp;
+		scopeState.policyMode = policy.mode;
 		return;
 	}
-	scopeState.driver.schedule({
-		lane: scrolling ? "post-paint" : "idle",
-		delayMs,
-	});
+
+	const enteredScrolling =
+		scopeState.policyMode !== null &&
+		scopeState.policyMode !== "scrolling" &&
+		policy.mode === "scrolling";
+	if (enteredScrolling) {
+		scopeState.availableCredits = Math.min(
+			scopeState.availableCredits,
+			policy.initialCredits ?? 1,
+		);
+		scopeState.lastRefillTimestamp = timestamp;
+	}
+	const elapsedMs = Math.min(
+		MAX_TOKEN_REFILL_ELAPSED_MS,
+		Math.max(0, timestamp - scopeState.lastRefillTimestamp),
+	);
+	scopeState.availableCredits = Math.min(
+		policy.creditCapacity,
+		scopeState.availableCredits + (elapsedMs * ratePerSecond) / 1000,
+	);
+	scopeState.lastRefillTimestamp = timestamp;
+	scopeState.policyMode = policy.mode;
+}
+
+function canConsumeToken(scopeState: PreviewDomCommitScopeState): boolean {
+	return scopeState.availableCredits + TOKEN_CREDIT_EPSILON >= 1;
+}
+
+function readTokenAvailabilityDelayMs(
+	scopeState: PreviewDomCommitScopeState,
+	ratePerSecond: number,
+): number {
+	if (canConsumeToken(scopeState)) return 0;
+	if (!Number.isFinite(ratePerSecond) || ratePerSecond <= 0) {
+		return MAX_TOKEN_REFILL_ELAPSED_MS;
+	}
+	const missingCredits = Math.max(0, 1 - scopeState.availableCredits);
+	const availabilityDelayMs = (missingCredits * 1000) / ratePerSecond;
+	return Math.min(
+		MAX_TOKEN_REFILL_ELAPSED_MS,
+		Math.max(0, availabilityDelayMs - EXPECTED_PREVIEW_FRAME_INTERVAL_MS),
+	);
 }
 
 function schedulePendingScope(
+	state: PreviewDomCommitSchedulerState,
 	scopeState: PreviewDomCommitScopeState,
 	policy: PreviewDomCommitPolicy,
+	ratePerSecond: number,
 ): void {
-	if (scopeState.queue.size === 0) return;
-	const tokenAvailabilityDelayMs = readPreviewTokenAvailabilityDelayMs(
-		scopeState.tokenState,
-		policy.ratePerSecond,
+	if (scopeState.pendingByKey.size === 0) return;
+	const tokenAvailabilityDelayMs = readTokenAvailabilityDelayMs(
+		scopeState,
+		ratePerSecond,
 	);
 	const delayMs =
 		policy.mode === "scrolling"
 			? Math.max(SCROLLING_REEVALUATION_DELAY_MS, tokenAvailabilityDelayMs)
 			: tokenAvailabilityDelayMs;
-	scheduleScope(scopeState, delayMs, policy.mode === "scrolling");
+	scheduleScope(state, scopeState, delayMs, policy.mode === "scrolling");
 }
 
 function drainScope(
@@ -220,40 +387,34 @@ function drainScope(
 ): void {
 	if (scopeState.disposed) return;
 	const scrolling = isScrollActivityActive();
-	const policy = scrolling
-		? {
-				...SCROLLING_POLICY,
-				ratePerSecond: resolvePositivePreviewRate(
-					scopeState.getCommitsPerSecond(),
-					DEFAULT_PREVIEW_DOM_COMMITS_PER_SECOND,
-				),
-			}
-		: IDLE_POLICY;
+	const policy = scrolling ? SCROLLING_POLICY : IDLE_POLICY;
+	const ratePerSecond = scrolling
+		? resolvePositivePreviewRate(
+				scopeState.getCommitsPerSecond(),
+				DEFAULT_PREVIEW_DOM_COMMITS_PER_SECOND,
+			)
+		: policy.ratePerSecond;
 
-	scopeState.tokenState = refillPreviewScheduleTokens(
-		scopeState.tokenState,
-		frameTimestamp,
-		policy,
-	);
+	refillTokens(scopeState, frameTimestamp, policy, ratePerSecond);
 	const deadline = readPreviewSchedulingTime() + policy.maxDrainCpuMs;
 	const maxInspectableQueueEntries = Math.min(
 		MAX_QUEUE_ENTRIES_PER_DRAIN,
-		Math.max(0, scopeState.queue.queuedEntryCount),
+		Math.max(0, scopeState.queueEntries.length - scopeState.queueHead),
 	);
 	let inspectedQueueEntries = 0;
 	let drainedTasks = 0;
 
 	while (
-		canConsumePreviewScheduleToken(scopeState.tokenState) &&
+		canConsumeToken(scopeState) &&
 		drainedTasks < policy.maxTasksPerDrain &&
 		inspectedQueueEntries < maxInspectableQueueEntries &&
 		readPreviewSchedulingTime() <= deadline
 	) {
-		const task = scopeState.queue.dequeue();
+		const task = dequeueTask(scopeState);
 		if (!task) break;
 		inspectedQueueEntries += 1;
 		if (task.settled) continue;
-		if (scopeState.queue.get(task.targetKey) !== task) continue;
+		if (scopeState.pendingByKey.get(task.targetKey) !== task) continue;
 
 		if (task.isStale()) {
 			settleTask(state, task, { type: "skipped", reason: "stale" });
@@ -271,8 +432,9 @@ function drainScope(
 					: { type: "skipped", reason: "no-op" },
 			);
 			if (didCommit) {
-				scopeState.tokenState = consumePreviewScheduleToken(
-					scopeState.tokenState,
+				scopeState.availableCredits = Math.max(
+					0,
+					scopeState.availableCredits - 1,
 				);
 			}
 		} catch (error) {
@@ -280,8 +442,8 @@ function drainScope(
 		}
 	}
 
-	scopeState.queue.compact();
-	schedulePendingScope(scopeState, policy);
+	compactQueue(scopeState);
+	schedulePendingScope(state, scopeState, policy, ratePerSecond);
 }
 
 function enqueuePreviewDomCommit(
@@ -300,16 +462,18 @@ function enqueuePreviewDomCommit(
 			reject,
 			settled: false,
 		};
-		const existingTask = scopeState.queue.enqueue(task.targetKey, queuedTask);
+		const existingTask = scopeState.pendingByKey.get(task.targetKey);
+		scopeState.pendingByKey.set(task.targetKey, queuedTask);
+		scopeState.queueEntries.push(queuedTask);
 		if (existingTask) {
 			settleTask(state, existingTask, {
 				type: "skipped",
 				reason: "replaced",
 			});
-			scopeState.queue.compact();
+			compactQueue(scopeState);
 		}
 		ensureScrollActivitySubscription(state);
-		scheduleScope(scopeState);
+		scheduleScope(state, scopeState);
 	});
 }
 
@@ -318,13 +482,15 @@ function disposeScope(
 	scopeState: PreviewDomCommitScopeState,
 ): void {
 	if (scopeState.disposed) return;
-	for (const task of Array.from(scopeState.queue.values())) {
+	for (const task of Array.from(scopeState.pendingByKey.values())) {
 		settleTask(state, task, { type: "skipped", reason: "disposed" });
 	}
-	scopeState.queue.clear();
+	clearQueue(scopeState);
 	scopeState.disposed = true;
-	scopeState.driver.dispose();
-	scopeState.tokenState = createEmptyPreviewScheduleTokenState();
+	cancelScopeSchedule(scopeState);
+	scopeState.availableCredits = 0;
+	scopeState.lastRefillTimestamp = null;
+	scopeState.policyMode = null;
 	state.scopes.delete(scopeState);
 	releaseScrollActivitySubscriptionIfIdle(state);
 }
@@ -334,18 +500,19 @@ function createPreviewDomCommitScope(
 	options: CreatePreviewDomCommitScopeOptions,
 ): PreviewDomCommitScope {
 	if (state.disposed) return DISABLED_PREVIEW_DOM_COMMIT_SCOPE;
-	let scopeState: PreviewDomCommitScopeState;
-	const driver = createPreviewFrameDriver({
+	const scopeState: PreviewDomCommitScopeState = {
 		coordinator: options.frameCoordinator,
 		taskKey: `preview:dom-commit-drain:${++state.nextScopeId}`,
-		getWindow: state.getWindow,
-		onFrame: (timestamp) => drainScope(state, scopeState, timestamp),
-	});
-	scopeState = {
-		queue: createPreviewKeyedQueue(),
-		driver,
 		getCommitsPerSecond: options.getCommitsPerSecond ?? getDefaultCommitsPerSecond,
-		tokenState: createEmptyPreviewScheduleTokenState(),
+		pendingByKey: new Map(),
+		queueEntries: [],
+		queueHead: 0,
+		delayHandle: null,
+		delayWindow: null,
+		scheduledLane: null,
+		availableCredits: 0,
+		lastRefillTimestamp: null,
+		policyMode: null,
 		disposed: false,
 	};
 	state.scopes.add(scopeState);

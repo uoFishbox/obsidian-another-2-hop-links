@@ -2,10 +2,6 @@ import {
 	findFencedCodeBlockContainingOffset,
 	type FencedCodeBlockRange,
 } from "./fencedCodeBlocks";
-import {
-	SEARCH_PREVIEW_SEEK_BUFFER_CHARS,
-	SEARCH_PREVIEW_SEEK_THRESHOLD_CHARS,
-} from "../pipeline/previewRenderSettings";
 import { stripLeadingFrontmatter } from "./frontmatterUtils";
 import { findCaseInsensitiveIndex } from "./searchUtils";
 import type { GetContentSnippetOptions, PreviewSnippetSettings } from "./types";
@@ -18,6 +14,8 @@ export interface ContentSnippetWindow {
 }
 
 const DEFAULT_PREVIEW_MAX_CHARS = 300;
+const SEARCH_PREVIEW_SEEK_THRESHOLD_CHARS = 0;
+const SEARCH_PREVIEW_SEEK_BUFFER_CHARS = 15;
 const DEFAULT_SEARCH_PREVIEW_SEEK_THRESHOLD_CHARS = 300;
 const DEFAULT_SEARCH_PREVIEW_SEEK_BUFFER_CHARS = 30;
 const RAW_WINDOW_SIZE_MULTIPLIER = 4;

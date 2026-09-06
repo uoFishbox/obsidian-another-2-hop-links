@@ -9,9 +9,8 @@ import {
 } from "./previewCache";
 import { clearMathRenderQueue } from "../renderers/mathRenderQueue";
 import { clearVideoPreviewQueue } from "../renderers/videoPreviewRenderer";
-import { createAbortError } from "./previewAbort";
+import { createAbortError, isAbortError } from "./previewAbort";
 import { createPreviewContext } from "./previewContext";
-import { createPreviewQueue } from "./previewQueue";
 import { resolvePreview as resolveDefaultPreview } from "./previewPipeline";
 import {
 	createPreviewRenderSettings,
@@ -54,6 +53,16 @@ type InFlightRawContentRequest = SharedAbortableRequest<string> & {
 	readonly cacheKey: string;
 };
 
+interface QueuedPreviewGenerationTask {
+	readonly run: () => Promise<PreviewData>;
+	readonly signal: AbortSignal;
+	started: boolean;
+	cancelled: boolean;
+	resolve(data: PreviewData): void;
+	reject(error: unknown): void;
+	cleanup(): void;
+}
+
 interface PreviewServiceOptions {
 	readonly vault: IVault;
 	readonly metadataCache: IMetadataCache;
@@ -77,7 +86,8 @@ export function createPreviewService(
 		RAW_CONTENT_CACHE_MAX_BYTES,
 	);
 	const rawContentInFlight = new Map<string, InFlightRawContentRequest>();
-	const queue = createPreviewQueue();
+	const previewGenerationQueue: QueuedPreviewGenerationTask[] = [];
+	let previewGenerationRunning = false;
 
 	const getRawContent: RawContentLoader = async (file, signal) => {
 		if (signal?.aborted) throw createAbortError();
@@ -150,7 +160,7 @@ export function createPreviewService(
 		const request: InFlightRequest = {
 			cacheKey,
 			...createSharedAbortableRequest((signal) =>
-				queue.enqueue(
+				enqueuePreviewGeneration(
 					() => generatePreview(file, settings, signal, cacheKey),
 					signal,
 				),
@@ -162,6 +172,95 @@ export function createPreviewService(
 			() => finalizeInFlightRequest(request),
 		);
 		return request;
+	}
+
+	function enqueuePreviewGeneration(
+		run: () => Promise<PreviewData>,
+		signal: AbortSignal,
+	): Promise<PreviewData> {
+		return new Promise((resolve, reject) => {
+			let settled = false;
+			const task: QueuedPreviewGenerationTask = {
+				run,
+				signal,
+				started: false,
+				cancelled: false,
+				resolve: () => {},
+				reject: () => {},
+				cleanup: () => {},
+			};
+
+			const settle = (handler: () => void): void => {
+				if (settled) return;
+				settled = true;
+				task.cleanup();
+				handler();
+			};
+			task.resolve = (data) => settle(() => resolve(data));
+			task.reject = (error) => settle(() => reject(error));
+
+			if (signal.aborted) {
+				task.reject(createAbortError());
+				return;
+			}
+			const onAbort = (): void => {
+				if (task.started) return;
+				task.cancelled = true;
+				const index = previewGenerationQueue.indexOf(task);
+				if (index >= 0) previewGenerationQueue.splice(index, 1);
+				task.reject(createAbortError());
+			};
+			signal.addEventListener("abort", onAbort, { once: true });
+			task.cleanup = () => signal.removeEventListener("abort", onAbort);
+
+			previewGenerationQueue.push(task);
+			drainPreviewGenerationQueue();
+		});
+	}
+
+	function drainPreviewGenerationQueue(): void {
+		if (previewGenerationRunning) return;
+		while (previewGenerationQueue.length > 0) {
+			const task = previewGenerationQueue.shift();
+			if (!task) return;
+			if (task.cancelled || task.signal.aborted) {
+				task.reject(createAbortError());
+				continue;
+			}
+
+			previewGenerationRunning = true;
+			task.started = true;
+			void task
+				.run()
+				.then((result) => {
+					if (task.cancelled || task.signal.aborted) {
+						task.reject(createAbortError());
+						return;
+					}
+					task.resolve(result);
+				})
+				.catch((error) => {
+					if (task.cancelled || task.signal.aborted || isAbortError(error)) {
+						task.reject(createAbortError());
+						return;
+					}
+					task.reject(error);
+				})
+				.finally(() => {
+					previewGenerationRunning = false;
+					drainPreviewGenerationQueue();
+				});
+			return;
+		}
+	}
+
+	function shutdownPreviewGenerationQueue(): void {
+		for (const task of previewGenerationQueue) {
+			task.cancelled = true;
+			task.reject(createAbortError());
+		}
+		previewGenerationQueue.length = 0;
+		previewGenerationRunning = false;
 	}
 
 	async function generatePreview(
@@ -209,7 +308,7 @@ export function createPreviewService(
 		inFlightRequests.clear();
 		for (const request of rawContentInFlight.values()) request.controller.abort();
 		rawContentInFlight.clear();
-		queue.shutdown();
+		shutdownPreviewGenerationQueue();
 		cache.clear();
 		rawContentCache.clear();
 		clearMathRenderQueue();
