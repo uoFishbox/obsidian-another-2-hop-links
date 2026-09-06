@@ -3,6 +3,7 @@ import type { PreviewData } from "../types";
 
 // Simple queue to limit concurrent generations (prevents browser decoder exhaustion)
 const MAX_CONCURRENT_GENERATIONS = 3;
+const IDLE_GENERATION_TIMEOUT_MS = 150;
 let activeGenerations = 0;
 interface VideoThumbnailResult {
 	url: string;
@@ -11,7 +12,11 @@ interface VideoThumbnailResult {
 
 interface GenerationQueueTask {
 	cancelled: boolean;
+	started: boolean;
 	ownerWindow: Window;
+	cancelSchedule: (() => void) | undefined;
+	cleanup: () => void;
+	reject: (error: unknown) => void;
 	resolve: (value: unknown) => void;
 	run: () => Promise<void>;
 }
@@ -19,46 +24,90 @@ const generationQueue: GenerationQueueTask[] = [];
 const scheduledGenerationTasks = new Set<GenerationQueueTask>();
 
 function processQueue(): void {
-	if (
-		activeGenerations + scheduledGenerationTasks.size >=
-			MAX_CONCURRENT_GENERATIONS ||
-		generationQueue.length === 0
+	while (
+		activeGenerations + scheduledGenerationTasks.size <
+			MAX_CONCURRENT_GENERATIONS &&
+		generationQueue.length > 0
 	) {
-		return;
-	}
+		const nextTask = generationQueue.shift();
+		if (!nextTask) return;
+		scheduledGenerationTasks.add(nextTask);
 
-	const nextTask = generationQueue.shift();
-	if (!nextTask) return;
-	scheduledGenerationTasks.add(nextTask);
-
-	const { ownerWindow } = nextTask;
-	const runScheduledTask = (): void => {
-		scheduledGenerationTasks.delete(nextTask);
-		if (nextTask.cancelled) {
+		let ranSynchronously = false;
+		const cancelSchedule = scheduleGeneration(nextTask.ownerWindow, () => {
+			ranSynchronously = true;
+			nextTask.cancelSchedule = undefined;
+			scheduledGenerationTasks.delete(nextTask);
+			if (nextTask.cancelled) {
+				processQueue();
+				return;
+			}
+			nextTask.started = true;
+			activeGenerations += 1;
+			void nextTask.run();
 			processQueue();
-			return;
-		}
-		activeGenerations++;
-		void nextTask.run();
-	};
-
-	// Schedule in the realm that owns the preview request instead of always
-	// using the main Electron window, which may be throttled behind a popout.
-	if (typeof ownerWindow.requestIdleCallback === "function") {
-		ownerWindow.requestIdleCallback(runScheduledTask);
-	} else {
-		ownerWindow.setTimeout(runScheduledTask, 0);
+		});
+		nextTask.cancelSchedule = ranSynchronously ? undefined : cancelSchedule;
 	}
 }
 
-function enqueue<T>(task: () => Promise<T>, ownerWindow: Window): Promise<T> {
+function scheduleGeneration(ownerWindow: Window, run: () => void): () => void {
+	let completed = false;
+	let idleHandle: number | undefined;
+	const finish = (): void => {
+		if (completed) return;
+		completed = true;
+		if (
+			idleHandle !== undefined &&
+			typeof ownerWindow.cancelIdleCallback === "function"
+		) {
+			ownerWindow.cancelIdleCallback(idleHandle);
+		}
+		globalThis.clearTimeout(fallbackHandle);
+		run();
+	};
+	const fallbackHandle = globalThis.setTimeout(finish, IDLE_GENERATION_TIMEOUT_MS);
+
+	if (typeof ownerWindow.requestIdleCallback === "function") {
+		idleHandle = ownerWindow.requestIdleCallback(finish, {
+			timeout: IDLE_GENERATION_TIMEOUT_MS,
+		});
+	} else {
+		ownerWindow.setTimeout(finish, 0);
+	}
+
+	return () => {
+		if (completed) return;
+		completed = true;
+		if (
+			idleHandle !== undefined &&
+			typeof ownerWindow.cancelIdleCallback === "function"
+		) {
+			ownerWindow.cancelIdleCallback(idleHandle);
+		}
+		globalThis.clearTimeout(fallbackHandle);
+	};
+}
+
+function enqueue<T>(
+	task: () => Promise<T>,
+	ownerWindow: Window,
+	signal?: AbortSignal,
+): Promise<T | undefined> {
 	return new Promise((resolve, reject) => {
+		let settled = false;
+		const settle = (handler: () => void): void => {
+			if (settled) return;
+			settled = true;
+			queueTask.cleanup();
+			handler();
+		};
 		const run = async (): Promise<void> => {
 			try {
 				const result = await task();
-				resolve(result);
+				queueTask.resolve(result);
 			} catch (e) {
-				reject(e);
+				queueTask.reject(e);
 			} finally {
 				activeGenerations = Math.max(activeGenerations - 1, 0);
 				processQueue();
@@ -66,10 +115,33 @@ function enqueue<T>(task: () => Promise<T>, ownerWindow: Window): Promise<T> {
 		};
 		const queueTask: GenerationQueueTask = {
 			cancelled: false,
+			started: false,
 			ownerWindow,
-			resolve: resolve as (value: unknown) => void,
+			cancelSchedule: undefined,
+			cleanup: () => {},
+			reject: (error) => settle(() => reject(error)),
+			resolve: (value) => settle(() => resolve(value as T | undefined)),
 			run,
 		};
+		if (signal?.aborted) {
+			queueTask.resolve(undefined);
+			return;
+		}
+		if (signal) {
+			const onAbort = (): void => {
+				if (queueTask.started) return;
+				queueTask.cancelled = true;
+				const queuedIndex = generationQueue.indexOf(queueTask);
+				if (queuedIndex >= 0) generationQueue.splice(queuedIndex, 1);
+				scheduledGenerationTasks.delete(queueTask);
+				queueTask.cancelSchedule?.();
+				queueTask.cancelSchedule = undefined;
+				queueTask.resolve(undefined);
+				processQueue();
+			};
+			signal.addEventListener("abort", onAbort, { once: true });
+			queueTask.cleanup = () => signal.removeEventListener("abort", onAbort);
+		}
 		generationQueue.push(queueTask);
 		processQueue();
 	});
@@ -78,14 +150,15 @@ function enqueue<T>(task: () => Promise<T>, ownerWindow: Window): Promise<T> {
 export function clearVideoPreviewQueue(): void {
 	for (const task of generationQueue.splice(0)) {
 		task.cancelled = true;
+		task.cancelSchedule?.();
 		task.resolve(undefined);
 	}
 	for (const task of scheduledGenerationTasks) {
 		task.cancelled = true;
+		task.cancelSchedule?.();
 		task.resolve(undefined);
 	}
 	scheduledGenerationTasks.clear();
-	activeGenerations = 0;
 }
 
 async function generateVideoThumbnail(
@@ -109,6 +182,7 @@ async function generateVideoThumbnail(
 				signal,
 			),
 		ownerWindow,
+		signal,
 	);
 }
 

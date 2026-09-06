@@ -29,6 +29,8 @@ import { createSizedLRUCache, stringBytes } from "shared/cache/sizedLRUCache";
 
 const RAW_CONTENT_CACHE_MAX_BYTES = 4 * 1024 * 1024;
 const RAW_CONTENT_CACHE_KEY_SEPARATOR = "\0";
+// Keep enough capacity for ordinary previews to progress past one slow media item.
+const MAX_CONCURRENT_PREVIEW_GENERATIONS = 3;
 
 export type PreviewResolver = (
 	file: TFile,
@@ -87,7 +89,7 @@ export function createPreviewService(
 	);
 	const rawContentInFlight = new Map<string, InFlightRawContentRequest>();
 	const previewGenerationQueue: QueuedPreviewGenerationTask[] = [];
-	let previewGenerationRunning = false;
+	let activePreviewGenerations = 0;
 
 	const getRawContent: RawContentLoader = async (file, signal) => {
 		if (signal?.aborted) throw createAbortError();
@@ -219,8 +221,10 @@ export function createPreviewService(
 	}
 
 	function drainPreviewGenerationQueue(): void {
-		if (previewGenerationRunning) return;
-		while (previewGenerationQueue.length > 0) {
+		while (
+			activePreviewGenerations < MAX_CONCURRENT_PREVIEW_GENERATIONS &&
+			previewGenerationQueue.length > 0
+		) {
 			const task = previewGenerationQueue.shift();
 			if (!task) return;
 			if (task.cancelled || task.signal.aborted) {
@@ -228,7 +232,7 @@ export function createPreviewService(
 				continue;
 			}
 
-			previewGenerationRunning = true;
+			activePreviewGenerations += 1;
 			task.started = true;
 			void task
 				.run()
@@ -247,10 +251,12 @@ export function createPreviewService(
 					task.reject(error);
 				})
 				.finally(() => {
-					previewGenerationRunning = false;
+					activePreviewGenerations = Math.max(
+						activePreviewGenerations - 1,
+						0,
+					);
 					drainPreviewGenerationQueue();
 				});
-			return;
 		}
 	}
 
@@ -260,7 +266,6 @@ export function createPreviewService(
 			task.reject(createAbortError());
 		}
 		previewGenerationQueue.length = 0;
-		previewGenerationRunning = false;
 	}
 
 	async function generatePreview(

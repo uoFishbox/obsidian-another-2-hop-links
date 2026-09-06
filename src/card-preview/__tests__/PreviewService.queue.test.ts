@@ -49,7 +49,7 @@ describe("PreviewService queue behavior", () => {
 		vi.clearAllMocks();
 	});
 
-	test("runs preview generation serially", async () => {
+	test("runs up to three preview generations concurrently", async () => {
 		const deferredByPath = new Map<
 			string,
 			ReturnType<typeof createDeferred<PreviewData>>
@@ -60,57 +60,58 @@ describe("PreviewService queue behavior", () => {
 			return deferred.promise;
 		});
 		const service = createService(resolvePreview);
-		const firstFile = createMockTFileAsPlainObject("first.md");
-		const secondFile = createMockTFileAsPlainObject("second.md");
+		const files = Array.from({ length: 4 }, (_, index) =>
+			createMockTFileAsPlainObject(`${index}.md`),
+		);
+		const promises = files.map((file) => service.getPreview(file));
 
-		const firstPromise = service.getPreview(firstFile);
-		const secondPromise = service.getPreview(secondFile);
+		expect(resolvePreview).toHaveBeenCalledTimes(3);
+		expect(resolvePreview).not.toHaveBeenCalledWith(
+			files[3],
+			expect.anything(),
+			expect.anything(),
+		);
 
-		expect(resolvePreview).toHaveBeenCalledTimes(1);
-
-		deferredByPath.get(firstFile.path)?.resolve({
+		deferredByPath.get(files[0].path)?.resolve({
 			type: "text",
-			content: "first",
+			content: "0",
 		});
-		await expect(firstPromise).resolves.toEqual({
+		await expect(promises[0]).resolves.toEqual({
 			type: "text",
-			content: "first",
-		});
-		await Promise.resolve();
-
-		expect(resolvePreview).toHaveBeenCalledTimes(2);
-
-		deferredByPath.get(secondFile.path)?.resolve({
-			type: "text",
-			content: "second",
-		});
-		await expect(secondPromise).resolves.toEqual({
-			type: "text",
-			content: "second",
+			content: "0",
 		});
 		await Promise.resolve();
+
+		expect(resolvePreview).toHaveBeenCalledTimes(4);
+
+		for (const file of files.slice(1)) {
+			deferredByPath.get(file.path)?.resolve({
+				type: "text",
+				content: file.path,
+			});
+		}
+		await Promise.all(promises.slice(1));
 	});
 
 	test("removes an aborted preview before it starts", async () => {
 		const firstDeferred = createDeferred<PreviewData>();
 		const resolvePreview = vi.fn<PreviewResolver>(() => firstDeferred.promise);
 		const service = createService(resolvePreview);
-		const firstFile = createMockTFileAsPlainObject("first.md");
-		const secondFile = createMockTFileAsPlainObject("second.md");
+		const activeFiles = Array.from({ length: 3 }, (_, index) =>
+			createMockTFileAsPlainObject(`active-${index}.md`),
+		);
+		const secondFile = createMockTFileAsPlainObject("queued.md");
 		const secondController = new AbortController();
 
-		const firstPromise = service.getPreview(firstFile);
+		const activePromises = activeFiles.map((file) => service.getPreview(file));
 		const secondPromise = service.getPreview(secondFile, secondController.signal);
 
 		secondController.abort();
 		await expect(secondPromise).rejects.toMatchObject({ name: "AbortError" });
-		expect(resolvePreview).toHaveBeenCalledTimes(1);
+		expect(resolvePreview).toHaveBeenCalledTimes(3);
 
-		firstDeferred.resolve({ type: "text", content: "first" });
-		await expect(firstPromise).resolves.toEqual({
-			type: "text",
-			content: "first",
-		});
+		firstDeferred.resolve({ type: "text", content: "active" });
+		await Promise.all(activePromises);
 		await Promise.resolve();
 	});
 
@@ -126,16 +127,18 @@ describe("PreviewService queue behavior", () => {
 				}),
 		);
 		const service = createService(resolvePreview);
-		const firstFile = createMockTFileAsPlainObject("first.md");
-		const secondFile = createMockTFileAsPlainObject("second.md");
+		const files = Array.from({ length: 4 }, (_, index) =>
+			createMockTFileAsPlainObject(`${index}.md`),
+		);
+		const requests = files.map((file) => service.getPreview(file));
 
-		const first = service.getPreview(firstFile);
-		const second = service.getPreview(secondFile);
+		expect(resolvePreview).toHaveBeenCalledTimes(3);
 
 		service.dispose();
 
-		await expect(first).rejects.toMatchObject({ name: "AbortError" });
-		await expect(second).rejects.toMatchObject({ name: "AbortError" });
+		for (const request of requests) {
+			await expect(request).rejects.toMatchObject({ name: "AbortError" });
+		}
 	});
 
 	test("already aborted preview is not executed", async () => {
