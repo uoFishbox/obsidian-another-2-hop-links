@@ -77,11 +77,10 @@
 	}
 </script>
 
+<!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
 	class={`cosense-card-links__box ${containerClass}`}
 	aria-label={tooltip}
-	role="button"
-	tabindex="0"
 	oncontextmenu={handleContextMenu}
 	data-ccl-section-variant={sectionVariant}
 >

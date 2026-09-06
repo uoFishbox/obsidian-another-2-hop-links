@@ -17,6 +17,7 @@ function createSequentialSurface(physicalOrder: readonly number[]) {
 		const cell = document.createElement("div");
 		const card = document.createElement("div");
 		card.className = "cosense-card-links__box";
+		card.dataset.cclInteractionHandle = `card-${logicalIndex}`;
 		card.tabIndex = 0;
 		cell.append(card);
 		content.append(cell);
@@ -148,6 +149,52 @@ describe("sequential virtual focus", () => {
 		expect(Array.from(cards.values()).every((card) => card.tabIndex === 0)).toBe(
 			true,
 		);
+	});
+
+	it("ignores focusable non-result headers when redirecting external focus entry", () => {
+		const before = document.createElement("button");
+		document.body.prepend(before);
+		const { root, content, registry, cards } = createSequentialSurface([0, 1]);
+		const headerCell = document.createElement("div");
+		const header = document.createElement("div");
+		header.className =
+			"cosense-card-links__box cosense-card-links__connected-links-header";
+		header.tabIndex = 0;
+		headerCell.append(header);
+		content.prepend(headerCell);
+		registry.rebindCell(headerCell, {
+			nextLogicalKey: "header",
+			rowIndex: -1,
+			columnIndex: 0,
+		});
+
+		const firstCard = cards.get(0)!;
+		const firstCardFocusSpy = vi.spyOn(firstCard, "focus");
+		const headerFocusSpy = vi.spyOn(header, "focus");
+		const handlers = createCardSurfaceNavigation({
+			getRootEl: () => root,
+			getContentEl: () => content,
+			getScrollContainerEl: () => null,
+			getRowHeight: () => 10,
+			delegatedInteractions: { handleKeyDown: vi.fn() },
+			cellBindingRegistry: registry,
+			flushMountedState: async () => {},
+			resolveSequentialNavigationTarget: () => null,
+		});
+		const event = new FocusEvent("focusin", {
+			bubbles: true,
+			composed: true,
+			relatedTarget: before,
+		});
+		Object.defineProperty(event, "composedPath", {
+			configurable: true,
+			value: () => [firstCard, firstCard.parentElement],
+		});
+
+		handlers.handleFocusIn(event);
+
+		expect(firstCardFocusSpy).not.toHaveBeenCalled();
+		expect(headerFocusSpy).not.toHaveBeenCalled();
 	});
 
 	it("redirects external focus entry to the logical mounted edge", () => {

@@ -17,7 +17,7 @@ import { findNearestScrollContainer } from "shared/ui/scroll/scrollContainer";
 import type { VirtualCellBindingRegistry } from "./cellBindingRegistry";
 import { isHTMLElementLike } from "shared/ui/dom/realmSafeDom";
 
-const SEQUENTIAL_FOCUS_SELECTOR = ".cosense-card-links__box";
+const SEQUENTIAL_FOCUS_SELECTOR = RESULT_FOCUS_SELECTOR;
 
 export function findMountedCellElementByKey(
 	container: HTMLElement | null,

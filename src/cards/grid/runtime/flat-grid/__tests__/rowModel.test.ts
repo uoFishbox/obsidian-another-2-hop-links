@@ -188,6 +188,50 @@ describe("flatLinkRowModel", () => {
 		});
 	});
 
+	it("skips a flat section header during sequential navigation", () => {
+		const items = [{ id: "item-0" }, { id: "item-1" }];
+		const cellSource = createFlatGridCellSource({
+			header: true,
+			items,
+			visibleCount: items.length,
+			showLoadMore: false,
+			getItemId: (item) => item.id,
+			sectionId: "flat-header-navigation",
+		});
+		const layout = computeFlatGridLayout({
+			containerWidth: 320,
+			minCellWidth: 100,
+			gap: 10,
+			maxColumns: 3,
+			rowHeight: 100,
+			cellCount: cellSource.cellCount,
+		});
+		const rowModel = createFlatGridRowModel<TestItem>({ cellSource, layout });
+		const header = rowModel.resolveCellAtIndex(0);
+		const firstItem = rowModel.resolveCellAtIndex(1);
+		expect(header?.kind).toBe("header");
+		expect(firstItem?.kind).toBe("item");
+		if (!header || !firstItem) return;
+
+		expect(
+			rowModel.resolveSequentialNavigationTarget?.(header.key, "forward", {
+				rowIndex: 0,
+				columnIndex: 0,
+			}),
+		).toEqual({
+			key: firstItem.key,
+			rowTop: 0,
+			rowIndex: 0,
+			columnIndex: 1,
+		});
+		expect(
+			rowModel.resolveSequentialNavigationTarget?.(firstItem.key, "backward", {
+				rowIndex: 0,
+				columnIndex: 1,
+			}),
+		).toBeNull();
+	});
+
 	it("wraps between rows with left and right navigation", () => {
 		const rowModel = createRowModel(6);
 		const item2 = rowModel.resolveCellAtIndex(2);

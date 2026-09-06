@@ -60,6 +60,8 @@ export function createFlatGridRowModel<T>(
 		rowIndex * columns + columnIndex;
 	const resolveCellAtIndex = (index: number): FlatGridLogicalCell<T> | null =>
 		cellSource.resolveCellAtIndex(index);
+	const isSequentiallyFocusableCell = (cell: FlatGridLogicalCell<T>): boolean =>
+		cell.kind !== "header";
 	const resolveOverscanRows = (overscanPx: number): number =>
 		rowStride > 0 ? Math.ceil(Math.max(0, overscanPx) / rowStride) : 0;
 	const writeVisibleRange = (
@@ -215,23 +217,28 @@ export function createFlatGridRowModel<T>(
 			const currentCell = resolveCellAtIndex(currentIndex);
 			if (!currentCell || currentCell.key !== currentKey) return null;
 
-			const targetIndex =
-				direction === "forward" ? currentIndex + 1 : currentIndex - 1;
-			if (targetIndex < 0 || targetIndex >= cellCount) return null;
+			const step = direction === "forward" ? 1 : -1;
+			for (
+				let targetIndex = currentIndex + step;
+				targetIndex >= 0 && targetIndex < cellCount;
+				targetIndex += step
+			) {
+				const targetCell = resolveCellAtIndex(targetIndex);
+				if (!targetCell || !isSequentiallyFocusableCell(targetCell)) continue;
+				const rowIndex = Math.floor(targetIndex / columns);
+				const columnIndex = targetIndex % columns;
+				const targetRow = this.getRow(rowIndex);
+				if (!targetRow) return null;
 
-			const targetCell = resolveCellAtIndex(targetIndex);
-			if (!targetCell) return null;
-			const rowIndex = Math.floor(targetIndex / columns);
-			const columnIndex = targetIndex % columns;
-			const targetRow = this.getRow(rowIndex);
-			if (!targetRow) return null;
+				return {
+					key: targetCell.key,
+					rowTop: targetRow.top,
+					rowIndex,
+					columnIndex,
+				};
+			}
 
-			return {
-				key: targetCell.key,
-				rowTop: targetRow.top,
-				rowIndex,
-				columnIndex,
-			};
+			return null;
 		},
 	};
 }
