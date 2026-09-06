@@ -355,26 +355,38 @@ export class TwoHopLinkResolver {
 	}
 }
 
+// Only arrays whose resolver-owned children were frozen here may skip traversal.
+// A shallow Object.freeze from a caller does not establish that invariant.
+const frozenBranchArrays = new WeakSet<TwoHopLinkResult["branches"]>();
+const frozenLinkArrays = new WeakSet<TwoHopLinkResult["backlinks"]>();
+const frozenTaggedNoteArrays = new WeakSet<TwoHopLinkResult["taggedNotes"]>();
+
 /**
- * Freezes a resolver-owned result graph and returns it as one immutable snapshot.
+ * Freezes a resolver-owned result graph, reusing previously frozen subgraphs.
  *
  * Obsidian values referenced by the graph (`TFile` and `Pos`) remain shared because
  * they are owned outside the resolver.
  */
 export function freezeTwoHopLinkResult(result: TwoHopLinkResult): TwoHopLinkResult {
-	for (const branch of result.branches) {
-		freezeIndexedLink(branch.hop1);
-		freezeIndexedLinks(branch.hop2);
-		Object.freeze(branch);
+	if (!frozenBranchArrays.has(result.branches)) {
+		for (const branch of result.branches) {
+			freezeIndexedLink(branch.hop1);
+			freezeIndexedLinks(branch.hop2);
+			Object.freeze(branch);
+		}
+		Object.freeze(result.branches);
+		frozenBranchArrays.add(result.branches);
 	}
-	Object.freeze(result.branches);
 	freezeIndexedLinks(result.backlinks);
 
-	for (const note of result.taggedNotes) {
-		Object.freeze(note.commonTags);
-		Object.freeze(note);
+	if (!frozenTaggedNoteArrays.has(result.taggedNotes)) {
+		for (const note of result.taggedNotes) {
+			Object.freeze(note.commonTags);
+			Object.freeze(note);
+		}
+		Object.freeze(result.taggedNotes);
+		frozenTaggedNoteArrays.add(result.taggedNotes);
 	}
-	Object.freeze(result.taggedNotes);
 
 	return Object.freeze(result);
 }
@@ -397,10 +409,12 @@ export function createImmutableTaggedNotes(
 }
 
 function freezeIndexedLinks(links: readonly Readonly<IndexedLink>[]): void {
+	if (frozenLinkArrays.has(links)) return;
 	for (const link of links) {
 		freezeIndexedLink(link);
 	}
 	Object.freeze(links);
+	frozenLinkArrays.add(links);
 }
 
 function freezeIndexedLink(link: Readonly<IndexedLink>): void {
