@@ -445,7 +445,7 @@ export function useTwoHopVirtualGrid(
 			return previewSurface;
 		},
 		get interactionDescriptorResolverProvider() {
-			return interactionController.provider;
+			return interactionController;
 		},
 		isPreviewHostEnabled(rowIndex: number): boolean {
 			const mounted = virtualList.getSnapshot()?.ranges.mounted;

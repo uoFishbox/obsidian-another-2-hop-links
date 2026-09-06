@@ -505,7 +505,7 @@ export function useFlatCardGrid<T>(
 			return measurement.scrollContainerEl;
 		},
 		get interactionDescriptorResolverProvider() {
-			return interactionController.provider;
+			return interactionController;
 		},
 		get previewSurface() {
 			return previewSurface;

@@ -11,115 +11,61 @@ export interface VirtualCardInteractionBinding {
 	descriptor: ItemInteractionDescriptor | null;
 }
 
-export interface VirtualCardInteractionController {
-	readonly provider: InteractionDescriptorResolverProvider;
+export interface VirtualCardInteractionController extends InteractionDescriptorResolverProvider {
 	getInteractionHandle(slotId: string): InteractionHandle;
 	/** Returns true when the set of handles exposed to mounted DOM changed. */
 	syncCards(cards: readonly VirtualCardInteractionBinding[]): boolean;
 	clear(): void;
 }
 
-interface VirtualCardInteractionSlotBinding {
-	readonly handle: InteractionHandle;
-	readonly descriptor: ItemInteractionDescriptor | null;
-}
-
 /** Owns one unique lookup handle for each live virtual card slot. */
 export function createVirtualCardInteractionController(): VirtualCardInteractionController {
-	const bindingBySlot = new Map<string, VirtualCardInteractionSlotBinding>();
+	const handleBySlot = new Map<string, InteractionHandle>();
 	const descriptorByHandle = new Map<InteractionHandle, ItemInteractionDescriptor>();
 
-	function createSlotBinding(
-		descriptor: ItemInteractionDescriptor | null,
-	): VirtualCardInteractionSlotBinding {
-		return {
-			handle: createInteractionHandle("v"),
-			descriptor,
-		};
-	}
-
-	function getInteractionHandle(slotId: string): InteractionHandle {
-		const existing = bindingBySlot.get(slotId);
-		if (existing) return existing.handle;
-
-		const binding = createSlotBinding(null);
-		bindingBySlot.set(slotId, binding);
-		return binding.handle;
-	}
-
-	function removeSlot(slotId: string): boolean {
-		const binding = bindingBySlot.get(slotId);
-		if (!binding) return false;
-		bindingBySlot.delete(slotId);
-		descriptorByHandle.delete(binding.handle);
-		return true;
-	}
-
-	function bindCard(
-		slotId: string,
-		descriptor: ItemInteractionDescriptor,
-	): boolean {
-		const previous = bindingBySlot.get(slotId);
-		let binding: VirtualCardInteractionSlotBinding;
-		if (
-			previous &&
-			(previous.descriptor === null ||
-				previous.descriptor.interactionId === descriptor.interactionId)
-		) {
-			binding = { handle: previous.handle, descriptor };
-		} else {
-			binding = createSlotBinding(descriptor);
-		}
-		if (previous && previous.handle !== binding.handle) {
-			descriptorByHandle.delete(previous.handle);
-		}
-		bindingBySlot.set(slotId, binding);
-		descriptorByHandle.set(binding.handle, descriptor);
-		return previous?.handle !== binding.handle;
-	}
-
-	function bindEmptySlot(slotId: string): boolean {
-		const previous = bindingBySlot.get(slotId);
-		if (!previous) {
-			bindingBySlot.set(slotId, createSlotBinding(null));
-			return true;
-		}
-
-		descriptorByHandle.delete(previous.handle);
-		bindingBySlot.set(slotId, {
-			handle: previous.handle,
-			descriptor: null,
-		});
-		return false;
-	}
-
-	const provider: InteractionDescriptorResolverProvider = {
+	return {
 		resolveInteractionDescriptor(interactionHandle) {
 			return descriptorByHandle.get(interactionHandle) ?? null;
 		},
-	};
-
-	return {
-		provider,
-		getInteractionHandle,
+		getInteractionHandle(slotId) {
+			const existing = handleBySlot.get(slotId);
+			if (existing) return existing;
+			const handle = createInteractionHandle("v");
+			handleBySlot.set(slotId, handle);
+			return handle;
+		},
 		syncCards(cards) {
 			const activeSlotIds = new Set<string>();
 			let handlesChanged = false;
-			for (const card of cards) {
-				activeSlotIds.add(card.slotId);
-				handlesChanged = card.descriptor
-					? bindCard(card.slotId, card.descriptor) || handlesChanged
-					: bindEmptySlot(card.slotId) || handlesChanged;
+			for (const { slotId, descriptor } of cards) {
+				activeSlotIds.add(slotId);
+				let handle = handleBySlot.get(slotId);
+				const previous = handle ? descriptorByHandle.get(handle) : undefined;
+				if (
+					!handle ||
+					(previous &&
+						descriptor &&
+						previous.interactionId !== descriptor.interactionId)
+				) {
+					if (handle) descriptorByHandle.delete(handle);
+					handle = createInteractionHandle("v");
+					handleBySlot.set(slotId, handle);
+					handlesChanged = true;
+				}
+				if (descriptor) descriptorByHandle.set(handle, descriptor);
+				else descriptorByHandle.delete(handle);
 			}
-			for (const slotId of bindingBySlot.keys()) {
+			for (const slotId of handleBySlot.keys()) {
 				if (!activeSlotIds.has(slotId)) {
-					handlesChanged = removeSlot(slotId) || handlesChanged;
+					descriptorByHandle.delete(handleBySlot.get(slotId)!);
+					handleBySlot.delete(slotId);
+					handlesChanged = true;
 				}
 			}
 			return handlesChanged;
 		},
 		clear() {
-			bindingBySlot.clear();
+			handleBySlot.clear();
 			descriptorByHandle.clear();
 		},
 	};
