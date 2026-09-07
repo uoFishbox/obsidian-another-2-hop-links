@@ -4,13 +4,13 @@ import {
 	isIndexLinkCapableExtension,
 } from "indexing/config";
 import type { CachedMetadataWithLinkReferences, LinkReference } from "indexing/model";
-import { extractTags } from "../metadata/metadataExtractor";
+import { countLinkReferences, extractTags } from "../metadata/metadataExtractor";
 import { toCaseInsensitiveLookupKey } from "../link-resolution/linkResolution";
 import type { RebuildOptions } from "../indexState";
 import {
 	createEmptyLinkIndex,
-	reconcileSourceRow,
 	resolvedEdgeKey,
+	type LinkIndex,
 	type SourceEdge,
 	unresolvedEdgeKey,
 } from "../link-index/linkIndex";
@@ -59,7 +59,6 @@ export async function buildLinkIndexArtifactsChunked(
 		throwIfRebuildAborted(options.signal);
 	}, options.yieldIntervalMs ?? INDEXING_YIELD_INTERVAL_MS);
 	const linkIndex = createEmptyLinkIndex();
-	const noOpSink = { markChangedEdge: (_key: string): void => {} };
 	const tagIndex = createEmptyTagIndex();
 	const allFiles = vault.getFiles();
 	const ambiguityIndex = createLinkResolutionAmbiguityIndex(allFiles);
@@ -80,34 +79,38 @@ export async function buildLinkIndexArtifactsChunked(
 	for (let index = 0; index < allFiles.length; index++) {
 		const file = allFiles[index];
 		const normalizedExtension = file.extension.toLowerCase();
-		const cache = metadataCache.getFileCache(
-			file,
-		) as CachedMetadataWithLinkReferences | null;
+		const shouldIndexLinks = isIndexLinkCapableExtension(normalizedExtension);
+		const shouldIndexTags = includeTagIndex && normalizedExtension === "md";
+		const cache =
+			shouldIndexLinks || shouldIndexTags
+				? (metadataCache.getFileCache(
+						file,
+					) as CachedMetadataWithLinkReferences | null)
+				: null;
 
-		if (isIndexLinkCapableExtension(normalizedExtension)) {
-			resolvedEdgeMemo.local.clear();
-			const sourceRowSteps = readSourceRowFromMetadataChunked(
-				metadataCache,
-				file,
-				cache,
-				resolvedEdgeMemo,
-				ambiguityIndex,
-				yieldScheduler,
-			);
-			let sourceRowStep = sourceRowSteps.next();
-			while (!sourceRowStep.done) {
-				await sourceRowStep.value;
-				sourceRowStep = sourceRowSteps.next();
-			}
-			const sourceRow = sourceRowStep.value;
-			reconcileSourceRow(linkIndex, file.path, sourceRow, noOpSink);
+		if (shouldIndexLinks) {
 			linkCapableFileCount++;
-			if (sourceRow.length > 0) {
+			if (countLinkReferences(cache) > 0) {
+				resolvedEdgeMemo.local.clear();
+				const sourceRowSteps = readSourceRowFromMetadataChunked(
+					metadataCache,
+					file,
+					cache,
+					resolvedEdgeMemo,
+					ambiguityIndex,
+					yieldScheduler,
+				);
+				let sourceRowStep = sourceRowSteps.next();
+				while (!sourceRowStep.done) {
+					await sourceRowStep.value;
+					sourceRowStep = sourceRowSteps.next();
+				}
+				addInitialSourceRow(linkIndex, file.path, sourceRowStep.value);
 				indexedSourceCount++;
 			}
 		}
 
-		if (includeTagIndex && normalizedExtension === "md") {
+		if (shouldIndexTags) {
 			addFileTagsToTagIndex(tagIndex, file.path, extractTags(cache));
 		}
 
@@ -129,6 +132,22 @@ export async function buildLinkIndexArtifactsChunked(
 
 	throwIfRebuildAborted(options.signal);
 	return { linkIndex, tagIndex };
+}
+
+function addInitialSourceRow(
+	index: LinkIndex,
+	sourcePath: string,
+	row: readonly SourceEdge[],
+): void {
+	index.outgoing.set(sourcePath, row);
+	for (const edge of row) {
+		let sources = index.incoming.get(edge.key);
+		if (!sources) {
+			sources = new Map();
+			index.incoming.set(edge.key, sources);
+		}
+		sources.set(sourcePath, edge.count);
+	}
 }
 
 function* readSourceRowFromMetadataChunked(

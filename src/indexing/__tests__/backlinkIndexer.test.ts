@@ -54,6 +54,20 @@ describe("buildLinkIndexArtifactsChunked", () => {
 		);
 	});
 
+	test("does not read metadata for files that cannot contribute links or tags", async () => {
+		const env = new VaultEnvironmentBuilder([
+			{ path: "source.md" },
+			{ path: "attachment.pdf" },
+		]).build();
+
+		await buildLinkIndexArtifactsChunked(env.mockVault, env.mockMetadataCache, {});
+
+		expect(env.mockMetadataCache.getFileCache).toHaveBeenCalledTimes(1);
+		expect(env.mockMetadataCache.getFileCache).toHaveBeenCalledWith(
+			env.files["source.md"],
+		);
+	});
+
 	test("resolves ambiguous basenames separately for each source file", async () => {
 		const env = new VaultEnvironmentBuilder([
 			{ path: "folder-a/source.md", links: ["target"] },
