@@ -8,52 +8,52 @@
 	interface SortField {
 		label: string;
 		icon: IconName;
-		asc: SortOption;
-		desc: SortOption;
+		default: SortOption;
+		reverse: SortOption;
 	}
 	const RELEVANCE_FIELD: SortField = {
 		label: "関連度",
 		icon: "network",
-		asc: "relevance-reverse",
-		desc: "relevance",
+		default: "relevance",
+		reverse: "relevance-reverse",
 	};
 
 	const SORT_FIELDS = [
 		{
 			label: "タイトル",
 			icon: "type",
-			asc: "alphabetical",
-			desc: "alphabetical-reverse",
+			default: "alphabetical",
+			reverse: "alphabetical-reverse",
 		},
 		{
 			label: "被リンク数",
 			icon: "links-coming-in",
-			asc: "backlink-count",
-			desc: "backlink-count-reverse",
+			default: "backlink-count-reverse",
+			reverse: "backlink-count",
 		},
 		{
 			label: "作成日時",
 			icon: "calendar-plus",
-			asc: "created-date",
-			desc: "created-date-reverse",
+			default: "created-date-reverse",
+			reverse: "created-date",
 		},
 		{
 			label: "更新日時",
 			icon: "calendar-clock",
-			asc: "modified-date",
-			desc: "modified-date-reverse",
+			default: "modified-date-reverse",
+			reverse: "modified-date",
 		},
 		{
 			label: "ファイルサイズ",
 			icon: "hard-drive",
-			asc: "file-size",
-			desc: "file-size-reverse",
+			default: "file-size-reverse",
+			reverse: "file-size",
 		},
 	] as const satisfies readonly {
 		label: string;
 		icon: IconName;
-		asc: SortOption;
-		desc: SortOption;
+		default: SortOption;
+		reverse: SortOption;
 	}[];
 
 	interface Props {
@@ -97,12 +97,17 @@
 	);
 	const sortField = $derived(
 		sortFields.find(
-			(field) => field.asc === sortOption || field.desc === sortOption,
+			(field) => field.default === sortOption || field.reverse === sortOption,
 		) ?? SORT_FIELDS[0],
 	);
-	const isDescending = $derived(sortOption === sortField.desc);
+	const isReversed = $derived(sortOption === sortField.reverse);
+	const isDescending = $derived(
+		sortOption === "relevance" ||
+			(sortOption !== "relevance-reverse" && sortOption.endsWith("-reverse")),
+	);
+	const isTitleSort = $derived(sortField.default === "alphabetical");
 	const sortDirectionIcon = $derived(
-		isDescending ? "arrow-down-wide-narrow" : "arrow-down-narrow-wide",
+		isReversed ? "arrow-up-wide-narrow" : "arrow-down-wide-narrow",
 	);
 	const sortDirectionLabel = $derived(
 		sortField === RELEVANCE_FIELD
@@ -141,9 +146,9 @@
 			menu.addItem((item) => {
 				item.setTitle(field.label)
 					.setIcon(field.icon)
-					.setChecked(field.asc === sortField.asc)
+					.setChecked(field.default === sortField.default)
 					.onClick(() => {
-						onSortChange(isDescending ? field.desc : field.asc);
+						onSortChange(isReversed ? field.reverse : field.default);
 					});
 			});
 		}
@@ -162,11 +167,11 @@
 	}
 
 	function toggleSortDirection(): void {
-		onSortChange(isDescending ? sortField.asc : sortField.desc);
+		onSortChange(isReversed ? sortField.default : sortField.reverse);
 	}
 
 	function selectModifiedDate(): void {
-		onSortChange(isDescending ? "modified-date-reverse" : "modified-date");
+		onSortChange(isReversed ? "modified-date" : "modified-date-reverse");
 	}
 
 	function handleSearchInput(e: Event) {
@@ -300,12 +305,46 @@
 			title={sortDirectionLabel}
 			onclick={toggleSortDirection}
 		>
-			<span aria-hidden="true" use:renderSortFieldIcon={sortDirectionIcon}></span>
+			{#if isTitleSort}
+				<span
+					aria-hidden="true"
+					data-icon={isReversed ? "arrow-up-a-z" : "arrow-down-a-z"}
+				>
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						width="100%"
+						height="100%"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						class={isReversed
+							? "svg-icon lucide lucide-arrow-up-a-z"
+							: "svg-icon lucide lucide-arrow-down-a-z"}
+					>
+						{#if isReversed}
+							<path d="m3 8 4-4 4 4" />
+							<path d="M7 4v16" />
+						{:else}
+							<path d="m3 16 4 4 4-4" />
+							<path d="M7 20V4" />
+						{/if}
+						<path d="M20 8h-5" />
+						<path d="M15 10V6.5a2.5 2.5 0 0 1 5 0V10" />
+						<path d="M15 14h5l-5 6h5" />
+					</svg>
+				</span>
+			{:else}
+				<span aria-hidden="true" use:renderSortFieldIcon={sortDirectionIcon}
+				></span>
+			{/if}
 		</button>
 		<button
 			type="button"
-			class:mod-cta={sortField.asc === "modified-date"}
-			aria-pressed={sortField.asc === "modified-date"}
+			class:mod-cta={sortField.default === "modified-date-reverse"}
+			aria-pressed={sortField.default === "modified-date-reverse"}
 			title="更新日時で並べ替え"
 			onclick={selectModifiedDate}
 		>

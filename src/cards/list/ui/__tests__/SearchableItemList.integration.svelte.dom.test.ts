@@ -14,7 +14,10 @@ import type { ISortService } from "cards/sorting";
 import type { ListViewUiState } from "cards/list/model/listViewUiState";
 import { DEFAULT_SETTINGS } from "settings/model";
 import { ARIA_LABELS } from "cards/ariaLabels";
-import { queryAllByRoleDeep } from "testing/helpers/shadowDomQueries";
+import {
+	queryAllByLabelTextDeep,
+	queryAllByRoleDeep,
+} from "testing/helpers/shadowDomQueries";
 import {
 	installResizeObserverMock,
 	resetRecords,
@@ -370,7 +373,7 @@ describe("SearchableItemList integration", () => {
 		);
 		expect(firstPublication.length).toBeGreaterThan(0);
 		expect(firstPublication).not.toContain(ARIA_LABELS.OPEN_LINK("alpha-10"));
-		expect(queryAllByRoleDeep("button", { name: "10 notes" })).toHaveLength(1);
+		expect(queryAllByLabelTextDeep("10 notes")).toHaveLength(1);
 
 		idleCallback?.({
 			didTimeout: false,
@@ -396,7 +399,7 @@ describe("SearchableItemList integration", () => {
 				firstPublicationElements[index],
 			);
 		}
-		expect(queryAllByRoleDeep("button", { name: "11 notes" })).toHaveLength(1);
+		expect(queryAllByLabelTextDeep("11 notes")).toHaveLength(1);
 
 		performanceNow.mockRestore();
 		requestIdle.mockRestore();

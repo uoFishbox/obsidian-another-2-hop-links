@@ -1,6 +1,7 @@
 import { screen as domScreen, within } from "@testing-library/svelte";
 
 export type TextMatcher = Parameters<typeof domScreen.queryAllByText>[0];
+export type LabelTextMatcher = Parameters<typeof domScreen.queryAllByLabelText>[0];
 export type RoleMatcher = Parameters<typeof domScreen.queryAllByRole>[0];
 export type ByRoleOptions = Parameters<typeof domScreen.queryAllByRole>[1];
 
@@ -59,6 +60,31 @@ export function queryAllByTextDeep(text: TextMatcher): HTMLElement[] {
 		for (const element of within(
 			shadowRoot as unknown as HTMLElement,
 		).queryAllByText(text)) {
+			if (!seen.has(element)) {
+				seen.add(element);
+				results.push(element);
+			}
+		}
+	}
+
+	return results;
+}
+
+export function queryAllByLabelTextDeep(label: LabelTextMatcher): HTMLElement[] {
+	const seen = new Set<HTMLElement>();
+	const results: HTMLElement[] = [];
+
+	for (const element of domScreen.queryAllByLabelText(label)) {
+		if (!seen.has(element)) {
+			seen.add(element);
+			results.push(element);
+		}
+	}
+
+	for (const shadowRoot of collectOpenShadowRoots()) {
+		for (const element of within(
+			shadowRoot as unknown as HTMLElement,
+		).queryAllByLabelText(label)) {
 			if (!seen.has(element)) {
 				seen.add(element);
 				results.push(element);

@@ -27,7 +27,7 @@ describe("ListControls", () => {
 		showAtPosition.mock.contexts[1].items
 			.find((item) => item.title === "関連度")
 			?.clickHandler?.();
-		expect(onSortChange).toHaveBeenLastCalledWith("relevance-reverse");
+		expect(onSortChange).toHaveBeenLastCalledWith("relevance");
 		await view.rerender({ sortOption: "relevance" });
 		expect(trigger).toHaveTextContent("関連度");
 		const directionButton = screen.getByRole("button", {
@@ -129,13 +129,13 @@ describe("ListControls", () => {
 
 	it.each([
 		["タイトル", "type", "alphabetical", "alphabetical-reverse"],
-		["被リンク数", "links-coming-in", "backlink-count", "backlink-count-reverse"],
-		["作成日時", "calendar-plus", "created-date", "created-date-reverse"],
-		["更新日時", "calendar-clock", "modified-date", "modified-date-reverse"],
-		["ファイルサイズ", "hard-drive", "file-size", "file-size-reverse"],
+		["被リンク数", "links-coming-in", "backlink-count-reverse", "backlink-count"],
+		["作成日時", "calendar-plus", "created-date-reverse", "created-date"],
+		["更新日時", "calendar-clock", "modified-date-reverse", "modified-date"],
+		["ファイルサイズ", "hard-drive", "file-size-reverse", "file-size"],
 	] as const)(
-		"selects %s while preserving the sort direction",
-		async (label, icon, asc, desc) => {
+		"selects %s while preserving the default/reverse state",
+		async (label, icon, defaultOption, reverseOption) => {
 			const showAtPosition = vi.spyOn(Menu.prototype, "showAtPosition");
 			const onSortChange = vi.fn();
 			const view = render(ListControls, {
@@ -148,9 +148,9 @@ describe("ListControls", () => {
 			showAtPosition.mock.contexts[0].items
 				.find((item) => item.title === label)
 				?.clickHandler?.();
-			expect(onSortChange).toHaveBeenNthCalledWith(1, asc);
+			expect(onSortChange).toHaveBeenNthCalledWith(1, defaultOption);
 
-			await view.rerender({ sortOption: desc });
+			await view.rerender({ sortOption: reverseOption });
 			expect(button).toHaveTextContent(label);
 			expect(button.querySelector(".twohop-sort-field-icon")).toHaveAttribute(
 				"data-icon",
@@ -162,7 +162,7 @@ describe("ListControls", () => {
 				menu.items.filter((item) => item.checked).map((item) => item.title),
 			).toEqual([label]);
 			menu.items.find((item) => item.title === label)?.clickHandler?.();
-			expect(onSortChange).toHaveBeenNthCalledWith(2, desc);
+			expect(onSortChange).toHaveBeenNthCalledWith(2, reverseOption);
 		},
 	);
 
@@ -185,23 +185,8 @@ describe("ListControls", () => {
 	it("keeps the direction toggle and modified-date shortcut", async () => {
 		const onSortChange = vi.fn();
 		const view = render(ListControls, {
-			props: { sortOption: "file-size", onSortChange },
+			props: { sortOption: "file-size-reverse", onSortChange },
 		});
-		expect(
-			screen
-				.getByRole("button", {
-					name: "昇順（クリックで降順に切り替え）",
-				})
-				.querySelector('[aria-hidden="true"]'),
-		).toHaveAttribute("data-icon", "arrow-down-narrow-wide");
-		await fireEvent.click(
-			screen.getByRole("button", { name: "昇順（クリックで降順に切り替え）" }),
-		);
-		expect(onSortChange).toHaveBeenLastCalledWith("file-size-reverse");
-		await fireEvent.click(screen.getByRole("button", { name: "更新日時" }));
-		expect(onSortChange).toHaveBeenLastCalledWith("modified-date");
-
-		await view.rerender({ sortOption: "file-size-reverse" });
 		expect(
 			screen
 				.getByRole("button", {
@@ -215,7 +200,67 @@ describe("ListControls", () => {
 		expect(onSortChange).toHaveBeenLastCalledWith("file-size");
 		await fireEvent.click(screen.getByRole("button", { name: "更新日時" }));
 		expect(onSortChange).toHaveBeenLastCalledWith("modified-date-reverse");
+
+		await view.rerender({ sortOption: "file-size" });
+		expect(
+			screen
+				.getByRole("button", {
+					name: "昇順（クリックで降順に切り替え）",
+				})
+				.querySelector('[aria-hidden="true"]'),
+		).toHaveAttribute("data-icon", "arrow-up-wide-narrow");
+		await fireEvent.click(
+			screen.getByRole("button", { name: "昇順（クリックで降順に切り替え）" }),
+		);
+		expect(onSortChange).toHaveBeenLastCalledWith("file-size-reverse");
+		await fireEvent.click(screen.getByRole("button", { name: "更新日時" }));
+		expect(onSortChange).toHaveBeenLastCalledWith("modified-date");
 	});
+
+	it.each([
+		["alphabetical", "arrow-down-a-z"],
+		["alphabetical-reverse", "arrow-up-a-z"],
+	] as const)(
+		"renders the title-specific direction icon for %s",
+		(sortOption, icon) => {
+			render(ListControls, {
+				props: { sortOption, onSortChange: vi.fn() },
+			});
+
+			const iconElement = screen
+				.getByRole("button", {
+					name: sortOption === "alphabetical" ? /昇順/ : /降順/,
+				})
+				.querySelector('[aria-hidden="true"]');
+			expect(iconElement).toHaveAttribute("data-icon", icon);
+			const svg = iconElement?.querySelector("svg");
+			expect(svg).toBeInTheDocument();
+			expect(svg).toHaveAttribute("width", "100%");
+			expect(svg).toHaveAttribute("height", "100%");
+			expect(svg).toHaveClass("svg-icon", "lucide", `lucide-${icon}`);
+			expect(
+				Array.from(iconElement?.querySelectorAll("path") ?? [], (path) =>
+					path.getAttribute("d"),
+				),
+			).toEqual(
+				sortOption === "alphabetical-reverse"
+					? [
+							"m3 8 4-4 4 4",
+							"M7 4v16",
+							"M20 8h-5",
+							"M15 10V6.5a2.5 2.5 0 0 1 5 0V10",
+							"M15 14h5l-5 6h5",
+						]
+					: [
+							"m3 16 4 4 4-4",
+							"M7 20V4",
+							"M20 8h-5",
+							"M15 10V6.5a2.5 2.5 0 0 1 5 0V10",
+							"M15 14h5l-5 6h5",
+						],
+			);
+		},
+	);
 
 	it("passes latest value to onSearchInput on input", async () => {
 		const onSearchInput = vi.fn();
