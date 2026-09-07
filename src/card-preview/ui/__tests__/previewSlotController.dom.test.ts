@@ -136,7 +136,7 @@ describe("PreviewSlotController", () => {
 		controller.dispose();
 	});
 
-	it("keeps errors separate from committed content and allows retry", () => {
+	it("does not retry an error until the preview is reactivated", () => {
 		const cleanups: Array<ReturnType<typeof vi.fn>> = [];
 		const callbacks: PreviewRenderCallbacks[] = [];
 		const render: CardPreviewRenderer = (_host, _request, next) => {
@@ -157,8 +157,14 @@ describe("PreviewSlotController", () => {
 		expect(host.querySelector(".error")?.textContent).toBe(
 			"Preview not available.",
 		);
-		expect(controller.needsActivation()).toBe(true);
+		expect(controller.needsActivation()).toBe(false);
 
+		controller.activate();
+		expect(callbacks).toHaveLength(1);
+
+		controller.setActive(false);
+		controller.setActive(true);
+		expect(controller.needsActivation()).toBe(true);
 		controller.activate();
 		expect(callbacks).toHaveLength(2);
 		expect(cleanups[0]).toHaveBeenCalledOnce();

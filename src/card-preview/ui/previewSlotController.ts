@@ -268,11 +268,11 @@ export function createPreviewSlotController(
 						return;
 					}
 					if (cancelRender === cancel) cancelRender = undefined;
+					failedRenderKey = expectedRequest.renderKey;
 					if (
 						content.state === "committed" &&
 						content.host === expectedHost
 					) {
-						failedRenderKey = expectedRequest.renderKey;
 						cancel();
 						return;
 					}

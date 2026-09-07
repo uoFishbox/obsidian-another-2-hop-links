@@ -80,6 +80,52 @@ describe("enqueueMathRender", () => {
 		expect(events).toEqual(["first:start", "first:end", "latest"]);
 	});
 
+	test("counts tasks waiting for idle execution against the concurrency limit", async () => {
+		vi.useFakeTimers();
+		const { enqueueMathRender } = await loadQueueModule();
+		const events: string[] = [];
+		const releases: Array<() => void> = [];
+		let activeTasks = 0;
+		let maxActiveTasks = 0;
+
+		const enqueueBlockingTask = (name: string) =>
+			enqueueMathRender(async () => {
+				events.push(`${name}:start`);
+				activeTasks += 1;
+				maxActiveTasks = Math.max(maxActiveTasks, activeTasks);
+				await new Promise<void>((resolve) => releases.push(resolve));
+				activeTasks -= 1;
+				events.push(`${name}:end`);
+			});
+
+		const firstTask = enqueueBlockingTask("first");
+		const secondTask = enqueueBlockingTask("second");
+		const thirdTask = enqueueBlockingTask("third");
+
+		await vi.advanceTimersByTimeAsync(0);
+		expect(events).toEqual(["first:start"]);
+
+		releases.shift()?.();
+		await firstTask;
+		await vi.advanceTimersByTimeAsync(0);
+		expect(events).toEqual(["first:start", "first:end", "second:start"]);
+
+		releases.shift()?.();
+		await secondTask;
+		await vi.advanceTimersByTimeAsync(0);
+		expect(events).toEqual([
+			"first:start",
+			"first:end",
+			"second:start",
+			"second:end",
+			"third:start",
+		]);
+
+		releases.shift()?.();
+		await thirdTask;
+		expect(maxActiveTasks).toBe(1);
+	});
+
 	test("pending tasks whose AbortSignal has been aborted are not executed", async () => {
 		vi.useFakeTimers();
 		const { enqueueMathRender } = await loadQueueModule();
