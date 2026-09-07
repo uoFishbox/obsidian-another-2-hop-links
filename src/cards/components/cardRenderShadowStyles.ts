@@ -272,10 +272,18 @@ export const CARD_RENDER_SHADOW_CSS = String.raw`
 
 .cosense-card-links__box-preview--text {
 	padding: 0px var(--ccl-box-padding) 0px var(--ccl-box-padding);
+	margin-bottom: var(--ccl-box-padding);
+	/* Move overflowing lines into clipped columns, preserving complete lines. */
+	column-count: 1;
+	column-fill: auto;
+	column-gap: calc(2 * var(--ccl-box-padding));
+	orphans: 1;
+	widows: 1;
 } 
 
 .cosense-card-links__box-preview--image {
 	padding: 0px calc(var(--ccl-box-padding) / 2) 0px calc(var(--ccl-box-padding) / 2);
+	margin-bottom: calc(var(--ccl-box-padding) / 2);
 }
 
 .lazy-placeholder {
