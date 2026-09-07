@@ -220,6 +220,12 @@ export const CARD_RENDER_SHADOW_CSS = String.raw`
 	text-transform: uppercase;
 }
 
+.cosense-card-links__box:focus-visible {
+	box-shadow: inset 0 0 0 2px var(--background-modifier-border-focus);
+	outline: none;
+	border-color: var(--background-modifier-border-focus);
+}
+
 
 .cosense-card-links__box.cosense-card-links__box--missing .cosense-card-links__box-title {
 	color: var(--color-base-50);
