@@ -10,8 +10,8 @@ import type { TwoHopItemModel } from "two-hop/ui/twoHopSectionModel";
 import { createTwoHopCardHydrator, type TwoHopCardHydrator } from "./cardHydrator";
 import {
 	buildTwoHopInteractionBindings,
-	buildTwoHopPreviewBindings,
 	collectTwoHopCardDemand,
+	createTwoHopPreviewBindingsMemo,
 } from "./mountedCardBindings";
 import type { MountedTwoHopBuild, MountedTwoHopRow } from "./mountedRows";
 
@@ -52,7 +52,9 @@ export function createTwoHopCardSurfaceRuntime(
 	let previewVisibleRange: Readonly<RowRange> = EMPTY_RANGE;
 	let previewPrefetchRange: Readonly<RowRange> = EMPTY_RANGE;
 	let lastInteractionMountedBuild: MountedTwoHopBuild | null | undefined;
+	let previewModelRevision = 0;
 	const previewPrefetchRangeTracker = createPreviewPrefetchRangeTracker();
+	const resolvePreviewBindings = createTwoHopPreviewBindingsMemo();
 	const interactionController = createVirtualCardInteractionController();
 	const cardHydrator = createTwoHopCardHydrator({
 		frameCoordinator: options.frameCoordinator,
@@ -60,7 +62,10 @@ export function createTwoHopCardSurfaceRuntime(
 		resolveCardModel: options.resolveCardModel,
 		isPreviewActive: options.isPreviewActive,
 		onModelsChanged: syncHydratedInteractions,
-		onPreviewModelsChanged: publishPreviewSnapshot,
+		onPreviewModelsChanged: () => {
+			previewModelRevision += 1;
+			publishPreviewSnapshot();
+		},
 	});
 
 	function getMountedRows(): readonly MountedTwoHopRow[] {
@@ -92,13 +97,14 @@ export function createTwoHopCardSurfaceRuntime(
 		const active = options.isPreviewActive();
 		const dimensions = options.getCardDimensions();
 		options.previewSurface.publish({
-			bindings: buildTwoHopPreviewBindings(
-				getMountedRows(),
-				cardHydrator.getModel,
-				dimensions.widthPx,
-				dimensions.heightPx,
+			bindings: resolvePreviewBindings({
+				mountedBuild: options.getMountedBuild(),
+				modelRevision: previewModelRevision,
+				widthPx: dimensions.widthPx,
+				heightPx: dimensions.heightPx,
 				active,
-			),
+				getCardModel: cardHydrator.getModel,
+			}),
 			visibleRange: previewVisibleRange,
 			prefetchRange: previewPrefetchRange,
 			active,

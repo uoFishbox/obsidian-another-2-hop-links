@@ -4,7 +4,23 @@ import type { CardRenderModel } from "cards/rendering/cardRenderModel";
 import type { VirtualCardInteractionBinding } from "cards/interactions/virtualCardInteractionController";
 import type { RowRange } from "cards/virtualization/public";
 import type { TwoHopCardDemand, TwoHopCardHydrationCell } from "./cardHydrator";
-import type { MountedTwoHopRow } from "./mountedRows";
+import type { MountedTwoHopBuild, MountedTwoHopRow } from "./mountedRows";
+
+export interface ResolveTwoHopPreviewBindingsParams {
+	readonly mountedBuild: MountedTwoHopBuild | null;
+	readonly modelRevision: number;
+	readonly widthPx: number;
+	readonly heightPx: number;
+	readonly active: boolean;
+	readonly getCardModel: (logicalKey: string) => CardRenderModel | undefined;
+}
+
+/** Resolves preview bindings cached by the inputs that can change their values. */
+export type TwoHopPreviewBindingsMemo = (
+	params: ResolveTwoHopPreviewBindingsParams,
+) => readonly VirtualPreviewBinding[];
+
+const EMPTY_PREVIEW_BINDINGS: readonly VirtualPreviewBinding[] = [];
 
 /** Builds interaction bindings owned by the current resident physical slots. */
 export function buildTwoHopInteractionBindings(
@@ -51,6 +67,61 @@ export function buildTwoHopPreviewBindings(
 		}
 	}
 	return bindings;
+}
+
+/**
+ * Reuses preview bindings while scrolling changes only the visible range.
+ * Hydration publishes an explicit model revision because it does not replace the
+ * mounted build.
+ */
+export function createTwoHopPreviewBindingsMemo(): TwoHopPreviewBindingsMemo {
+	let lastMountedBuild: MountedTwoHopBuild | null | undefined;
+	let lastModelRevision: number | undefined;
+	let lastWidthPx: number | undefined;
+	let lastHeightPx: number | undefined;
+	let lastActive: boolean | undefined;
+	let lastGetCardModel:
+		| ResolveTwoHopPreviewBindingsParams["getCardModel"]
+		| undefined;
+	let bindings = EMPTY_PREVIEW_BINDINGS;
+
+	return ({
+		mountedBuild,
+		modelRevision,
+		widthPx,
+		heightPx,
+		active,
+		getCardModel,
+	}): readonly VirtualPreviewBinding[] => {
+		if (
+			mountedBuild === lastMountedBuild &&
+			modelRevision === lastModelRevision &&
+			widthPx === lastWidthPx &&
+			heightPx === lastHeightPx &&
+			active === lastActive &&
+			getCardModel === lastGetCardModel
+		) {
+			return bindings;
+		}
+
+		bindings = active
+			? buildTwoHopPreviewBindings(
+					mountedBuild?.rowsInMountedRange ?? [],
+					getCardModel,
+					widthPx,
+					heightPx,
+					true,
+				)
+			: EMPTY_PREVIEW_BINDINGS;
+		lastMountedBuild = mountedBuild;
+		lastModelRevision = modelRevision;
+		lastWidthPx = widthPx;
+		lastHeightPx = heightPx;
+		lastActive = active;
+		lastGetCardModel = getCardModel;
+
+		return bindings;
+	};
 }
 
 /** Splits resident item cells into hydration priorities for the current ranges. */
