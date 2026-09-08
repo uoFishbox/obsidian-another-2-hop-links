@@ -1,6 +1,5 @@
 import type { PluginHost } from "obsidian-integration/pluginHost";
 import { openTagNotesView } from "search/tag-notes/TagNotesView";
-import { areTagFeaturesEnabled } from "settings/model";
 import { getGlobalSearchOpenGlobalSearch } from "obsidian-integration/capabilities/obsidianInternals";
 import { applyPatch } from "obsidian-integration/capabilities/applyPatch";
 import type { TaggedNote } from "indexing/model";
@@ -27,7 +26,7 @@ function patchGlobalSearch(plugin: PluginHost): void {
 				const currentGeneration = ++searchGeneration;
 				if (
 					!plugin.settings.enableGlobalSearchTagModal ||
-					!areTagFeaturesEnabled(plugin.settings)
+					!plugin.settings.enableTagFeatures
 				) {
 					return next.call(this, query);
 				}

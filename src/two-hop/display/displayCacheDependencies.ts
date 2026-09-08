@@ -1,4 +1,4 @@
-import { areTagFeaturesEnabled, type PluginSettings } from "settings/model";
+import type { PluginSettings } from "settings/model";
 import type { SortOption } from "cards/sorting";
 
 export interface LinkDisplayPreprocessSettings {
@@ -33,7 +33,7 @@ export function selectTagDisplayPreprocessSettings(
 ): TagDisplayPreprocessSettings {
 	return {
 		excludeAttachments: settings.excludeAttachments,
-		tagFeaturesEnabled: areTagFeaturesEnabled(settings),
+		tagFeaturesEnabled: settings.enableTagFeatures,
 		showTagsSection: settings.showTagsSection,
 	};
 }
@@ -59,7 +59,7 @@ export function createLinkPreprocessCacheKey(settings: PluginSettings): string {
 export function createTagPreprocessCacheKey(settings: PluginSettings): string {
 	return JSON.stringify([
 		settings.excludeAttachments,
-		areTagFeaturesEnabled(settings),
+		settings.enableTagFeatures,
 		settings.showTagsSection,
 		settings.dedupeCards,
 	]);

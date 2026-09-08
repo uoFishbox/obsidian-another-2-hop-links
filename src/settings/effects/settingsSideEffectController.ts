@@ -44,18 +44,13 @@ export interface SettingsSideEffectControllerDeps {
 	readonly bumpSortContextVersion: () => void;
 }
 
-export interface SettingsSideEffectController {
-	apply(changedKeys: Iterable<keyof PluginSettings>, settings: PluginSettings): void;
-	refreshLayoutAffectedViews(): void;
-}
-
 /**
  * Encapsulates the imperative side effects triggered by setting changes,
  * keeping the plugin entry point free from handler wiring and view-type loops.
  */
 export function createSettingsSideEffectController(
 	deps: SettingsSideEffectControllerDeps,
-): SettingsSideEffectController {
+): (changedKeys: Iterable<keyof PluginSettings>) => void {
 	function refreshLayoutAffectedViews(): void {
 		for (const viewType of LAYOUT_REFRESHABLE_VIEW_TYPES) {
 			for (const leaf of deps.workspace.getLeavesOfType(viewType)) {
@@ -68,10 +63,7 @@ export function createSettingsSideEffectController(
 		deps.emptyViewController.refresh();
 	}
 
-	function apply(
-		changedKeys: Iterable<keyof PluginSettings>,
-		settings: PluginSettings,
-	): void {
+	return (changedKeys): void => {
 		const changedKeySet = new Set(changedKeys);
 		if (changedKeySet.size === 0) {
 			return;
@@ -121,10 +113,5 @@ export function createSettingsSideEffectController(
 		if (refreshesLayout) {
 			refreshLayoutAffectedViews();
 		}
-	}
-
-	return {
-		apply,
-		refreshLayoutAffectedViews,
 	};
 }

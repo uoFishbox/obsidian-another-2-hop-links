@@ -30,19 +30,6 @@ function getOptionLabel(option: SelectOption, lang: Language): string {
 	return option.label;
 }
 
-function updatePluginSetting<K extends keyof PluginSettings>(
-	plugin: PluginHost,
-	key: K,
-	value: PluginSettings[K],
-	immediate?: boolean,
-): Promise<void> {
-	if (Object.is(plugin.settings[key], value)) {
-		return Promise.resolve();
-	}
-
-	return plugin.updateSetting(key, value, immediate ? { immediate: true } : {});
-}
-
 function reportSettingUpdateError(error: unknown): void {
 	console.error("設定の更新に失敗しました:", error);
 }
@@ -104,12 +91,12 @@ export class CosenseCardLinksSettingTab extends PluginSettingTab {
 			case "toggle":
 				setting.addToggle((toggle) =>
 					toggle.setValue(Boolean(currentValue)).onChange((value) => {
-						void updatePluginSetting(
-							this.pluginInstance,
-							definition.settingKey,
-							value as PluginSettings[typeof definition.settingKey],
-							definition.immediate,
-						)
+						void this.pluginInstance
+							.updateSetting(
+								definition.settingKey,
+								value as PluginSettings[typeof definition.settingKey],
+								definition.immediate ? { immediate: true } : undefined,
+							)
 							.then(() => {
 								if (definition.settingKey === "language") {
 									this.update();
@@ -125,12 +112,12 @@ export class CosenseCardLinksSettingTab extends PluginSettingTab {
 						dropdown.addOption(option.value, getOptionLabel(option, lang));
 					}
 					dropdown.setValue(String(currentValue)).onChange((value) => {
-						void updatePluginSetting(
-							this.pluginInstance,
-							definition.settingKey,
-							value as PluginSettings[typeof definition.settingKey],
-							definition.immediate,
-						)
+						void this.pluginInstance
+							.updateSetting(
+								definition.settingKey,
+								value as PluginSettings[typeof definition.settingKey],
+								definition.immediate ? { immediate: true } : undefined,
+							)
 							.then(() => {
 								if (definition.settingKey === "language") {
 									this.update();
@@ -156,12 +143,15 @@ export class CosenseCardLinksSettingTab extends PluginSettingTab {
 							if (parsed === undefined) {
 								return;
 							}
-							void updatePluginSetting(
-								this.pluginInstance,
-								definition.settingKey,
-								parsed,
-								definition.immediate,
-							).catch(reportSettingUpdateError);
+							void this.pluginInstance
+								.updateSetting(
+									definition.settingKey,
+									parsed,
+									definition.immediate
+										? { immediate: true }
+										: undefined,
+								)
+								.catch(reportSettingUpdateError);
 						}),
 				);
 				return;
@@ -181,12 +171,15 @@ export class CosenseCardLinksSettingTab extends PluginSettingTab {
 							if (parsed === undefined) {
 								return;
 							}
-							void updatePluginSetting(
-								this.pluginInstance,
-								definition.settingKey,
-								parsed,
-								definition.immediate,
-							).catch(reportSettingUpdateError);
+							void this.pluginInstance
+								.updateSetting(
+									definition.settingKey,
+									parsed,
+									definition.immediate
+										? { immediate: true }
+										: undefined,
+								)
+								.catch(reportSettingUpdateError);
 						}),
 				);
 				return;

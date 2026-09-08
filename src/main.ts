@@ -20,8 +20,8 @@ import type { PluginHost } from "obsidian-integration/pluginHost";
 import { registerCliHandlers } from "obsidian-integration/cli/registerCliHandlers";
 
 export default class CosenseCardLinksPlugin extends Plugin implements PluginHost {
-	public settings: PluginSettings = { ...DEFAULT_SETTINGS };
-	public settingsManager!: SettingsManager;
+	public settings: PluginSettings = Object.freeze({ ...DEFAULT_SETTINGS });
+	private settingsManager!: SettingsManager;
 	private runtime!: PluginRuntime;
 
 	private readonly forceRedrawEffect = forceRedrawEffect;
@@ -65,7 +65,6 @@ export default class CosenseCardLinksPlugin extends Plugin implements PluginHost
 			app: this.app,
 			plugin: this,
 			forceRedrawEffect: this.forceRedrawEffect,
-			settingsManager: this.settingsManager,
 			getSettings: () => this.settings,
 			isUnloaded: () => this.isUnloaded,
 			bumpSortContextVersion: () => this.bumpSortContextVersion(),
@@ -155,20 +154,12 @@ export default class CosenseCardLinksPlugin extends Plugin implements PluginHost
 		value: PluginSettings[K],
 		options: { immediate?: boolean } = {},
 	): Promise<void> {
-		const updatePromise = this.settingsManager.update(key, value, options);
-		this.runtime.sideEffectController.apply([key], this.settings);
-		await updatePromise;
-	}
+		if (Object.is(this.settings[key], value)) {
+			return;
+		}
 
-	public async updateSettings(
-		updates: Partial<PluginSettings>,
-		options: { immediate?: boolean } = {},
-	): Promise<void> {
-		const updatePromise = this.settingsManager.updateBatch(updates, options);
-		this.runtime.sideEffectController.apply(
-			Object.keys(updates) as Array<keyof PluginSettings>,
-			this.settings,
-		);
+		const updatePromise = this.settingsManager.update(key, value, options);
+		this.runtime.applySettingsSideEffects([key]);
 		await updatePromise;
 	}
 

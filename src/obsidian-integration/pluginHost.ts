@@ -5,19 +5,6 @@ import type { ResolveOptions } from "two-hop/resolution/TwoHopLinkResolver";
 import type { IIndexingService } from "indexing/index-service/IndexingService";
 import type { ISortService } from "cards/sorting";
 
-export interface PluginSettingsManager {
-	readonly settings: PluginSettings;
-	update<K extends keyof PluginSettings>(
-		key: K,
-		value: PluginSettings[K],
-		options?: { immediate?: boolean },
-	): Promise<void>;
-	updateBatch(
-		updates: Partial<PluginSettings>,
-		options?: { immediate?: boolean },
-	): Promise<void>;
-}
-
 export interface PluginIndexUpdateQueue {
 	requestIndexUpdateForFile(path: string): void;
 }
@@ -33,7 +20,6 @@ export interface PluginComponentController {
 
 export interface PluginHost extends Plugin {
 	settings: PluginSettings;
-	settingsManager: PluginSettingsManager;
 	indexingService: IIndexingService;
 	sortService: ISortService;
 	indexUpdateQueue: PluginIndexUpdateQueue;
@@ -47,10 +33,6 @@ export interface PluginHost extends Plugin {
 	updateSetting<K extends keyof PluginSettings>(
 		key: K,
 		value: PluginSettings[K],
-		options?: { immediate?: boolean },
-	): Promise<void>;
-	updateSettings(
-		updates: Partial<PluginSettings>,
 		options?: { immediate?: boolean },
 	): Promise<void>;
 }

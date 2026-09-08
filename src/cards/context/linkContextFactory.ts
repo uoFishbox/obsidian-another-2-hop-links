@@ -4,7 +4,7 @@ import type { IPreviewService } from "card-preview/pipeline/createPreviewService
 import type { CachedMetadataWithLinkReferences, IndexedLink } from "indexing/model";
 import type { IIndexingService } from "indexing/index-service/IndexingService";
 import type { HighlightMode, LinkContext, LinkInteractionOptions } from "./linkContext";
-import { areTagFeaturesEnabled, type PluginSettings } from "settings/model";
+import type { PluginSettings } from "settings/model";
 import { triggerHoverPopover } from "hover-popover/mobilePopover";
 import type { PluginHost } from "obsidian-integration/pluginHost";
 import { openTagNotesView } from "search/tag-notes/TagNotesView";
@@ -26,7 +26,7 @@ export async function handleTagClick(
 	indexingService: IIndexingService,
 	plugin: PluginHost,
 ): Promise<void> {
-	if (!areTagFeaturesEnabled(plugin.settings)) return;
+	if (!plugin.settings.enableTagFeatures) return;
 	const notes = await indexingService.getNotesWithTag(
 		tag,
 		linkContext.sourceFile.path,

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { DEFAULT_SETTINGS, type PluginSettings } from "settings/model";
+import type { PluginSettings } from "settings/model";
 import { createSettingsSideEffectController } from "../settingsSideEffectController";
 
 function createHarness() {
@@ -41,8 +41,7 @@ function createHarness() {
 	});
 
 	return {
-		apply: (...keys: Array<keyof PluginSettings>) =>
-			controller.apply(keys, DEFAULT_SETTINGS),
+		apply: (...keys: Array<keyof PluginSettings>) => controller(keys),
 		mocks,
 	};
 }

@@ -1,12 +1,9 @@
 import { describe, expect, it } from "vitest";
-import {
-	parsePluginSettings,
-	PluginSettingsSchema,
-} from "settings/model/settingsSchema";
+import { parsePluginSettings } from "settings/model/settingsSchema";
 import { DEFAULT_SETTINGS } from "settings/model/defaults";
 import { SETTINGS_SCHEMA_VERSION, type PluginSettings } from "settings/model/settings";
 
-describe("PluginSettingsSchema", () => {
+describe("parsePluginSettings", () => {
 	it.each(["relevance", "relevance-reverse"] as const)(
 		"restores the %s sort selection",
 		(sortOption) => {
@@ -36,12 +33,7 @@ describe("PluginSettingsSchema", () => {
 	it("accepts a fully valid settings object unchanged", () => {
 		const raw: PluginSettings = { ...DEFAULT_SETTINGS, language: "ja" };
 
-		const result = PluginSettingsSchema.safeParse(raw);
-
-		expect(result.success).toBe(true);
-		if (result.success) {
-			expect(result.data).toEqual(raw);
-		}
+		expect(parsePluginSettings(raw)).toEqual(raw);
 	});
 
 	it("falls back to defaults for invalid enum values", () => {

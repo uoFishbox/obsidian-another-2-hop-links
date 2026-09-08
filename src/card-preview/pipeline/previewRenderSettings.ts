@@ -41,8 +41,7 @@ export function createPreviewRenderSettings(
 		previewMaxChars: settings.previewMaxChars,
 		previewMaxLines: settings.previewMaxLines,
 		previewVisualLineSafetyMargin: settings.previewVisualLineSafetyMargin,
-		priorityFrontmatterKeyForPreview:
-			settings.priorityFrontmatterKeyForPreview ?? "",
+		priorityFrontmatterKeyForPreview: settings.priorityFrontmatterKeyForPreview,
 	});
 	settingsSnapshots.set(settings, snapshot);
 	return snapshot;

@@ -101,9 +101,3 @@ export const parsePositiveNumber = (value: string): number | undefined => {
 };
 
 export const parseTrimmedString = (value: string): string => value.trim();
-
-export const parseCommaSeparatedList = (value: string): string[] =>
-	value
-		.split(",")
-		.map((entry) => entry.trim())
-		.filter(Boolean);

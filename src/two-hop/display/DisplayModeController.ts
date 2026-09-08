@@ -2,8 +2,7 @@ import { MarkdownView, TFile, type Plugin, type App } from "obsidian";
 import { resolveFileByPath } from "obsidian-integration/files/resolveFileByPath";
 import type { CanvasViewCanvas } from "obsidian-typings";
 import type { CanvasNodeData } from "obsidian-integration/hostContracts";
-import type { SettingsManager } from "settings/persistence/SettingsManager";
-import type { DisplayMode } from "settings/model";
+import type { DisplayMode, PluginSettings } from "settings/model";
 import type { IComponentManager } from "obsidian-integration/lifecycle/ComponentController";
 import { resolveWorkspaceWindow } from "obsidian-integration/workspace/workspaceDocuments";
 import { TwoHopLinksView, TWO_HOP_LINKS_VIEW_TYPE } from "two-hop/ui/TwoHopLinksView";
@@ -30,13 +29,13 @@ export class DisplayModeController {
 
 	constructor(
 		private app: App,
-		private settingsManager: SettingsManager,
+		private getSettings: () => PluginSettings,
 		private componentManager: IComponentManager,
 		private plugin: Plugin,
 		private updateSidebarView?: (file: TFile) => void,
 		private getActiveFile?: () => TFile | null,
 	) {
-		this.activeMode = this.settingsManager.settings.displayMode;
+		this.activeMode = this.getSettings().displayMode;
 
 		this.plugin.registerEvent(
 			this.app.workspace.on(
@@ -64,11 +63,7 @@ export class DisplayModeController {
 	}
 
 	public mountInlineComponents(options: { forceRemount?: boolean } = {}): void {
-		if (
-			!["editor-inline", "hybrid"].includes(
-				this.settingsManager.settings.displayMode,
-			)
-		) {
+		if (!["editor-inline", "hybrid"].includes(this.getSettings().displayMode)) {
 			return;
 		}
 
@@ -86,7 +81,7 @@ export class DisplayModeController {
 
 	public handleSettingsChange(): void {
 		this.deactivateMode(this.activeMode);
-		this.activeMode = this.settingsManager.settings.displayMode;
+		this.activeMode = this.getSettings().displayMode;
 		this.activateMode(this.activeMode);
 		// Re-evaluate the display target for the current active view immediately after a settings change
 		this.handleActiveLeafChangeByMode(
@@ -319,9 +314,7 @@ export class DisplayModeController {
 	}
 
 	private shouldFollowSelectedCanvasFileNode(): boolean {
-		return (
-			this.settingsManager.settings.showTwoHopForSelectedCanvasFileNode ?? true
-		);
+		return this.getSettings().showTwoHopForSelectedCanvasFileNode;
 	}
 
 	private isMarkdownView(view: unknown): boolean {

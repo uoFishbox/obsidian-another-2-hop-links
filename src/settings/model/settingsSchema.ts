@@ -1,6 +1,6 @@
 import { z } from "zod";
-import type { SortOption } from "cards/sorting";
-import { clonePluginSettings, DEFAULT_SETTINGS } from "./defaults";
+import { SORT_OPTIONS } from "cards/sorting/types";
+import { DEFAULT_SETTINGS } from "./defaults";
 import {
 	DISPLAY_MODES,
 	HIGHLIGHT_ON_OPEN_ACTIONS,
@@ -10,43 +10,6 @@ import {
 	TWO_HOP_HEADER_SORT_ORDERS,
 	type PluginSettings,
 } from "./settings";
-
-const SORT_OPTION_VALUES = [
-	"relevance",
-	"relevance-reverse",
-	"alphabetical",
-	"alphabetical-reverse",
-	"created-date",
-	"created-date-reverse",
-	"modified-date",
-	"modified-date-reverse",
-	"backlink-count",
-	"backlink-count-reverse",
-	"file-size",
-	"file-size-reverse",
-] as const satisfies readonly SortOption[];
-
-/** Compile error here means SORT_OPTION_VALUES is missing a SortOption member. */
-export type AssertSortOptionsExhaustive =
-	Exclude<SortOption, (typeof SORT_OPTION_VALUES)[number]> extends never
-		? true
-		: never;
-
-/**
- * Keys removed from PluginSettings in past versions. They are dropped during
- * load so they never re-enter data.json after the next save.
- */
-const OBSOLETE_SETTING_KEYS = [
-	"twoHopListMode",
-	"enableTwoRowMountedOverscan",
-	"renderCodeBlockTypes",
-	"previewActivationAheadRows",
-	"previewDomCommitsPerSecond",
-	"searchPreviewSeekThresholdChars",
-	"searchPreviewSeekBufferChars",
-	"enableProgressiveTwoHopBuild",
-	"maxOutgoingToProcess",
-] as const;
 
 const positiveInteger = (fallback: number) =>
 	z
@@ -73,7 +36,7 @@ const stringSetting = (fallback: string) => z.string().catch(fallback);
  * invalid value, so a corrupt data.json can never inject a wrong type into
  * the running plugin.
  */
-export const PluginSettingsSchema = z.object({
+const PluginSettingsSchema = z.object({
 	settingsSchemaVersion: z
 		.literal(SETTINGS_SCHEMA_VERSION)
 		.catch(SETTINGS_SCHEMA_VERSION),
@@ -81,7 +44,7 @@ export const PluginSettingsSchema = z.object({
 	displayMode: z.enum(DISPLAY_MODES).catch(DEFAULT_SETTINGS.displayMode),
 	useMergedLinksSection: booleanSetting(DEFAULT_SETTINGS.useMergedLinksSection),
 	dedupeCards: booleanSetting(DEFAULT_SETTINGS.dedupeCards),
-	enableTagFeatures: booleanSetting(DEFAULT_SETTINGS.enableTagFeatures ?? true),
+	enableTagFeatures: booleanSetting(DEFAULT_SETTINGS.enableTagFeatures),
 	showTagsSection: booleanSetting(DEFAULT_SETTINGS.showTagsSection),
 	defaultVisibleLinkCount: positiveInteger(DEFAULT_SETTINGS.defaultVisibleLinkCount),
 	loadMoreLinkIncrement: positiveInteger(DEFAULT_SETTINGS.loadMoreLinkIncrement),
@@ -99,9 +62,7 @@ export const PluginSettingsSchema = z.object({
 	twoHopHeaderSortOrder: z
 		.enum(TWO_HOP_HEADER_SORT_ORDERS)
 		.catch(DEFAULT_SETTINGS.twoHopHeaderSortOrder),
-	lastUsedSortOption: z
-		.enum(SORT_OPTION_VALUES)
-		.catch(DEFAULT_SETTINGS.lastUsedSortOption),
+	lastUsedSortOption: z.enum(SORT_OPTIONS).catch(DEFAULT_SETTINGS.lastUsedSortOption),
 	previewMaxLines: nonNegativeInteger(DEFAULT_SETTINGS.previewMaxLines),
 	previewMaxChars: nonNegativeInteger(DEFAULT_SETTINGS.previewMaxChars),
 	previewVisualLineSafetyMargin: nonNegativeInteger(
@@ -141,48 +102,31 @@ export const PluginSettingsSchema = z.object({
 	enableEditorArrowDownToSearchInput: booleanSetting(
 		DEFAULT_SETTINGS.enableEditorArrowDownToSearchInput,
 	),
-	enableContentSearch: booleanSetting(DEFAULT_SETTINGS.enableContentSearch ?? false),
+	enableContentSearch: booleanSetting(DEFAULT_SETTINGS.enableContentSearch),
 	experimentalCosenseTitleEditing: booleanSetting(
 		DEFAULT_SETTINGS.experimentalCosenseTitleEditing,
 	),
 	priorityFrontmatterKeyForPreview: stringSetting(
-		DEFAULT_SETTINGS.priorityFrontmatterKeyForPreview ?? "",
+		DEFAULT_SETTINGS.priorityFrontmatterKeyForPreview,
 	),
 	priorityFrontmatterKeyForTitle: stringSetting(
-		DEFAULT_SETTINGS.priorityFrontmatterKeyForTitle ?? "",
+		DEFAULT_SETTINGS.priorityFrontmatterKeyForTitle,
 	),
 });
-
-type RawSettings = Record<string, unknown>;
-
-/**
- * Migrates raw persisted settings toward SETTINGS_SCHEMA_VERSION.
- * Add versioned rename/reshape steps here before bumping the version.
- */
-function migrateRawSettings(raw: RawSettings): RawSettings {
-	const migrated = { ...raw };
-	for (const key of OBSOLETE_SETTING_KEYS) {
-		delete migrated[key];
-	}
-	return migrated;
-}
 
 /**
  * Validates unknown persisted data into PluginSettings, normalizing each
  * invalid field to its default. Non-object input falls back to full defaults.
- * The returned value never shares nested arrays with DEFAULT_SETTINGS.
  */
 export function parsePluginSettings(raw: unknown): PluginSettings {
 	if (typeof raw !== "object" || raw === null) {
-		return clonePluginSettings(DEFAULT_SETTINGS);
+		return { ...DEFAULT_SETTINGS };
 	}
 
-	const result = PluginSettingsSchema.safeParse(
-		migrateRawSettings(raw as RawSettings),
-	);
+	const result = PluginSettingsSchema.safeParse(raw);
 	if (!result.success) {
-		return clonePluginSettings(DEFAULT_SETTINGS);
+		return { ...DEFAULT_SETTINGS };
 	}
 
-	return clonePluginSettings(result.data);
+	return result.data;
 }

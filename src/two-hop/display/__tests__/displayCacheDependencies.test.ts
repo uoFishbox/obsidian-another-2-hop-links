@@ -23,20 +23,15 @@ describe("display cache keys", () => {
 		expect(changed).not.toBe(first);
 	});
 
-	it("normalizes the optional tag feature setting", () => {
+	it("keys the tag feature setting", () => {
 		const enabled = createTagPreprocessCacheKey({
 			...DEFAULT_SETTINGS,
 			enableTagFeatures: true,
-		});
-		const defaultEnabled = createTagPreprocessCacheKey({
-			...DEFAULT_SETTINGS,
-			enableTagFeatures: undefined,
 		});
 		const disabled = createTagPreprocessCacheKey({
 			...DEFAULT_SETTINGS,
 			enableTagFeatures: false,
 		});
-		expect(defaultEnabled).toBe(enabled);
 		expect(disabled).not.toBe(enabled);
 	});
 });

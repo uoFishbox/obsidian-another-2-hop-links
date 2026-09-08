@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import type { TaggedNote } from "indexing/model";
+import { DEFAULT_SETTINGS } from "settings/model";
 
 const { openTagNotesView } = vi.hoisted(() => ({
 	openTagNotesView: vi.fn(),
@@ -29,7 +30,7 @@ describe("handleTagClick", () => {
 		const linkContext = {
 			sourceFile: { path: "source.md" },
 		} as any;
-		const plugin = {} as any;
+		const plugin = { settings: DEFAULT_SETTINGS } as any;
 
 		const pending = handleTagClick(
 			"tag1",
@@ -64,7 +65,7 @@ describe("handleTagClick", () => {
 			"missing",
 			{ sourceFile: { path: "source.md" } } as any,
 			indexingService as any,
-			{} as any,
+			{ settings: DEFAULT_SETTINGS } as any,
 		);
 
 		expect(openTagNotesView).not.toHaveBeenCalled();

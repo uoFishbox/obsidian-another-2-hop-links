@@ -14,7 +14,6 @@ import type { ListConfig } from "cards/list/ui/types";
 import type { PluginHost } from "obsidian-integration/pluginHost";
 import type { ViewServices } from "obsidian-integration/views/viewServices";
 import type { TaggedNote } from "indexing/model";
-import { areTagFeaturesEnabled } from "settings/model";
 import {
 	dataUpdateCollectionHas,
 	dataUpdateCollectionSize,
@@ -72,7 +71,7 @@ export async function openTagNotesView(
 	sourcePath: string,
 	newLeaf: PaneType | boolean = false,
 ): Promise<void> {
-	if (!areTagFeaturesEnabled(plugin.settings)) {
+	if (!plugin.settings.enableTagFeatures) {
 		return;
 	}
 
@@ -119,7 +118,7 @@ export class TagNotesView extends AbstractSvelteListView<TaggedNote> {
 	}
 
 	getDisplayText(): string {
-		if (!areTagFeaturesEnabled(this.plugin.settings)) {
+		if (!this.plugin.settings.enableTagFeatures) {
 			return "Tag features disabled";
 		}
 
@@ -186,7 +185,7 @@ export class TagNotesView extends AbstractSvelteListView<TaggedNote> {
 	}
 
 	private isTagFeatureEnabled(): boolean {
-		return areTagFeaturesEnabled(this.plugin.settings);
+		return this.plugin.settings.enableTagFeatures;
 	}
 
 	async onOpen(): Promise<void> {

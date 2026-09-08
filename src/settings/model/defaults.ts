@@ -47,8 +47,3 @@ export const DEFAULT_SETTINGS: PluginSettings = {
 	priorityFrontmatterKeyForTitle: "",
 	enableContentSearch: false,
 };
-
-/** Returns an independent settings object. */
-export function clonePluginSettings(settings: PluginSettings): PluginSettings {
-	return { ...settings };
-}

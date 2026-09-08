@@ -2,19 +2,22 @@ import type { TFile } from "obsidian";
 import type { CardLinkBranch } from "cards/model";
 import type { IndexedLink, TaggedNote } from "indexing/model";
 
-export type SortOption =
-	| "relevance"
-	| "relevance-reverse"
-	| "alphabetical"
-	| "alphabetical-reverse"
-	| "created-date"
-	| "created-date-reverse"
-	| "modified-date"
-	| "modified-date-reverse"
-	| "backlink-count"
-	| "backlink-count-reverse"
-	| "file-size"
-	| "file-size-reverse";
+export const SORT_OPTIONS = [
+	"relevance",
+	"relevance-reverse",
+	"alphabetical",
+	"alphabetical-reverse",
+	"created-date",
+	"created-date-reverse",
+	"modified-date",
+	"modified-date-reverse",
+	"backlink-count",
+	"backlink-count-reverse",
+	"file-size",
+	"file-size-reverse",
+] as const;
+
+export type SortOption = (typeof SORT_OPTIONS)[number];
 
 export type SortableItem = CardLinkBranch | IndexedLink | TaggedNote | TFile;
 

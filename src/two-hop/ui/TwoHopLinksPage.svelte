@@ -158,7 +158,7 @@
 	);
 
 	$effect(() => {
-		contentSearchEnabled = currentSettings.enableContentSearch ?? false;
+		contentSearchEnabled = currentSettings.enableContentSearch;
 	});
 
 	const search = useSearchQuery({

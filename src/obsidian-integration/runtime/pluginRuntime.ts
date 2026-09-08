@@ -53,14 +53,10 @@ import {
 	createPreviewRuntime,
 	type PreviewRuntime,
 } from "card-preview/runtime/previewRuntime";
-import {
-	createSettingsSideEffectController,
-	type SettingsSideEffectController,
-} from "settings/effects/settingsSideEffectController";
-import type { SettingsManager } from "settings/persistence/SettingsManager";
+import { createSettingsSideEffectController } from "settings/effects/settingsSideEffectController";
 import type { PluginHost } from "obsidian-integration/pluginHost";
 import type { ViewServices } from "obsidian-integration/views/viewServices";
-import { areTagFeaturesEnabled, type PluginSettings } from "settings/model";
+import type { PluginSettings } from "settings/model";
 import { getLazyLoadManager } from "obsidian-integration/observers/IntersectionObserverRegistry";
 import {
 	DEFAULT_PREVIEW_DOM_COMMITS_PER_SECOND,
@@ -73,7 +69,6 @@ export interface PluginRuntimeOptions {
 	app: App;
 	plugin: PluginHost;
 	forceRedrawEffect: StateEffectType<undefined>;
-	settingsManager: SettingsManager;
 	getSettings: () => PluginSettings;
 	isUnloaded: () => boolean;
 	bumpSortContextVersion: () => void;
@@ -101,7 +96,7 @@ export interface PluginRuntime {
 	scrollManager: ScrollManager;
 	emptyViewController: EmptyViewController;
 	keyboardCardNavigator: KeyboardCardNavigator;
-	sideEffectController: SettingsSideEffectController;
+	applySettingsSideEffects: (changedKeys: Iterable<keyof PluginSettings>) => void;
 	linkStatusService: LinkStatusService;
 	stylingService: StylingService;
 	propertyWidgetStyler: PropertyWidgetStyler;
@@ -136,7 +131,7 @@ export function createPluginRuntime(options: PluginRuntimeOptions): PluginRuntim
 	const indexingService = new IndexingService(
 		options.app.vault,
 		options.app.metadataCache,
-		() => areTagFeaturesEnabled(options.getSettings()),
+		() => options.getSettings().enableTagFeatures,
 	);
 	const twoHopLinkResolver = new TwoHopLinkResolver(
 		options.app.metadataCache,
@@ -192,8 +187,7 @@ export function createPluginRuntime(options: PluginRuntimeOptions): PluginRuntim
 	const resolveTwoHopLinks: ResolveTwoHopLinks = (file, onProgress, signal) => {
 		const settings = options.getSettings();
 		return twoHopLinkResolver.resolveSnapshot(file, onProgress, {
-			includeTaggedNotes:
-				areTagFeaturesEnabled(settings) && settings.showTagsSection,
+			includeTaggedNotes: settings.enableTagFeatures && settings.showTagsSection,
 			signal,
 		});
 	};
@@ -234,7 +228,7 @@ export function createPluginRuntime(options: PluginRuntimeOptions): PluginRuntim
 	const indexUpdateQueue = new IndexUpdateQueue(options.plugin, indexingService);
 	const displayModeController = new DisplayModeController(
 		options.app,
-		options.settingsManager,
+		options.getSettings,
 		componentController,
 		options.plugin,
 		options.updateSidebarView,
@@ -266,7 +260,7 @@ export function createPluginRuntime(options: PluginRuntimeOptions): PluginRuntim
 	});
 	indexUpdateQueue.setupEventListeners();
 
-	const sideEffectController = createSettingsSideEffectController({
+	const applySettingsSideEffects = createSettingsSideEffectController({
 		viewUpdateOrchestrator,
 		emptyViewController,
 		displayModeManager: displayModeController,
@@ -314,7 +308,7 @@ export function createPluginRuntime(options: PluginRuntimeOptions): PluginRuntim
 		scrollManager,
 		emptyViewController,
 		keyboardCardNavigator,
-		sideEffectController,
+		applySettingsSideEffects,
 		linkStatusService,
 		stylingService,
 		propertyWidgetStyler,

@@ -43,7 +43,7 @@ export interface PluginSettings {
 	displayMode: DisplayMode;
 	useMergedLinksSection: boolean;
 	dedupeCards: boolean;
-	enableTagFeatures?: boolean;
+	enableTagFeatures: boolean;
 	showTagsSection: boolean;
 	defaultVisibleLinkCount: number;
 	loadMoreLinkIncrement: number;
@@ -73,13 +73,7 @@ export interface PluginSettings {
 	enableEditorArrowDownToSearchInput: boolean;
 	/** Enables experimental Cosense-style title/body editing and note creation. */
 	experimentalCosenseTitleEditing: boolean;
-	enableContentSearch?: boolean;
-	priorityFrontmatterKeyForPreview?: string;
-	priorityFrontmatterKeyForTitle?: string;
-}
-
-export function areTagFeaturesEnabled(
-	settings: Pick<PluginSettings, "enableTagFeatures"> | undefined,
-): boolean {
-	return settings?.enableTagFeatures !== false;
+	enableContentSearch: boolean;
+	priorityFrontmatterKeyForPreview: string;
+	priorityFrontmatterKeyForTitle: string;
 }

@@ -1,6 +1,4 @@
-import type { PluginHost } from "obsidian-integration/pluginHost";
 import {
-	clonePluginSettings,
 	DEFAULT_SETTINGS,
 	parsePluginSettings,
 	type PluginSettings,
@@ -12,16 +10,16 @@ interface UpdateOptions {
 	immediate?: boolean;
 }
 
+interface SettingsPersistenceHost {
+	settings: PluginSettings;
+	loadData(): Promise<unknown>;
+	saveData(settings: PluginSettings): Promise<void>;
+}
+
 export class SettingsManager {
 	private saveDebounceTimer: number | undefined = undefined;
 
-	constructor(private plugin: PluginHost) {
-		this.replaceSettings(this.plugin.settings ?? DEFAULT_SETTINGS);
-	}
-
-	public get settings(): PluginSettings {
-		return this.plugin.settings;
-	}
+	constructor(private plugin: SettingsPersistenceHost) {}
 
 	async load(): Promise<void> {
 		try {
@@ -63,7 +61,7 @@ export class SettingsManager {
 
 	private async persistSettings(): Promise<void> {
 		try {
-			await this.plugin.saveData(this.settings);
+			await this.plugin.saveData(this.plugin.settings);
 		} catch (error) {
 			console.error("設定の保存に失敗しました:", error);
 			throw error;
@@ -84,21 +82,12 @@ export class SettingsManager {
 		value: PluginSettings[K],
 		options: UpdateOptions = {},
 	): Promise<void> {
-		this.replaceSettings({ ...this.settings, [key]: value });
-		await this.save(options);
-	}
-
-	async updateBatch(
-		updates: Partial<PluginSettings>,
-		options: UpdateOptions = {},
-	): Promise<void> {
-		this.replaceSettings({ ...this.settings, ...updates });
+		this.replaceSettings({ ...this.plugin.settings, [key]: value });
 		await this.save(options);
 	}
 
 	private replaceSettings(settings: PluginSettings): void {
-		const nextSettings = clonePluginSettings(settings);
-		this.plugin.settings = Object.freeze(nextSettings);
+		this.plugin.settings = Object.freeze({ ...settings });
 	}
 
 	async destroy(): Promise<void> {

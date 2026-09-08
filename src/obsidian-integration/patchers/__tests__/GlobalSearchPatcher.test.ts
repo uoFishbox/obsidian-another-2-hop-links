@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import type { TaggedNote } from "indexing/model";
+import { DEFAULT_SETTINGS } from "settings/model";
 
 const { openTagNotesView } = vi.hoisted(() => ({
 	openTagNotesView: vi.fn(),
@@ -18,6 +19,7 @@ function createPlugin(getNotesWithTag: (tag: string) => Promise<TaggedNote[]>) {
 	};
 	const plugin = {
 		settings: {
+			...DEFAULT_SETTINGS,
 			enableGlobalSearchTagModal: true,
 		},
 		indexingService: {
