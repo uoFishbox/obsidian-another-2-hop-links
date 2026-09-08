@@ -14,11 +14,19 @@ import { mountTwoHopLinksRootView } from "./mountTwoHopLinksRootView";
 
 export const TWO_HOP_LINKS_VIEW_TYPE = "cosense-card-links-view";
 
+export interface ExternalListSurfaceLease {
+	readonly element: HTMLElement;
+	release(): void;
+}
+
 export class TwoHopLinksView extends ItemView {
 	private component: SvelteComponentInstance | undefined = undefined;
 	private applicationStore: TwoHopState | undefined = undefined;
 	private currentFile: TFile | undefined = undefined;
 	private lazyLoaderCache: Set<string> = new Set();
+	private externalListSurfaceOwner:
+		| { readonly id: symbol; readonly onReclaim: () => void }
+		| undefined = undefined;
 
 	constructor(
 		leaf: WorkspaceLeaf,
@@ -56,7 +64,41 @@ export class TwoHopLinksView extends ItemView {
 		this.renderFile(this.currentFile, { force: true });
 	}
 
+	/**
+	 * Hand the sidebar content area to another plugin-owned view.
+	 *
+	 * Temporary views such as pre-creation and tag notes keep their editor-like
+	 * shell in the main workspace while rendering their link cards in this
+	 * sidebar when sidebar display mode is active.
+	 */
+	public claimExternalListSurface(onReclaim: () => void): ExternalListSurfaceLease {
+		this.reclaimExternalListSurface();
+		this.currentFile = undefined;
+		this.lazyLoaderCache.clear();
+		[this.component, this.applicationStore] = cleanupSvelteAndStore(
+			this.component,
+			this.applicationStore,
+		);
+		this.contentEl.empty();
+		this.resetSidebarScrollPosition();
+
+		const ownerId = Symbol("external-list-surface-owner");
+		this.externalListSurfaceOwner = { id: ownerId, onReclaim };
+		return {
+			element: this.contentEl,
+			release: () => {
+				if (this.externalListSurfaceOwner?.id !== ownerId) {
+					return;
+				}
+				this.externalListSurfaceOwner = undefined;
+				this.contentEl.empty();
+				this.resetSidebarScrollPosition();
+			},
+		};
+	}
+
 	private renderFile(file: TFile, options: { force: boolean }): void {
+		this.reclaimExternalListSurface();
 		const isFileTransition = this.currentFile?.path !== file.path;
 
 		// Skip re-rendering when the file is unchanged
@@ -116,6 +158,7 @@ export class TwoHopLinksView extends ItemView {
 	 * Used to hide the UI in hybrid mode.
 	 */
 	public clearContent(): void {
+		this.reclaimExternalListSurface();
 		this.currentFile = undefined;
 		this.lazyLoaderCache.clear();
 		[this.component, this.applicationStore] = cleanupSvelteAndStore(
@@ -137,7 +180,18 @@ export class TwoHopLinksView extends ItemView {
 		this.contentEl.scrollTop = 0;
 	}
 
+	private reclaimExternalListSurface(): void {
+		const owner = this.externalListSurfaceOwner;
+		if (!owner) {
+			return;
+		}
+
+		this.externalListSurfaceOwner = undefined;
+		owner.onReclaim();
+	}
+
 	async onClose(): Promise<void> {
+		this.reclaimExternalListSurface();
 		[this.component, this.applicationStore] = cleanupSvelteAndStore(
 			this.component,
 			this.applicationStore,

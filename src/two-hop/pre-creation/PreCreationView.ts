@@ -124,6 +124,10 @@ export class PreCreationView extends AbstractSvelteListView<IndexedLink> {
 		return "file-plus-2";
 	}
 
+	public usesSidebarLinkSurface(): boolean {
+		return this.plugin.settings.displayMode === "sidebar-view";
+	}
+
 	getDisplayText(): string {
 		const expectedPath = this.getDisplayExpectedPath();
 		if (!expectedPath) {

@@ -117,6 +117,10 @@ export class TagNotesView extends AbstractSvelteListView<TaggedNote> {
 		return "tag";
 	}
 
+	public usesSidebarLinkSurface(): boolean {
+		return this.plugin.settings.displayMode === "sidebar-view";
+	}
+
 	getDisplayText(): string {
 		if (!this.plugin.settings.enableTagFeatures) {
 			return "Tag features disabled";

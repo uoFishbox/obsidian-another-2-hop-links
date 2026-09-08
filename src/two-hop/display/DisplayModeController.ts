@@ -111,7 +111,10 @@ export class DisplayModeController {
 			case "sidebar-view":
 				this.deactivateInlineMode();
 				void this.activateSidebarView().then(() => {
-					this.updateSidebarForActiveFile();
+					this.handleActiveLeafChangeByMode(
+						"sidebar-view",
+						this.app.workspace.activeLeaf?.view,
+					);
 				});
 				return;
 			case "hybrid":
@@ -133,6 +136,10 @@ export class DisplayModeController {
 				this.mountInlineComponents({ forceRemount: false });
 				return;
 			case "sidebar-view":
+				if (this.isSidebarLinkSurfaceOwner(view)) {
+					this.refreshSidebarLinkSurface(view);
+					return;
+				}
 				if (this.isCanvasSingleFileSelected(view)) {
 					this.updateSidebarForCanvasSelectionView(view);
 					return;
@@ -142,6 +149,31 @@ export class DisplayModeController {
 			case "hybrid":
 				this.applyHybridLayout(view, false);
 		}
+	}
+
+	private isSidebarLinkSurfaceOwner(view: unknown): boolean {
+		if (typeof view !== "object" || view === null) {
+			return false;
+		}
+
+		const candidate = view as {
+			usesSidebarLinkSurface?: () => boolean;
+		};
+		return (
+			typeof candidate.usesSidebarLinkSurface === "function" &&
+			candidate.usesSidebarLinkSurface()
+		);
+	}
+
+	private refreshSidebarLinkSurface(view: unknown): void {
+		if (typeof view !== "object" || view === null) {
+			return;
+		}
+
+		const candidate = view as {
+			refreshSidebarLinkSurface?: () => void;
+		};
+		candidate.refreshSidebarLinkSurface?.();
 	}
 
 	private applyHybridLayout(view: unknown, forceInlineRemount: boolean): void {

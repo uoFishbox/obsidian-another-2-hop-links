@@ -25,6 +25,15 @@ interface ListHostComponent extends ComponentInstance {
 	updateItems?: (nextItems: CardItem[]) => void;
 }
 
+interface ExternalListSurfaceHost {
+	claimExternalListSurface(onReclaim: () => void): {
+		readonly element: HTMLElement;
+		release(): void;
+	};
+}
+
+const TWO_HOP_LINKS_VIEW_TYPE = "cosense-card-links-view";
+
 interface MergePreservingUnchangedOptions<T> {
 	getKey: (item: T) => string;
 	getVersion: (item: T) => number | string;
@@ -105,6 +114,10 @@ export abstract class AbstractSvelteListView<
 	private readonly searchFocusScope: Scope;
 	private unregisterSearchFocusShortcut: (() => void) | undefined = undefined;
 	private unregisterKeyboardNavigationSurface: (() => void) | undefined = undefined;
+	private externalListParentEl: HTMLElement | undefined = undefined;
+	private mountedListSectionEl: HTMLElement | undefined = undefined;
+	private releaseExternalListSurface: (() => void) | undefined = undefined;
+	private externalListScrollTop = 0;
 
 	private readonly guardedIndexUpdateHandler = createGuardedIndexUpdateHandler({
 		isReady: () => this.isViewReady(),
@@ -153,6 +166,31 @@ export abstract class AbstractSvelteListView<
 
 	protected onViewClose(): void {}
 
+	/** Whether this temporary view owns the plugin sidebar link surface. */
+	public usesSidebarLinkSurface(): boolean {
+		return false;
+	}
+
+	/**
+	 * Reattach this view's existing link surface after it becomes active again.
+	 *
+	 * The mounted Svelte tree is intentionally kept alive while another view owns
+	 * the shared sidebar. Re-render only when this view has never mounted its list
+	 * (for example, when it opened before the sidebar leaf was available).
+	 */
+	public refreshSidebarLinkSurface(): void {
+		if (!this.usesSidebarLinkSurface()) {
+			return;
+		}
+
+		if (this.hasMountedListHost()) {
+			this.attachMountedListHostToSidebar();
+			return;
+		}
+
+		this.render();
+	}
+
 	protected isViewReady(): boolean {
 		return this.hasMountedListHost();
 	}
@@ -164,6 +202,9 @@ export abstract class AbstractSvelteListView<
 	protected prepareRenderContainer(): HTMLElement {
 		this.destroyListHost();
 		this.scrollerEl = undefined;
+		this.externalListParentEl = this.shouldClaimSidebarLinkSurface()
+			? this.claimSidebarListSurface()
+			: undefined;
 
 		const container = this.contentEl;
 		container.empty();
@@ -206,10 +247,20 @@ export abstract class AbstractSvelteListView<
 	}
 
 	protected mountListSection(options: MountListSectionOptions): void {
-		const sectionEl = options.parentEl.createDiv({
+		const parentEl = this.usesSidebarLinkSurface()
+			? this.externalListParentEl
+			: options.parentEl;
+		if (!parentEl) {
+			return;
+		}
+
+		const sectionEl = parentEl.createDiv({
 			cls: "cosense-card-links__temp-view",
 		});
-		sectionEl.dataset.cclCardSurface = "workspace";
+		this.mountedListSectionEl = sectionEl;
+		sectionEl.dataset.cclCardSurface = this.usesSidebarLinkSurface()
+			? "sidebar"
+			: "workspace";
 		applyCardLayoutCssVars(sectionEl, this.plugin.settings);
 
 		const linkContext = createLinkContextForView(
@@ -280,8 +331,76 @@ export abstract class AbstractSvelteListView<
 			this.listHostComponent,
 			this.cardCollectionState,
 		);
+		this.mountedListSectionEl?.remove();
+		this.mountedListSectionEl = undefined;
+		this.releaseExternalListSurface?.();
+		this.releaseExternalListSurface = undefined;
+		this.externalListParentEl = undefined;
 		this.currentItems = [];
 		this.currentItemKeySet.clear();
+	}
+
+	private claimSidebarListSurface(): HTMLElement | undefined {
+		const workspace = this.app.workspace;
+		const leaves = workspace.getLeavesOfType(TWO_HOP_LINKS_VIEW_TYPE);
+		for (const leaf of leaves) {
+			const view = leaf.view as Partial<ExternalListSurfaceHost>;
+			if (typeof view.claimExternalListSurface === "function") {
+				const lease = view.claimExternalListSurface(() => {
+					this.detachSidebarListSurface();
+				});
+				this.releaseExternalListSurface = lease.release;
+				return lease.element;
+			}
+		}
+
+		return undefined;
+	}
+
+	private attachMountedListHostToSidebar(): boolean {
+		const sectionEl = this.mountedListSectionEl;
+		if (!this.listHostComponent || !sectionEl) {
+			return false;
+		}
+
+		if (
+			this.externalListParentEl &&
+			sectionEl.parentElement === this.externalListParentEl
+		) {
+			return true;
+		}
+
+		const parentEl = this.claimSidebarListSurface();
+		if (!parentEl) {
+			return false;
+		}
+
+		this.externalListParentEl = parentEl;
+		parentEl.appendChild(sectionEl);
+		parentEl.scrollTop = this.externalListScrollTop;
+		return true;
+	}
+
+	private detachSidebarListSurface(): void {
+		if (!this.usesSidebarLinkSurface()) {
+			return;
+		}
+
+		// Keep the Svelte component mounted to its section while the section itself
+		// is detached from the shared sidebar. Moving the same DOM node back later
+		// preserves preview/component state and avoids active-view flicker.
+		if (this.externalListParentEl) {
+			this.externalListScrollTop = this.externalListParentEl.scrollTop;
+		}
+		this.mountedListSectionEl?.remove();
+		this.releaseExternalListSurface = undefined;
+		this.externalListParentEl = undefined;
+	}
+
+	private shouldClaimSidebarLinkSurface(): boolean {
+		return (
+			this.usesSidebarLinkSurface() && this.app.workspace.activeLeaf === this.leaf
+		);
 	}
 
 	protected abstract render(): void;
