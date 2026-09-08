@@ -6,7 +6,31 @@ type ProcessPreviewContent =
 
 let finishRenderMath: ObsidianModule["finishRenderMath"];
 let renderMath: ObsidianModule["renderMath"];
+let sanitizeHTMLToDom: ObsidianModule["sanitizeHTMLToDom"];
 let processPreviewContent: ProcessPreviewContent;
+
+function sanitizeTestHtmlToDom(html: string): DocumentFragment {
+	const template = document.createElement("template");
+	template.innerHTML = html;
+
+	for (const element of template.content.querySelectorAll(
+		"script, iframe, object, embed",
+	)) {
+		element.remove();
+	}
+
+	for (const element of template.content.querySelectorAll("*")) {
+		for (const attribute of Array.from(element.attributes)) {
+			const name = attribute.name.toLowerCase();
+			const value = attribute.value.trim().toLowerCase();
+			if (name.startsWith("on") || value.startsWith("javascript:")) {
+				element.removeAttribute(attribute.name);
+			}
+		}
+	}
+
+	return template.content;
+}
 
 function createObsidianMock() {
 	return {
@@ -17,6 +41,7 @@ function createObsidianMock() {
 			return span;
 		}),
 		finishRenderMath: vi.fn(),
+		sanitizeHTMLToDom: vi.fn(sanitizeTestHtmlToDom),
 		requireApiVersion: vi.fn(() => false),
 	};
 }
@@ -36,6 +61,7 @@ describe("processPreviewContent DOM rendering", () => {
 		const obsidian = await import("obsidian");
 		finishRenderMath = obsidian.finishRenderMath;
 		renderMath = obsidian.renderMath;
+		sanitizeHTMLToDom = obsidian.sanitizeHTMLToDom;
 		({ processPreviewContent } =
 			await import("../renderers/markdownPreviewRenderer"));
 		containerEl = document.createElement("div");
@@ -69,5 +95,47 @@ describe("processPreviewContent DOM rendering", () => {
 
 		expect(renderMath).not.toHaveBeenCalled();
 		expect(containerEl.textContent).toContain("$$\\frac{1}{2} + target$$");
+	});
+
+	test("sanitizes preview HTML before inserting it into the DOM", async () => {
+		const content = [
+			'<span class="cosense-card-links__wikilink">Safe link</span>',
+			'<img src="x" onerror="globalThis.compromised = true">',
+			"<script>globalThis.compromised = true</script>",
+			'<a href="javascript:alert(1)" onclick="alert(1)">Unsafe link</a>',
+		].join("");
+
+		await processPreviewContent(containerEl, content);
+
+		expect(sanitizeHTMLToDom).toHaveBeenCalledWith(content);
+		expect(containerEl.querySelector("script")).toBeNull();
+		expect(containerEl.querySelector("[onerror], [onclick]")).toBeNull();
+		expect(containerEl.querySelector("[href^='javascript:']")).toBeNull();
+		expect(
+			containerEl.querySelector(".cosense-card-links__wikilink")?.textContent,
+		).toBe("Safe link");
+	});
+
+	test("sanitizes HTML fragments around rendered math", async () => {
+		const content =
+			'<img src="x" onerror="alert(1)">before $x^2$ after' +
+			'<svg onload="alert(1)"></svg><iframe src="https://example.com"></iframe>';
+
+		await processPreviewContent(containerEl, content);
+
+		expect(sanitizeHTMLToDom).toHaveBeenCalledTimes(2);
+		expect(containerEl.querySelector(".math-inline")?.textContent).toBe("x^2");
+		expect(containerEl.querySelector("[onerror], [onload]")).toBeNull();
+		expect(containerEl.querySelector("iframe")).toBeNull();
+	});
+
+	test("sanitizes dollar-containing content without a math expression", async () => {
+		const content = 'Price \\$5 <object data="unsafe"></object>';
+
+		await processPreviewContent(containerEl, content);
+
+		expect(sanitizeHTMLToDom).toHaveBeenCalledTimes(1);
+		expect(containerEl.textContent).toContain("Price $5");
+		expect(containerEl.querySelector("object")).toBeNull();
 	});
 });

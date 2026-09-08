@@ -44,6 +44,12 @@ export function requireApiVersion(_version: string): boolean {
 	return false;
 }
 
+export function sanitizeHTMLToDom(html: string): DocumentFragment {
+	const template = document.createElement("template");
+	template.innerHTML = html;
+	return template.content;
+}
+
 export class Component {
 	load(): void {}
 	unload(): void {}

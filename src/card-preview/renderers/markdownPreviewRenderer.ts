@@ -1,4 +1,4 @@
-import { renderMath, finishRenderMath } from "obsidian";
+import { finishRenderMath, renderMath, sanitizeHTMLToDom } from "obsidian";
 import { createProtectedSegmentRestorer } from "../text/protectedHtml";
 import {
 	analyzePreviewContent,
@@ -22,6 +22,14 @@ interface ProcessPreviewContentOptions {
 	signal?: AbortSignal;
 }
 
+function replaceWithSanitizedHtml(containerEl: HTMLElement, html: string): void {
+	containerEl.replaceChildren(sanitizeHTMLToDom(html));
+}
+
+function appendSanitizedHtml(containerEl: HTMLElement, html: string): void {
+	containerEl.append(sanitizeHTMLToDom(html));
+}
+
 export async function processPreviewContent(
 	containerEl: HTMLElement,
 	content: string,
@@ -42,7 +50,7 @@ export async function processPreviewContent(
 	}
 
 	if (!enableMathRendering || !hasDollar) {
-		containerEl.innerHTML = content;
+		replaceWithSanitizedHtml(containerEl, content);
 	} else {
 		analysis = options?.analysis ?? analyzePreviewContent(content);
 		const restoreProtectedSegments = createProtectedSegmentRestorer(
@@ -50,11 +58,14 @@ export async function processPreviewContent(
 		);
 
 		if (!analysis.hasMathExpression) {
-			containerEl.innerHTML = restoreProtectedSegments(
-				analysis.contentForMathParsing.replace(/\\\$/g, "$"),
+			replaceWithSanitizedHtml(
+				containerEl,
+				restoreProtectedSegments(
+					analysis.contentForMathParsing.replace(/\\\$/g, "$"),
+				),
 			);
 		} else {
-			containerEl.innerHTML = "";
+			containerEl.replaceChildren();
 			MATH_SPLIT_REGEX.lastIndex = 0;
 			let lastIndex = 0;
 			const { contentForMathParsing } = analysis;
@@ -73,7 +84,7 @@ export async function processPreviewContent(
 						match.index,
 					);
 					const span = containerEl.createSpan();
-					span.innerHTML = restoreProtectedSegments(textPart);
+					appendSanitizedHtml(span, restoreProtectedSegments(textPart));
 				}
 
 				const matchedString = match[0];
@@ -104,7 +115,7 @@ export async function processPreviewContent(
 			if (lastIndex < contentForMathParsing.length) {
 				const textPart = contentForMathParsing.substring(lastIndex);
 				const span = containerEl.createSpan();
-				span.innerHTML = restoreProtectedSegments(textPart);
+				appendSanitizedHtml(span, restoreProtectedSegments(textPart));
 			}
 
 			if (signal?.aborted) {

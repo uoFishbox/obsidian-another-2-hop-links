@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
-import { MarkdownRenderer } from "obsidian";
+import { MarkdownRenderer, type App, type Component } from "obsidian";
 import { createMockTFileAsPlainObject } from "testing/__mocks__/testHelpers";
 import { generateCanvasPreview } from "../canvasPreviewRenderer";
 import { createMarkdownDomPreview } from "../domPreviewRenderer";
@@ -8,6 +8,21 @@ vi.mock("obsidian", () => ({
 	MarkdownRenderer: {
 		render: vi.fn().mockResolvedValue(undefined),
 	},
+	sanitizeHTMLToDom: vi.fn((html: string) => {
+		const template = document.createElement("template");
+		template.innerHTML = html;
+		for (const element of template.content.querySelectorAll("script, iframe")) {
+			element.remove();
+		}
+		for (const element of template.content.querySelectorAll("*")) {
+			for (const attribute of Array.from(element.attributes)) {
+				if (attribute.name.toLowerCase().startsWith("on")) {
+					element.removeAttribute(attribute.name);
+				}
+			}
+		}
+		return template.content;
+	}),
 }));
 
 describe("createMarkdownDomPreview", () => {
@@ -82,6 +97,29 @@ describe("createMarkdownDomPreview", () => {
 
 		expect(onError).toHaveBeenCalledTimes(1);
 		expect(container.innerHTML).toBe("<p>fallback</p>");
+	});
+
+	test("sanitizes fallbackHtml before inserting it into the DOM", async () => {
+		const app = {} as App;
+		const preview = createMarkdownDomPreview(
+			app,
+			"note.md",
+			"![](https://example.com)",
+			{
+				fallbackHtml:
+					'<p onclick="alert(1)">fallback</p><script>alert(1)</script>',
+			},
+		);
+		const container = document.createElement("div");
+
+		if (preview.type !== "dom") {
+			throw new Error("Expected dom preview");
+		}
+
+		await preview.render(container, {} as Component);
+
+		expect(container.textContent).toBe("fallback");
+		expect(container.querySelector("script, [onclick]")).toBeNull();
 	});
 
 	test("does not render if already aborted before start", async () => {

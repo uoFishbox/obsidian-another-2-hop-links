@@ -1,4 +1,4 @@
-import { MarkdownRenderer, type App } from "obsidian";
+import { MarkdownRenderer, sanitizeHTMLToDom, type App } from "obsidian";
 import type { PreviewData, PreviewDomRenderer } from "../types";
 
 interface MarkdownDomPreviewOptions {
@@ -9,7 +9,7 @@ interface MarkdownDomPreviewOptions {
 function applyFallback(container: HTMLElement, fallbackHtml: string | undefined): void {
 	container.replaceChildren();
 	if (fallbackHtml?.trim()) {
-		container.innerHTML = fallbackHtml;
+		container.append(sanitizeHTMLToDom(fallbackHtml));
 	}
 }
 
