@@ -8,10 +8,7 @@ import {
 	type WorkspaceLeaf,
 } from "obsidian";
 import type { PluginHost } from "obsidian-integration/pluginHost";
-import {
-	normalizeLinkToMarkdownPath,
-	toCaseInsensitiveLookupKey,
-} from "indexing/link-resolution/linkResolution";
+import { toCaseInsensitiveLookupKey } from "indexing/link-resolution/linkResolution";
 import {
 	PRE_CREATION_EPHEMERAL_STATE_KEY,
 	hasAnyPreCreationBootstrapState,
@@ -81,93 +78,74 @@ function patchWorkspaceOpenLinkText(plugin: PluginHost): void {
 						sourcePath,
 					);
 
-					// Process only when the target does not exist (unresolved link)
+					// Open the pre-creation view for every unresolved link.
 					if (!destFile) {
-						const indexingService = plugin.indexingService;
+						// Calculate the path that will actually be created
+						const expectedPath = resolveExpectedPath(
+							plugin.app,
+							linktext,
+							sourcePath,
+						);
+						const normalizedExpectedPath = normalizePath(expectedPath);
 
-						if (indexingService) {
-							const lookupPath = normalizeLinkToMarkdownPath(rawLinkPath);
+						const leaf = plugin.app.workspace.getLeaf(
+							(newLeaf ?? false) as PaneType | boolean,
+						);
+						const inheritedState = (openViewState?.state ?? {}) as Record<
+							string,
+							unknown
+						>;
+						const inheritedEphemeralState =
+							asRecord(openViewState?.eState) ??
+							asRecord(leaf.getEphemeralState()) ??
+							{};
+						const preCreationEphemeralState = {
+							...inheritedEphemeralState,
+							[PRE_CREATION_EPHEMERAL_STATE_KEY]: {
+								linktext: linktext,
+								sourcePath: sourcePath,
+								expectedPath: normalizedExpectedPath,
+								creationPath: normalizedExpectedPath,
+							},
+						};
+						setPendingPreCreationBootstrapState(leaf, {
+							linktext,
+							sourcePath,
+							expectedPath: normalizedExpectedPath,
+							creationPath: normalizedExpectedPath,
+						});
+						setPersistedPreCreationBootstrapState(leaf, {
+							linktext,
+							sourcePath,
+							expectedPath: normalizedExpectedPath,
+							creationPath: normalizedExpectedPath,
+						});
+						const viewState: ViewState = {
+							type: VIEW_TYPE_PRE_CREATE,
+							state: {
+								...inheritedState,
+								linktext: linktext,
+								sourcePath: sourcePath,
+								expectedPath: normalizedExpectedPath,
+								creationPath: normalizedExpectedPath,
+							},
+						};
 
-							const hasMultipleBacklinks =
-								indexingService.hasAtLeastUniqueBacklinkSources(
-									lookupPath,
-									2,
-									{
-										requireExistingSourceFile: true,
-									},
-								);
-
-							if (hasMultipleBacklinks) {
-								// Calculate the path that will actually be created
-								const expectedPath = resolveExpectedPath(
-									plugin.app,
-									linktext,
-									sourcePath,
-								);
-								const normalizedExpectedPath =
-									normalizePath(expectedPath);
-
-								const leaf = plugin.app.workspace.getLeaf(
-									(newLeaf ?? false) as PaneType | boolean,
-								);
-								const inheritedState = (openViewState?.state ??
-									{}) as Record<string, unknown>;
-								const inheritedEphemeralState =
-									asRecord(openViewState?.eState) ??
-									asRecord(leaf.getEphemeralState()) ??
-									{};
-								const preCreationEphemeralState = {
-									...inheritedEphemeralState,
-									[PRE_CREATION_EPHEMERAL_STATE_KEY]: {
-										linktext: linktext,
-										sourcePath: sourcePath,
-										expectedPath: normalizedExpectedPath,
-										creationPath: normalizedExpectedPath,
-									},
-								};
-								setPendingPreCreationBootstrapState(leaf, {
-									linktext,
-									sourcePath,
-									expectedPath: normalizedExpectedPath,
-									creationPath: normalizedExpectedPath,
-								});
-								setPersistedPreCreationBootstrapState(leaf, {
-									linktext,
-									sourcePath,
-									expectedPath: normalizedExpectedPath,
-									creationPath: normalizedExpectedPath,
-								});
-								const viewState: ViewState = {
-									type: VIEW_TYPE_PRE_CREATE,
-									state: {
-										...inheritedState,
-										linktext: linktext,
-										sourcePath: sourcePath,
-										expectedPath: normalizedExpectedPath,
-										creationPath: normalizedExpectedPath,
-									},
-								};
-
-								if (openViewState?.active !== undefined) {
-									viewState.active = openViewState.active;
-								}
-								if (openViewState?.group !== undefined) {
-									viewState.group = openViewState.group;
-								}
-
-								leaf.setEphemeralState(preCreationEphemeralState);
-								await leaf.setViewState(
-									viewState,
-									preCreationEphemeralState,
-								);
-								if (openViewState?.active !== false) {
-									plugin.app.workspace.revealLeaf(leaf);
-								}
-
-								// Abort processing (do not create a new file)
-								return;
-							}
+						if (openViewState?.active !== undefined) {
+							viewState.active = openViewState.active;
 						}
+						if (openViewState?.group !== undefined) {
+							viewState.group = openViewState.group;
+						}
+
+						leaf.setEphemeralState(preCreationEphemeralState);
+						await leaf.setViewState(viewState, preCreationEphemeralState);
+						if (openViewState?.active !== false) {
+							plugin.app.workspace.revealLeaf(leaf);
+						}
+
+						// Abort processing (do not create a new file)
+						return;
 					}
 				} catch (e) {
 					console.error(
