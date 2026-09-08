@@ -37,12 +37,6 @@ export type TranslationKey =
 	| "highlightUnresolvedLinks"
 	| "highlightUnresolvedLinksDesc"
 	| "preview"
-	| "maximumPreviewLines"
-	| "maximumPreviewLinesDesc"
-	| "maximumPreviewChars"
-	| "maximumPreviewCharsDesc"
-	| "previewVisualLineSafetyMargin"
-	| "previewVisualLineSafetyMarginDesc"
 	| "priorityFrontmatterKeyForPreview"
 	| "priorityFrontmatterKeyForPreviewDesc"
 	| "priorityFrontmatterKeyForTitle"
@@ -142,15 +136,6 @@ const translations: Record<Language, Record<TranslationKey, string>> = {
 		highlightUnresolvedLinksDesc:
 			"Change the appearance of unresolved links that have only one Backlink.",
 		preview: "Preview",
-		maximumPreviewLines: "Maximum preview lines",
-		maximumPreviewLinesDesc:
-			"The maximum number of lines to display in the card preview. Set to 0 to disable.",
-		maximumPreviewChars: "Maximum preview characters",
-		maximumPreviewCharsDesc:
-			"This is a fallback for very long lines. Set to 0 to disable.",
-		previewVisualLineSafetyMargin: "Preview extra lines",
-		previewVisualLineSafetyMarginDesc:
-			"Add this many estimated visual lines to the card preview. Set to 0 to disable.",
 		priorityFrontmatterKeyForPreview: "Priority frontmatter key for preview",
 		priorityFrontmatterKeyForPreviewDesc:
 			"If specified, the value of this property will be displayed as plain text in the preview instead of the file content.",
@@ -259,15 +244,6 @@ const translations: Record<Language, Record<TranslationKey, string>> = {
 		highlightUnresolvedLinksDesc:
 			"バックリンクが1つのみの未解決リンクの外観を変更します。",
 		preview: "プレビュー",
-		maximumPreviewLines: "プレビューの最大行数",
-		maximumPreviewLinesDesc:
-			"カードプレビューに表示する最大行数を設定します。0に設定すると無効になります。",
-		maximumPreviewChars: "プレビューの最大文字数",
-		maximumPreviewCharsDesc:
-			"非常に長い行の場合のフォールバック設定です。0に設定すると無効になります。",
-		previewVisualLineSafetyMargin: "プレビュー追加行数",
-		previewVisualLineSafetyMarginDesc:
-			"プレビューに追加する推定表示行数を設定します。0に設定すると無効になります。",
 		priorityFrontmatterKeyForPreview: "プレビュー優先フロントマターキー",
 		priorityFrontmatterKeyForPreviewDesc:
 			"指定した場合、このプロパティの値がファイルコンテンツの代わりにプレビューにプレーンテキストとして表示されます。",

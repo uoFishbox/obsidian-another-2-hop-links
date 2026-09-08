@@ -3,6 +3,16 @@ import { DEFAULT_SETTINGS } from "settings/model";
 import { PREVIEW_SETTING_DEFINITIONS } from "../previewSettings";
 
 describe("PREVIEW_SETTING_DEFINITIONS", () => {
+	it("does not expose preview truncation controls", () => {
+		const settingKeys = PREVIEW_SETTING_DEFINITIONS.map(
+			(definition) => definition.settingKey,
+		);
+
+		expect(settingKeys).not.toContain("previewMaxLines");
+		expect(settingKeys).not.toContain("previewMaxChars");
+		expect(settingKeys).not.toContain("previewVisualLineSafetyMargin");
+	});
+
 	it("accepts zero as the card gap", () => {
 		const definition = PREVIEW_SETTING_DEFINITIONS.find(
 			(candidate) => candidate.settingKey === "cardGapPx",
