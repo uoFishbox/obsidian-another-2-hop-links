@@ -1,4 +1,10 @@
-import { App, Platform, PluginSettingTab, Setting } from "obsidian";
+import { Platform, PluginSettingTab } from "obsidian";
+import type {
+	App,
+	Setting,
+	SettingDefinitionItem as ObsidianSettingDefinitionItem,
+	SettingGroupItem,
+} from "obsidian";
 import type { PluginHost } from "obsidian-integration/pluginHost";
 import type { Language, PluginSettings } from "settings/model";
 import {
@@ -49,11 +55,9 @@ export class CosenseCardLinksSettingTab extends PluginSettingTab {
 		this.pluginInstance = plugin;
 	}
 
-	display(): void {
-		const { containerEl } = this;
-		containerEl.empty();
-
+	getSettingDefinitions(): ObsidianSettingDefinitionItem[] {
 		const lang = this.pluginInstance.settings.language;
+		const items: ObsidianSettingDefinitionItem[] = [];
 
 		for (const section of SECTION_ORDER) {
 			const sectionSettings = SETTING_DEFINITIONS.filter(
@@ -65,24 +69,34 @@ export class CosenseCardLinksSettingTab extends PluginSettingTab {
 				continue;
 			}
 
-			if (section.titleKey) {
-				containerEl.createEl("h2", { text: t(section.titleKey, lang) });
+			const settingItems = sectionSettings.map(
+				(definition): SettingGroupItem => ({
+					name: t(definition.translationKey, lang),
+					desc: t(definition.descriptionKey, lang),
+					render: (setting) => this.renderControl(setting, definition, lang),
+				}),
+			);
+
+			if (!section.titleKey) {
+				items.push(...settingItems);
+				continue;
 			}
 
-			for (const definition of sectionSettings) {
-				this.renderSetting(containerEl, definition, lang);
-			}
+			items.push({
+				type: "group",
+				heading: t(section.titleKey, lang),
+				items: settingItems,
+			});
 		}
+
+		return items;
 	}
 
-	private renderSetting(
-		containerEl: HTMLElement,
+	private renderControl(
+		setting: Setting,
 		definition: SettingDefinition,
 		lang: Language,
 	): void {
-		const setting = new Setting(containerEl)
-			.setName(t(definition.translationKey, lang))
-			.setDesc(t(definition.descriptionKey, lang));
 		const currentSettings = this.pluginInstance.settings;
 		const currentValue = currentSettings[definition.settingKey];
 
@@ -98,7 +112,7 @@ export class CosenseCardLinksSettingTab extends PluginSettingTab {
 						)
 							.then(() => {
 								if (definition.settingKey === "language") {
-									this.display();
+									this.update();
 								}
 							})
 							.catch(reportSettingUpdateError);
@@ -119,7 +133,7 @@ export class CosenseCardLinksSettingTab extends PluginSettingTab {
 						)
 							.then(() => {
 								if (definition.settingKey === "language") {
-									this.display();
+									this.update();
 								}
 							})
 							.catch(reportSettingUpdateError);
