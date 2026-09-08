@@ -231,7 +231,7 @@ export function createLinkContextFactory(
 }
 
 function shouldHighlight(settings: PluginSettings): boolean {
-	return settings.highlightOnOpen === "always";
+	return settings.highlightOnOpen;
 }
 
 function buildDragLinkFormat(

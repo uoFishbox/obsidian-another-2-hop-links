@@ -3,7 +3,6 @@ import { SORT_OPTIONS } from "cards/sorting/types";
 import { DEFAULT_SETTINGS } from "./defaults";
 import {
 	DISPLAY_MODES,
-	HIGHLIGHT_ON_OPEN_ACTIONS,
 	LANGUAGES,
 	MOBILE_LONG_PRESS_ACTIONS,
 	SETTINGS_SCHEMA_VERSION,
@@ -53,9 +52,7 @@ const PluginSettingsSchema = z.object({
 	cardGapPx: nonNegativeInteger(DEFAULT_SETTINGS.cardGapPx),
 	cardMaxColumns: positiveInteger(DEFAULT_SETTINGS.cardMaxColumns),
 	sectionMarginBottomPx: positiveInteger(DEFAULT_SETTINGS.sectionMarginBottomPx),
-	highlightOnOpen: z
-		.enum(HIGHLIGHT_ON_OPEN_ACTIONS)
-		.catch(DEFAULT_SETTINGS.highlightOnOpen),
+	highlightOnOpen: booleanSetting(DEFAULT_SETTINGS.highlightOnOpen),
 	highlightInPreviewOnHover: booleanSetting(
 		DEFAULT_SETTINGS.highlightInPreviewOnHover,
 	),

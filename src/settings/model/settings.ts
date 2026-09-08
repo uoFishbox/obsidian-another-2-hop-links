@@ -17,14 +17,11 @@ export type DisplayMode = (typeof DISPLAY_MODES)[number];
 export const TWO_HOP_HEADER_SORT_ORDERS = ["appearance", "hop2-count-asc"] as const;
 export type TwoHopHeaderSortOrder = (typeof TWO_HOP_HEADER_SORT_ORDERS)[number];
 
-export const HIGHLIGHT_ON_OPEN_ACTIONS = ["always", "never"] as const;
-export type HighlightOnOpen = (typeof HIGHLIGHT_ON_OPEN_ACTIONS)[number];
-
 export const MOBILE_LONG_PRESS_ACTIONS = ["preview", "menu"] as const;
 export type MobileLongPressAction = (typeof MOBILE_LONG_PRESS_ACTIONS)[number];
 
 /** Current persisted settings shape version; bump when keys are renamed or reshaped. */
-export const SETTINGS_SCHEMA_VERSION = 1;
+export const SETTINGS_SCHEMA_VERSION = 2;
 
 export const CARD_LAYOUT_SETTING_KEYS = [
 	"cardWidthPx",
@@ -52,7 +49,7 @@ export interface PluginSettings {
 	cardGapPx: number;
 	cardMaxColumns: number;
 	sectionMarginBottomPx: number;
-	highlightOnOpen: HighlightOnOpen;
+	highlightOnOpen: boolean;
 	highlightInPreviewOnHover: boolean;
 	twoHopHeaderSortOrder: TwoHopHeaderSortOrder;
 	lastUsedSortOption: SortOption;

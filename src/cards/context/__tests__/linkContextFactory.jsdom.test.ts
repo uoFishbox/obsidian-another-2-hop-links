@@ -81,7 +81,7 @@ describe("createLinkContextFactory", () => {
 			workspace,
 		);
 		const context = factory(sourceFile, {
-			highlightOnOpen: "always",
+			highlightOnOpen: true,
 		} as any);
 
 		const link = createBaseLink(sourceFile);
@@ -110,7 +110,7 @@ describe("createLinkContextFactory", () => {
 			},
 			workspace,
 		);
-		const context = factory(sourceFile, { highlightOnOpen: "always" } as any);
+		const context = factory(sourceFile, { highlightOnOpen: true } as any);
 		const link: IndexedLink = {
 			rawText: "missing-destination",
 			path: undefined,
@@ -140,7 +140,7 @@ describe("createLinkContextFactory", () => {
 			workspace,
 		);
 		const context = factory(originFile, {
-			highlightOnOpen: "always",
+			highlightOnOpen: true,
 		} as any);
 
 		const link: IndexedLink = {
@@ -186,7 +186,7 @@ describe("createLinkContextFactory", () => {
 			workspace,
 		);
 		const context = factory(sourceFile, {
-			highlightOnOpen: "always",
+			highlightOnOpen: true,
 		} as any);
 
 		const link = {
@@ -249,7 +249,7 @@ describe("createLinkContextFactory", () => {
 			}),
 		} as any;
 		const factory = createFactory(metadataCache, workspace);
-		const context = factory(sourceFile, { highlightOnOpen: "always" } as any);
+		const context = factory(sourceFile, { highlightOnOpen: true } as any);
 		const link: IndexedLink = {
 			rawText: "destination-link",
 			path: targetFile.path,
@@ -288,7 +288,7 @@ describe("createLinkContextFactory", () => {
 			workspace,
 		);
 		const context = factory(sourceFile, {
-			highlightOnOpen: "always",
+			highlightOnOpen: true,
 		} as any);
 		const event = new (foreignWindow as any).MouseEvent("click", {
 			ctrlKey: true,

@@ -11,13 +11,9 @@ export const INTERACTION_SETTING_DEFINITIONS: ReadonlyArray<SettingDefinition> =
 	{
 		section: "interaction",
 		settingKey: "highlightOnOpen",
-		controlType: "dropdown",
+		controlType: "toggle",
 		translationKey: "highlightOnOpen",
 		descriptionKey: "highlightOnOpenDesc",
-		options: [
-			{ value: "always", label: "always", isTranslationKey: true },
-			{ value: "never", label: "never", isTranslationKey: true },
-		],
 	},
 	{
 		section: "interaction",

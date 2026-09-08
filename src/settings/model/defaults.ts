@@ -23,7 +23,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
 	cardGapPx: DEFAULT_CARD_GAP_PX,
 	cardMaxColumns: DEFAULT_CARD_MAX_COLUMNS,
 	sectionMarginBottomPx: DEFAULT_SECTION_MARGIN_BOTTOM_PX,
-	highlightOnOpen: "always",
+	highlightOnOpen: true,
 	highlightInPreviewOnHover: true,
 	twoHopHeaderSortOrder: "appearance",
 	lastUsedSortOption: "alphabetical",

@@ -36,6 +36,15 @@ describe("parsePluginSettings", () => {
 		expect(parsePluginSettings(raw)).toEqual(raw);
 	});
 
+	it("parses highlight on open as a boolean", () => {
+		expect(parsePluginSettings({ highlightOnOpen: false }).highlightOnOpen).toBe(
+			false,
+		);
+		expect(parsePluginSettings({ highlightOnOpen: "always" }).highlightOnOpen).toBe(
+			DEFAULT_SETTINGS.highlightOnOpen,
+		);
+	});
+
 	it("falls back to defaults for invalid enum values", () => {
 		const settings = parsePluginSettings({
 			language: "fr",

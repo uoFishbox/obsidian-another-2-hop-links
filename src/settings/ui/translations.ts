@@ -73,8 +73,6 @@ export type TranslationKey =
 	| "hybrid"
 	| "appearance"
 	| "linkCountAscending"
-	| "always"
-	| "never"
 	| "showPreview"
 	| "showMenu"
 	| "tags"
@@ -183,9 +181,6 @@ const translations: Record<Language, Record<TranslationKey, string>> = {
 		hybrid: "Hybrid",
 		appearance: "Appearance",
 		linkCountAscending: "Link count (ascending)",
-		always: "Always",
-
-		never: "Never",
 		showPreview: "Show preview",
 		showMenu: "Show menu",
 		tags: "Tags",
@@ -291,9 +286,6 @@ const translations: Record<Language, Record<TranslationKey, string>> = {
 		hybrid: "ハイブリッド",
 		appearance: "出現順",
 		linkCountAscending: "リンク数（昇順）",
-		always: "常に",
-
-		never: "なし",
 		showPreview: "プレビューを表示",
 		showMenu: "メニューを表示",
 		tags: "タグ",
