@@ -8,6 +8,75 @@ const defaultSettings: PluginSettings = DEFAULT_SETTINGS;
 
 const SEARCH_PREVIEW_SEEK_BUFFER_CHARS = 15;
 
+describe("fenced code preview budgets", () => {
+	const openTag = '<span class="cosense-card-links__code-block">';
+	const settings = {
+		...defaultSettings,
+		cardWidthPx: 1000,
+		previewMaxLines: 0,
+		previewMaxChars: 10,
+	};
+
+	test.each(["```", "~~~"])(
+		"keeps the same preview when a %s block exceeds the raw window",
+		(fence) => {
+			const prefix = "Introduction\n";
+			const firstLines = "# keep this comment\nvalue = 123\n";
+			const short = prefix + fence + "python\n" + firstLines.repeat(10) + fence;
+			const long = prefix + fence + "python\n" + firstLines.repeat(200) + fence;
+			const expected = getContentSnippet(short, defaultSettings);
+			expect(expected).toContain(openTag);
+			expect(expected).toContain("# keep this comment");
+			expect(getContentSnippet(long, defaultSettings)).toBe(expected);
+		},
+	);
+
+	test("renders an unfinished code block as code through the end of the note", () => {
+		const code = "# comment\nvalue = 123";
+		expect(
+			getContentSnippet("~~~python\n" + code, {
+				...settings,
+				previewMaxChars: 100,
+			}),
+		).toBe(openTag + code + "</span>");
+	});
+
+	test("spends the character budget on code instead of wrapper tags", () => {
+		expect(getContentSnippet("```\n" + "a".repeat(100) + "\n```", settings)).toBe(
+			openTag + "a".repeat(20) + "</span>...",
+		);
+	});
+
+	test.each([
+		['"', "&quot;"],
+		["'", "&#039;"],
+		["<", "&lt;"],
+		[">", "&gt;"],
+		["&", "&amp;"],
+	])("counts escaped %s as one visible character", (source, escaped) => {
+		expect(
+			getContentSnippet("```\n" + source.repeat(100) + "\n```", settings),
+		).toBe(openTag + escaped.repeat(20) + "</span>...");
+	});
+
+	test("uses visible entity width for estimated wrapping", () => {
+		const result = getContentSnippet("```\n" + '"'.repeat(100) + "\n```", {
+			...settings,
+			cardWidthPx: 140,
+			previewMaxChars: 0,
+			previewMaxLines: 2,
+		});
+		expect(result).toBe(openTag + "&quot;".repeat(41) + "</span>...");
+	});
+
+	test.each(["`", "$", "\\", "["])("keeps %s literal inside code", (symbol) => {
+		const code = symbol.repeat(50);
+		expect(getContentSnippet("~~~\n" + code + "\n~~~", settings)).toBe(
+			openTag + symbol.repeat(20) + "</span>...",
+		);
+	});
+});
+
 describe("getContentSnippet", () => {
 	describe("basic text processing", () => {
 		test("returns plain text as-is", () => {

@@ -79,8 +79,9 @@ Body`;
 	test("does not treat a fence line with info string as a closing fence", () => {
 		const content = "```md\n[[note]]\n```ts";
 		const result = transformContentForPreview(content);
-		expect(result).not.toContain('class="cosense-card-links__code-block"');
-		expect(result).toContain("[[note]]");
+		expect(result).toBe(
+			'<span class="cosense-card-links__code-block">[[note]]\n```ts</span>',
+		);
 	});
 
 	test("converts fenced code blocks to styled text", () => {

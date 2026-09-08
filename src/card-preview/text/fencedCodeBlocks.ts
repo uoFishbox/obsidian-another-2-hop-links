@@ -151,7 +151,16 @@ function findFencedCodeBlockAtLineStart(
 		nextLineStart = getNextLineStart(content, lineEnd);
 	}
 
-	return undefined;
+	// Preview windows can end before the closing fence. Markdown keeps an
+	// unfinished fenced block open through EOF, so its body must stay protected.
+	return {
+		blockStart: lineStartIndex,
+		blockEnd: content.length,
+		contentStart,
+		contentEnd: content.length,
+		fence: openingFence.fence,
+		infoString: openingFence.infoString,
+	};
 }
 
 async function findFencedCodeBlockAtLineStartAsync(
@@ -244,7 +253,7 @@ export async function skipFencedCodeBlockAsync(
 		: lineStartIndex;
 }
 
-/** Finds the closed fenced code block whose opening line or body contains the offset. */
+/** Finds the fenced code block whose opening line or body contains the offset, including unfinished blocks. */
 export function findFencedCodeBlockContainingOffset(
 	content: string,
 	matchIndex: number,

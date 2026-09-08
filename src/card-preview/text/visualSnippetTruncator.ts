@@ -256,6 +256,28 @@ function scanAndTruncate(
 		const charCode = text.charCodeAt(index);
 		const char = text[index];
 
+		// Escaped code is literal text, not Markdown. Count each generated HTML
+		// entity as one visible character and consume it without splitting it.
+		if (openCodeBlockSpan && !text.startsWith("</span>", index)) {
+			if (char === "&") {
+				const entityEnd = text.indexOf(";", index + 1);
+				if (entityEnd !== -1) {
+					addCells(state, 0.5, metrics.columns);
+					weight += 0.5;
+					index = entityEnd + 1;
+					continue;
+				}
+			}
+			if (char === "\n") {
+				addHardNewline(state);
+			} else {
+				addCells(state, getDisplayCellWidthFromCode(charCode), metrics.columns);
+			}
+			weight += getCharWeightFromCode(charCode);
+			index++;
+			continue;
+		}
+
 		if (char === "\n") {
 			addHardNewline(state);
 			if (openCodeBlock && !openCodeBlock.multiline) {
@@ -352,8 +374,19 @@ function scanAndTruncate(
 				) {
 					const closeIndex = text.indexOf(">", index + 2);
 					if (closeIndex !== -1) {
-						for (let tagIndex = index; tagIndex <= closeIndex; tagIndex++) {
-							weight += getCharWeightFromCode(text.charCodeAt(tagIndex));
+						const isCodeBlockTag =
+							text.startsWith(CODE_BLOCK_OPEN_TAG, index) ||
+							(openCodeBlockSpan && text.startsWith("</span>", index));
+						if (!isCodeBlockTag) {
+							for (
+								let tagIndex = index;
+								tagIndex <= closeIndex;
+								tagIndex++
+							) {
+								weight += getCharWeightFromCode(
+									text.charCodeAt(tagIndex),
+								);
+							}
 						}
 
 						const tagBodyStart = nextChar === "/" ? index + 2 : index + 1;

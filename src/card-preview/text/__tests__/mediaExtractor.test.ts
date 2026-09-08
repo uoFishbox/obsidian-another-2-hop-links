@@ -32,18 +32,16 @@ describe("extractFirstEmbeddedMedia", () => {
 		expect(embed?.target).toBe("outside.png");
 	});
 
-	test("does not treat a fence with info text as a closing fence", () => {
-		const stripped = stripCodeSegmentsForEmbedDetection(
-			[
-				"```md",
-				"![[inside-fence.png]]",
-				"```ts",
-				"![[still-not-closed.png]]",
-			].join("\n"),
-		);
+	test("keeps a fence with info text inside the unfinished code block", async () => {
+		const content = [
+			"```md",
+			"![[inside-fence.png]]",
+			"```ts",
+			"![[still-not-closed.png]]",
+		].join("\n");
 
-		expect(stripped).toContain("![[inside-fence.png]]");
-		expect(stripped).toContain("![[still-not-closed.png]]");
+		expect(stripCodeSegmentsForEmbedDetection(content)).toBe("");
+		expect(await extractFirstEmbeddedMedia(content)).toBeUndefined();
 	});
 
 	test("parses markdown image embeds", async () => {
