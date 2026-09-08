@@ -1,4 +1,9 @@
 import { selectContentSnippetWindow } from "./snippetWindow";
+import {
+	highlightSearchMatchesInHtml,
+	highlightTextForSearch,
+} from "./searchHighlighter";
+import { findCaseInsensitiveIndex } from "./searchUtils";
 import { transformContentForPreview } from "./textTransformUtils";
 import type {
 	GetContentSnippetOptions,
@@ -67,6 +72,7 @@ export function prepareContentSnippet(
 
 	return {
 		contentToProcess: contentWindow.contentToProcess,
+		searchQuery: normalizedSearchQuery || undefined,
 		context,
 		hasLeadingOmission: contentWindow.hasLeadingOmission,
 		hasTrailingOmission: contentWindow.hasTrailingOmission,
@@ -82,6 +88,42 @@ export function renderPreparedContentSnippet(
 		context: prepared.context,
 		skipFrontmatterRemoval: true,
 	}).replace(/^[\r\n]+/, "");
+
+	// Search candidates are bounded by the raw window, not estimated card lines.
+	// Keep the normal short snippet when it contains the complete match; otherwise
+	// let the host fit the bounded candidate using the actual rendered geometry.
+	if (
+		prepared.searchQuery &&
+		findCaseInsensitiveIndex(prepared.contentToProcess, prepared.searchQuery) >= 0
+	) {
+		const hasMatch = (html: string): boolean =>
+			highlightSearchMatchesInHtml(html, prepared.searchQuery).includes(
+				'class="ccl-search-highlight"',
+			);
+		const short = settings
+			? truncatePreviewContent(processedContent, settings)
+			: { content: processedContent, truncated: false };
+		const candidate = hasMatch(short.content)
+			? short
+			: { content: processedContent, truncated: false };
+		if (hasMatch(candidate.content)) {
+			return (
+				(prepared.hasLeadingOmission ? "..." : "") +
+				candidate.content.trim() +
+				(candidate.truncated || prepared.hasTrailingOmission ? "..." : "")
+			);
+		}
+		// Link destinations and other Markdown syntax may disappear in conversion.
+		// Highlight before escaping so entities cannot hide or split the raw match.
+		return (
+			(prepared.hasLeadingOmission ? "..." : "") +
+			highlightTextForSearch(
+				prepared.contentToProcess.trim(),
+				prepared.searchQuery,
+			) +
+			(prepared.hasTrailingOmission ? "..." : "")
+		);
+	}
 
 	if (!settings || (settings.previewMaxLines <= 0 && settings.previewMaxChars <= 0)) {
 		return processedContent;

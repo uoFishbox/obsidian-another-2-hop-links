@@ -213,6 +213,22 @@ describe("cardPreviewSharedCache search context", () => {
 		expect(state.findCaseInsensitiveIndex).toHaveBeenCalledTimes(0);
 	});
 
+	it("preserves escaped raw-fallback highlights without matching inside HTML entities again", async () => {
+		const fallback = '<span class="ccl-search-highlight">&lt;script&gt;</span>';
+		state.getFileContent.mockResolvedValue("<script>");
+		state.getContentSnippet.mockResolvedValue(fallback);
+		const result = await applySharedSearchContextToTextPreview({
+			previewContent: "",
+			cacheKey: "raw-html-fallback",
+			targetFile: createMockTFile("raw-html.md"),
+			normalizedQuery: "<script>",
+			settings: createSettings(),
+			vault: {} as never,
+		});
+		expect(result).toBe(fallback);
+		expect(state.highlightSearchMatchesInHtml).not.toHaveBeenCalled();
+	});
+
 	it("does not retain raw full content for large files", async () => {
 		const file = createMockTFile("notes/large-search.md");
 		file.stat.size = 300 * 1024;

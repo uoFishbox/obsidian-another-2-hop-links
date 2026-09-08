@@ -286,6 +286,30 @@ export const CARD_RENDER_SHADOW_CSS = String.raw`
 	margin-bottom: calc(var(--ccl-box-padding) / 2);
 }
 
+.cosense-card-links__box-preview--text.ccl-search-preview {
+	column-count: auto;
+	position: relative;
+}
+
+.ccl-search-preview-body {
+	display: flow-root;
+	overflow-wrap: anywhere;
+}
+
+.ccl-search-preview-body .cosense-card-links__code-block,
+.ccl-search-preview-body .cosense-card-links__inline-code {
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+}
+
+.ccl-search-preview-truncated::after {
+	content: "…";
+	position: absolute;
+	right: 0;
+	bottom: 0;
+	background: var(--ccl-bg-box);
+}
+
 .lazy-placeholder {
 	width: 100%;
 	height: 100%;

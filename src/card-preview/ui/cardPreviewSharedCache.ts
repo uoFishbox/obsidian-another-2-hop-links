@@ -184,11 +184,15 @@ async function applySharedSearchContextToTextPreviewForState(
 			}
 
 			throwIfAborted(sharedSignal, "Preview request aborted");
-			const highlightedContent = await highlightSearchMatchesInHtmlAsync(
-				contentForRender,
-				normalizedQuery,
-				sharedSignal,
-			);
+			const highlightedContent = contentForRender.includes(
+				'class="ccl-search-highlight"',
+			)
+				? contentForRender
+				: await highlightSearchMatchesInHtmlAsync(
+						contentForRender,
+						normalizedQuery,
+						sharedSignal,
+					);
 			throwIfAborted(sharedSignal, "Preview request aborted");
 			state.searchContextPreviewCache.set(
 				cacheKey,

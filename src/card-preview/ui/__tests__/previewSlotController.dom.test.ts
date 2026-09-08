@@ -7,6 +7,7 @@ import type {
 	PreviewRenderCallbacks,
 } from "../cardPreviewRenderer";
 import { createPreviewSlotController } from "../previewSlotController";
+import * as searchPreviewFit from "../searchPreviewFit";
 import { describe, expect, it, vi } from "vitest";
 
 function request(renderKey: string): CardPreviewRequest {
@@ -21,6 +22,43 @@ function request(renderKey: string): CardPreviewRequest {
 }
 
 describe("PreviewSlotController", () => {
+	it("moves search fitting with retained DOM and releases it while inactive", () => {
+		const release = vi.fn();
+		const observe = vi
+			.spyOn(searchPreviewFit, "observeSearchPreviewFit")
+			.mockReturnValue(release);
+		const render = vi.fn<CardPreviewRenderer>((host, _request, callbacks) => {
+			host.innerHTML = '<span class="ccl-search-highlight">target</span>';
+			callbacks?.onCommitted("text", "detachable");
+			return vi.fn();
+		});
+		const controller = createPreviewSlotController(() => render);
+		try {
+			const first = document.createElement("div");
+			const second = document.createElement("div");
+			const lease = controller.attachHost(first);
+			controller.bind({ ...request("search"), searchQuery: "target" });
+			controller.setActive(true);
+			controller.activate();
+			expect(observe).toHaveBeenLastCalledWith(first, "target");
+			lease.dispose();
+			expect(release).toHaveBeenCalledTimes(1);
+			controller.attachHost(second);
+			expect(observe).toHaveBeenLastCalledWith(second, "target");
+			expect(second.textContent).toBe("target");
+			expect(render).toHaveBeenCalledOnce();
+			controller.setActive(false);
+			expect(release).toHaveBeenCalledTimes(2);
+			controller.setActive(true);
+			expect(observe).toHaveBeenCalledTimes(3);
+			controller.dispose();
+			expect(release).toHaveBeenCalledTimes(3);
+		} finally {
+			controller.dispose();
+			observe.mockRestore();
+		}
+	});
+
 	it("does not let an old lease detach a newer lease for the same host", () => {
 		const render = vi.fn<CardPreviewRenderer>(() => vi.fn());
 		const controller = createPreviewSlotController(() => render);

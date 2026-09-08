@@ -1,6 +1,7 @@
 import type { PreviewData } from "card-preview/types";
 import type { CardPreviewRequest } from "card-preview/pipeline/cardPreviewRequest";
 import type { CardPreviewAttachment, CardPreviewRenderer } from "./cardPreviewRenderer";
+import { observeSearchPreviewFit } from "./searchPreviewFit";
 
 export interface PreviewSlotController {
 	attachHost(element: HTMLElement): { dispose(): void };
@@ -44,6 +45,12 @@ export function createPreviewSlotController(
 	let renderer: CardPreviewRenderer | undefined;
 	let disposed = false;
 	let appliedContentType: PreviewData["type"] | undefined;
+	let releaseSearchFit: (() => void) | undefined;
+
+	function stopSearchFit(): void {
+		releaseSearchFit?.();
+		releaseSearchFit = undefined;
+	}
 
 	function advanceRevision(): number {
 		revision += 1;
@@ -51,6 +58,16 @@ export function createPreviewSlotController(
 	}
 
 	function syncHostAppearance(): void {
+		stopSearchFit();
+		if (
+			active &&
+			host &&
+			request?.searchQuery &&
+			content.state === "committed" &&
+			content.contentType === "text"
+		) {
+			releaseSearchFit = observeSearchPreviewFit(host, request.searchQuery);
+		}
 		const nextContentType =
 			content.state === "committed" ? content.contentType : undefined;
 		if (appliedContentType === nextContentType) return;
@@ -74,6 +91,7 @@ export function createPreviewSlotController(
 	}
 
 	function clearDom(): void {
+		stopSearchFit();
 		releaseContentLease();
 		host?.replaceChildren();
 		detachedContent?.replaceChildren();
@@ -82,6 +100,7 @@ export function createPreviewSlotController(
 	}
 
 	function detachDetachableContent(element: HTMLElement): boolean {
+		stopSearchFit();
 		if (
 			content.state !== "committed" ||
 			content.attachment !== "detachable" ||

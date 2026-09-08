@@ -527,6 +527,50 @@ End.`;
 });
 
 describe("getContentSnippet with search query", () => {
+	test("preserves the match when short preceding lines exhaust the visual budget", () => {
+		const result = getContentSnippet(
+			"prefix\n" + "a\n".repeat(7) + "target suffix",
+			{
+				...defaultSettings,
+				cardWidthPx: 140,
+				cardHeightRatio: 1.1,
+			},
+			"target",
+		);
+		expect(result).toContain("target suffix");
+	});
+
+	test("preserves a complete match longer than the character budget", () => {
+		const query = "日本語".repeat(20);
+		const result = getContentSnippet(
+			"prefix " + query + " suffix",
+			{
+				...defaultSettings,
+				previewMaxChars: 3,
+				previewMaxLines: 1,
+			},
+			query,
+		);
+		expect(result).toContain(query);
+	});
+
+	test("shows a safely escaped raw match when link conversion hides its destination", () => {
+		const result = getContentSnippet("[label](target)", defaultSettings, "target");
+		expect(result).toContain('<span class="ccl-search-highlight">target</span>');
+	});
+
+	test("does not interpret HTML in a raw search fallback", () => {
+		const result = getContentSnippet(
+			"<script>alert(1)</script>",
+			defaultSettings,
+			"<script>",
+		);
+		expect(result).not.toContain("<script>");
+		expect(result).toContain(
+			'<span class="ccl-search-highlight">&lt;script&gt;</span>',
+		);
+	});
+
 	test("seeks to hit location and adds ellipsis on both sides", () => {
 		const content = "A".repeat(1800) + "\nTarget phrase here.\n" + "B".repeat(1000);
 		const result = getContentSnippet(content, defaultSettings, "target phrase");

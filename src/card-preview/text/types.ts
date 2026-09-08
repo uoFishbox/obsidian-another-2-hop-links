@@ -17,6 +17,8 @@ export interface GetContentSnippetOptions {
 
 /** Raw Markdown and rendering context prepared for the transform stage. */
 export interface PreparedContentSnippet {
+	/** Query whose first visible match must survive truncation. */
+	readonly searchQuery?: string;
 	readonly contentToProcess: string;
 	readonly context: TextTransformContext;
 	readonly hasLeadingOmission: boolean;
