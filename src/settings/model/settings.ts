@@ -70,6 +70,8 @@ export interface PluginSettings {
 	enableEditorArrowDownToSearchInput: boolean;
 	/** Enables experimental Cosense-style title/body editing and note creation. */
 	experimentalCosenseTitleEditing: boolean;
+	/** CSS appended to each card-rendering Shadow DOM surface. */
+	experimentalShadowDomCss: string;
 	enableContentSearch: boolean;
 	priorityFrontmatterKeyForPreview: string;
 	priorityFrontmatterKeyForTitle: string;

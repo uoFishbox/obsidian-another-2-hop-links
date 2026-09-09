@@ -5,6 +5,7 @@ import {
 import { CARD_RENDER_SHADOW_CSS } from "./cardRenderShadowStyles";
 
 const SHADOW_BASE_STYLE_ATTRIBUTE = "data-ccl-card-render-shadow-base-style";
+const SHADOW_CUSTOM_STYLE_ATTRIBUTE = "data-ccl-card-render-shadow-custom-style";
 const SHADOW_SURFACE_ATTRIBUTE = "data-ccl-card-render-shadow-surface";
 
 function resolveSectionContextClassName(host: HTMLElement): string {
@@ -31,6 +32,25 @@ function syncSurfaceClassName(host: HTMLElement, surfaceEl: HTMLDivElement): voi
 	}
 }
 
+function syncCustomStyle(shadowRoot: ShadowRoot, customCss: string): void {
+	const existingStyleEl = shadowRoot.querySelector<HTMLStyleElement>(
+		`style[${SHADOW_CUSTOM_STYLE_ATTRIBUTE}]`,
+	);
+	if (customCss.length === 0) {
+		existingStyleEl?.remove();
+		return;
+	}
+
+	const styleEl = existingStyleEl ?? shadowRoot.ownerDocument.createElement("style");
+	if (!existingStyleEl) {
+		styleEl.setAttribute(SHADOW_CUSTOM_STYLE_ATTRIBUTE, "1");
+		shadowRoot.append(styleEl);
+	}
+	if (styleEl.textContent !== customCss) {
+		styleEl.textContent = customCss;
+	}
+}
+
 export interface CardRenderShadowSurfaceHandles {
 	shadowRoot: ShadowRoot;
 	surfaceEl: HTMLDivElement;
@@ -39,6 +59,7 @@ export interface CardRenderShadowSurfaceHandles {
 
 export function ensureCardRenderShadowSurface(
 	host: HTMLElement,
+	customCss = "",
 ): CardRenderShadowSurfaceHandles {
 	if (typeof host.attachShadow !== "function") {
 		throw new Error("Card render host does not support attachShadow().");
@@ -59,6 +80,7 @@ export function ensureCardRenderShadowSurface(
 	if (baseStyleEl.textContent !== CARD_RENDER_SHADOW_CSS) {
 		baseStyleEl.textContent = CARD_RENDER_SHADOW_CSS;
 	}
+	syncCustomStyle(shadowRoot, customCss);
 
 	let surfaceEl = shadowRoot.querySelector<HTMLDivElement>(
 		`div[${SHADOW_SURFACE_ATTRIBUTE}]`,

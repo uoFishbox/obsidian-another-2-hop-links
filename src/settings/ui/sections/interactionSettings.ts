@@ -10,6 +10,16 @@ export const INTERACTION_SETTING_DEFINITIONS: ReadonlyArray<SettingDefinition> =
 	},
 	{
 		section: "interaction",
+		settingKey: "experimentalShadowDomCss",
+		controlType: "textarea",
+		translationKey: "experimentalShadowDomCss",
+		descriptionKey: "experimentalShadowDomCssDesc",
+		placeholder: ".cosense-card-links__box {\n\t/* Custom styles */\n}",
+		rows: 10,
+		parse: (value) => value,
+	},
+	{
+		section: "interaction",
 		settingKey: "highlightOnOpen",
 		controlType: "toggle",
 		translationKey: "highlightOnOpen",

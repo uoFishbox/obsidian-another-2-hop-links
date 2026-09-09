@@ -103,6 +103,30 @@ describe("cardRenderShadowSurface", () => {
 		handles.dispose();
 		iframe.remove();
 	});
+
+	it("appends, updates, and removes custom CSS independently of base styles", () => {
+		const host = document.createElement("div");
+		const firstCss = ".card { color: red; }";
+		const secondCss = ".card { color: blue; }";
+
+		const handles = ensureCardRenderShadowSurface(host, firstCss);
+		const selector = "style[data-ccl-card-render-shadow-custom-style]";
+		expect(handles.shadowRoot.querySelector(selector)?.textContent).toBe(firstCss);
+		expect(handles.shadowRoot.querySelectorAll(selector)).toHaveLength(1);
+
+		ensureCardRenderShadowSurface(host, secondCss).dispose();
+		expect(handles.shadowRoot.querySelector(selector)?.textContent).toBe(secondCss);
+		expect(handles.shadowRoot.querySelectorAll(selector)).toHaveLength(1);
+
+		ensureCardRenderShadowSurface(host, "").dispose();
+		expect(handles.shadowRoot.querySelector(selector)).toBeNull();
+		expect(
+			handles.shadowRoot.querySelector(
+				"style[data-ccl-card-render-shadow-base-style]",
+			),
+		).not.toBeNull();
+		handles.dispose();
+	});
 });
 
 describe("cardRenderShadowSurface math styles (Temml)", () => {

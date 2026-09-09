@@ -20,6 +20,7 @@ const LAYOUT_AFFECTING_SETTINGS = new Set<keyof PluginSettings>([
 	...CARD_LAYOUT_SETTING_KEYS,
 	"displayMode",
 	"enableTagFeatures",
+	"experimentalShadowDomCss",
 ]);
 
 interface RefreshableFromSettings {

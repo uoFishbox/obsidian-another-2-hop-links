@@ -133,7 +133,9 @@ export function createCardSurfaceInteractions({
 			return;
 		}
 
-		const handles = ensureCardRenderShadowSurface(rootEl);
+		const customCss =
+			appContext?.applicationStore.settings.experimentalShadowDomCss ?? "";
+		const handles = ensureCardRenderShadowSurface(rootEl, customCss);
 		if (contentEl.parentNode !== handles.surfaceEl) {
 			handles.surfaceEl.append(contentEl);
 		}

@@ -43,6 +43,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
 	enableSearchArrowUpToEditorBottom: true,
 	enableEditorArrowDownToSearchInput: true,
 	experimentalCosenseTitleEditing: false,
+	experimentalShadowDomCss: "",
 	priorityFrontmatterKeyForPreview: "",
 	priorityFrontmatterKeyForTitle: "",
 	enableContentSearch: false,

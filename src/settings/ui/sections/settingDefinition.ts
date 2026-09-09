@@ -48,19 +48,32 @@ interface DropdownSettingDefinition<
 	options: ReadonlyArray<SelectOption>;
 }
 
-interface TextSettingDefinition<
+interface StringSettingDefinition<
 	K extends keyof PluginSettings,
 > extends BaseSettingDefinition<K> {
-	controlType: "text" | "textarea";
 	placeholder?: string;
 	parse: (value: string, settings: PluginSettings) => PluginSettings[K] | undefined;
 	format?: (value: PluginSettings[K]) => string;
 }
 
+interface TextSettingDefinition<
+	K extends keyof PluginSettings,
+> extends StringSettingDefinition<K> {
+	controlType: "text";
+}
+
+interface TextareaSettingDefinition<
+	K extends keyof PluginSettings,
+> extends StringSettingDefinition<K> {
+	controlType: "textarea";
+	rows?: number;
+}
+
 export type SettingDefinition<K extends keyof PluginSettings = keyof PluginSettings> =
 	| ToggleSettingDefinition<K>
 	| DropdownSettingDefinition<K>
-	| TextSettingDefinition<K>;
+	| TextSettingDefinition<K>
+	| TextareaSettingDefinition<K>;
 
 export const SECTION_ORDER: ReadonlyArray<{
 	id: SectionId;

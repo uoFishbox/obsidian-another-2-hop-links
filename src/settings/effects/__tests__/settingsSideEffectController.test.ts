@@ -77,6 +77,15 @@ describe("SettingsSideEffectController", () => {
 		expect(mocks.refreshEmptyView).toHaveBeenCalledOnce();
 	});
 
+	it("refreshes every card view when custom Shadow DOM CSS changes", () => {
+		const { apply, mocks } = createHarness();
+
+		apply("experimentalShadowDomCss");
+
+		expect(mocks.getLeavesOfType).toHaveBeenCalledTimes(4);
+		expect(mocks.refreshEmptyView).toHaveBeenCalledOnce();
+	});
+
 	it("skips global work for the persisted sort option", () => {
 		const { apply, mocks } = createHarness();
 

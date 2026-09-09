@@ -44,6 +44,8 @@ export type TranslationKey =
 	| "interaction"
 	| "experimentalCosenseTitleEditing"
 	| "experimentalCosenseTitleEditingDesc"
+	| "experimentalShadowDomCss"
+	| "experimentalShadowDomCssDesc"
 	| "highlightOnOpen"
 	| "highlightOnOpenDesc"
 	| "highlightInPopoverOnHover"
@@ -84,6 +86,9 @@ const translations: Record<Language, Record<TranslationKey, string>> = {
 		experimentalCosenseTitleEditing: "Experimental: Cosense-style title editing",
 		experimentalCosenseTitleEditingDesc:
 			"In edit mode, seamlessly move the caret and edit text between the title and body.",
+		experimentalShadowDomCss: "Experimental: Shadow DOM custom CSS",
+		experimentalShadowDomCssDesc:
+			"Append CSS to card-rendering Shadow DOM surfaces. Changes apply immediately. Invalid CSS may break card display.",
 		language: "Language",
 		languageDesc: "Select the display language for settings.",
 		display: "Display",
@@ -191,6 +196,9 @@ const translations: Record<Language, Record<TranslationKey, string>> = {
 		experimentalCosenseTitleEditing: "Experimental: Cosenseスタイルのタイトル編集",
 		experimentalCosenseTitleEditingDesc:
 			"編集モードで、タイトルと本文の間のキャレット移動・テキスト編集をシームレスにします。",
+		experimentalShadowDomCss: "Experimental: Shadow DOM カスタム CSS",
+		experimentalShadowDomCssDesc:
+			"カード描画用 Shadow DOM に CSS を追加します。変更はすぐに反映されます。不正な CSS によりカード表示が崩れる場合があります。",
 		language: "言語",
 		languageDesc: "設定画面の表示言語を選択します。",
 		display: "表示",

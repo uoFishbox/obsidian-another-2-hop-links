@@ -103,6 +103,7 @@ const PluginSettingsSchema = z.object({
 	experimentalCosenseTitleEditing: booleanSetting(
 		DEFAULT_SETTINGS.experimentalCosenseTitleEditing,
 	),
+	experimentalShadowDomCss: stringSetting(DEFAULT_SETTINGS.experimentalShadowDomCss),
 	priorityFrontmatterKeyForPreview: stringSetting(
 		DEFAULT_SETTINGS.priorityFrontmatterKeyForPreview,
 	),

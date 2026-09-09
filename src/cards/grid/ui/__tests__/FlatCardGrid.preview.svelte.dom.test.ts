@@ -104,8 +104,9 @@ describe("FlatCardGrid preview surface", () => {
 			fileToLinktext: () => "flat",
 			getMetadata: () => null,
 		} as unknown as LinkContext;
+		const customCss = ".cosense-card-links__box { color: rebeccapurple; }";
 		const applicationStore = {
-			settings: DEFAULT_SETTINGS,
+			settings: { ...DEFAULT_SETTINGS, experimentalShadowDomCss: customCss },
 			previewState: { getRenderVersion: () => "0:0" },
 		} as unknown as CardCollectionState;
 		const app = { vault: {} } as App;
@@ -139,6 +140,11 @@ describe("FlatCardGrid preview surface", () => {
 		if (!scrollRoot || !gridRoot) {
 			throw new TypeError("Virtual grid test surface was not rendered");
 		}
+		expect(
+			gridRoot.shadowRoot?.querySelector(
+				"style[data-ccl-card-render-shadow-custom-style]",
+			)?.textContent,
+		).toBe(customCss);
 		setNumericProperty(scrollRoot, "clientHeight", 240);
 		setNumericProperty(scrollRoot, "scrollTop", 0);
 		setElementRect(scrollRoot, { top: 0, width: 330, height: 240 });

@@ -180,6 +180,10 @@ export class CosenseCardLinksSettingTab extends PluginSettingTab {
 										: undefined,
 								)
 								.catch(reportSettingUpdateError);
+						})
+						.then((component) => {
+							component.inputEl.rows = definition.rows ?? 8;
+							component.inputEl.spellcheck = false;
 						}),
 				);
 				return;

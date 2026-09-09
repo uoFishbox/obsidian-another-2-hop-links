@@ -30,6 +30,17 @@ describe("parsePluginSettings", () => {
 		).toBe(true);
 	});
 
+	it("preserves experimental Shadow DOM CSS only when it is a string", () => {
+		const css = ".card { color: rebeccapurple; }";
+		expect(parsePluginSettings({ experimentalShadowDomCss: css })).toMatchObject({
+			experimentalShadowDomCss: css,
+		});
+		expect(
+			parsePluginSettings({ experimentalShadowDomCss: 123 })
+				.experimentalShadowDomCss,
+		).toBe("");
+	});
+
 	it("accepts a fully valid settings object unchanged", () => {
 		const raw: PluginSettings = { ...DEFAULT_SETTINGS, language: "ja" };
 

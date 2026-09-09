@@ -9,4 +9,14 @@ describe("INTERACTION_SETTING_DEFINITIONS", () => {
 
 		expect(definition?.controlType).toBe("toggle");
 	});
+
+	it("uses a multiline editor that preserves custom Shadow DOM CSS", () => {
+		const definition = INTERACTION_SETTING_DEFINITIONS.find(
+			(candidate) => candidate.settingKey === "experimentalShadowDomCss",
+		);
+
+		expect(definition?.controlType).toBe("textarea");
+		if (definition?.controlType !== "textarea") return;
+		expect(definition.parse("  .card {}\n", {} as never)).toBe("  .card {}\n");
+	});
 });
