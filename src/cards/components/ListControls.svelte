@@ -72,6 +72,7 @@
 		showSearchInput?: boolean;
 		showContentSearchToggle?: boolean;
 		searchPlaceholder?: string;
+		contentSearchPlaceholder?: string;
 		searchInputEl?: HTMLInputElement | null;
 	}
 
@@ -89,6 +90,7 @@
 		showSearchInput = true,
 		showContentSearchToggle = true,
 		searchPlaceholder = "Search...",
+		contentSearchPlaceholder,
 		searchInputEl = $bindable<HTMLInputElement | null>(null),
 	}: Props = $props();
 
@@ -233,6 +235,11 @@
 	const contentSearchAriaLabel = $derived(
 		contentSearchEnabled ? "Disable full-text search" : "Enable full-text search",
 	);
+	const activeSearchPlaceholder = $derived(
+		contentSearchEnabled
+			? (contentSearchPlaceholder ?? searchPlaceholder)
+			: searchPlaceholder,
+	);
 </script>
 
 <div class="twohop-header" class:twohop-header--no-search={!showSearchInput}>
@@ -247,7 +254,7 @@
 					value={searchInputValue}
 					oninput={handleSearchInput}
 					onkeydown={handleSearchKeydown}
-					placeholder={searchPlaceholder}
+					placeholder={activeSearchPlaceholder}
 					aria-label="Find cards"
 					spellcheck={false}
 					use:focusInput

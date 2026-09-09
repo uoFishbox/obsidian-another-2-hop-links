@@ -21,6 +21,8 @@ export interface ListConfig<T = CardItem> {
 	searchEnabled?: boolean;
 	allowContentSearch?: boolean;
 	searchPlaceholder?: string;
+	/** Placeholder displayed while full-text search is enabled. */
+	contentSearchPlaceholder?: string;
 	getSearchText?: (item: T, linkContext: LinkContext) => string;
 	onSearchSubmit?: (value: string) => void | Promise<void>;
 	/** Unique semantic identity that remains stable across filtering and sorting. */

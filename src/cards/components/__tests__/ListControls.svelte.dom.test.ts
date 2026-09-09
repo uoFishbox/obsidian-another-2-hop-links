@@ -384,4 +384,27 @@ describe("ListControls", () => {
 			screen.queryByRole("button", { name: "Disable full-text search" }),
 		).not.toBeInTheDocument();
 	});
+
+	it("uses the full-text placeholder while content search is enabled", async () => {
+		const view = render(ListControls, {
+			props: {
+				searchInputValue: "",
+				sortOption: "alphabetical",
+				onSortChange: vi.fn(),
+				searchPlaceholder: "Search note titles...",
+				contentSearchPlaceholder: "Search note contents...",
+				contentSearchEnabled: false,
+			},
+		});
+
+		expect(
+			screen.getByPlaceholderText("Search note titles..."),
+		).toBeInTheDocument();
+
+		await view.rerender({ contentSearchEnabled: true });
+
+		expect(
+			screen.getByPlaceholderText("Search note contents..."),
+		).toBeInTheDocument();
+	});
 });

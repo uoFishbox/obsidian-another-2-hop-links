@@ -100,6 +100,7 @@
 		searchEnabled: true,
 		allowContentSearch: true,
 		searchPlaceholder: "Search note titles...",
+		contentSearchPlaceholder: "Search note contents...",
 		getSearchText: (item: CardItem, ctx) => {
 			if (item.type !== "file") return "";
 			return getFileCardTitleSearchText(

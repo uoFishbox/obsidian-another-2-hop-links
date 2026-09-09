@@ -407,6 +407,7 @@
 	showSearchInput={searchEnabled}
 	showContentSearchToggle={allowContentSearch}
 	searchPlaceholder={config.searchPlaceholder ?? "Search..."}
+	contentSearchPlaceholder={config.contentSearchPlaceholder}
 	{autofocus}
 	bind:searchInputEl
 />
