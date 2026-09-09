@@ -286,6 +286,17 @@ export const CARD_RENDER_SHADOW_CSS = String.raw`
 	margin-bottom: calc(var(--ccl-box-padding) / 2);
 }
 
+.cosense-card-links__box:not(.is-attachment)
+	.cosense-card-links__box-preview--image {
+	padding: 0;
+	margin:
+		0
+		calc(var(--ccl-box-padding) / 2)
+		calc(var(--ccl-box-padding) / 2);
+	border-radius: var(--image-radius);
+	overflow: clip;
+}
+
 .cosense-card-links__box-preview--text.ccl-search-preview {
 	column-count: auto;
 	position: relative;
@@ -346,6 +357,7 @@ export const CARD_RENDER_SHADOW_CSS = String.raw`
 }
 
 .cosense-card-links__box-preview--image img {
+	display: block;
 	width: 100%;
 	height: auto;
 	border-radius: var(--image-radius);
