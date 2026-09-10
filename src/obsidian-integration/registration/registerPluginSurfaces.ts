@@ -23,6 +23,7 @@ import {
 	COSENSE_CARD_LINKS_HOVER_SOURCE_ID,
 } from "hover-popover/hoverPopoverLinkSpec";
 import { CosenseCardLinksSettingTab } from "settings/ui/SettingTab";
+import { getMainUiTranslations } from "shared/i18n/mainUiTranslations";
 
 /** Collaborators required while registering plugin-owned Obsidian surfaces. */
 export interface RegisterPluginSurfacesDeps {
@@ -72,9 +73,10 @@ function registerViews(plugin: PluginHost, viewServices: ViewServices): void {
 }
 
 function registerCommands(plugin: PluginHost, deps: RegisterPluginSurfacesDeps): void {
+	const text = getMainUiTranslations(plugin.settings.language);
 	plugin.addCommand({
 		id: "toggle-scroll-to-two-hop-links",
-		name: "Scroll to Two Hop Links and focus search",
+		name: text.scrollToTwoHopLinks,
 		checkCallback: (checking: boolean) => {
 			const activeView = plugin.app.workspace.getActiveViewOfType(MarkdownView);
 			const isInlineMode =
@@ -93,7 +95,7 @@ function registerCommands(plugin: PluginHost, deps: RegisterPluginSurfacesDeps):
 
 	plugin.addCommand({
 		id: "activate-card-keyboard-mode",
-		name: "Activate keyboard card navigation",
+		name: text.activateKeyboardNavigation,
 		callback: () => {
 			deps.keyboardCardNavigator.toggle();
 		},
@@ -128,25 +130,26 @@ function registerFileMenu(plugin: PluginHost): void {
 	plugin.registerEvent(
 		plugin.app.workspace.on("file-menu", (menu, file) => {
 			if (!(file instanceof TFile)) return;
+			const text = getMainUiTranslations(plugin.settings.language);
 
 			menu.addSeparator();
 			menu.addItem((item) => {
-				item.setTitle("Copy 2-hop links to clipboard")
+				item.setTitle(text.copyTwoHopLinks)
 					.setIcon("copy")
 					.setSection("action")
 					.onClick(async () => {
 						const result = await plugin.getTwoHopLinkResult(file);
-						await exportToClipboard(plugin.app, result);
+						await exportToClipboard(plugin.app, result, plugin.settings.language);
 					});
 			});
 
 			menu.addItem((item) => {
-				item.setTitle("Export 2-hop links to file")
+				item.setTitle(text.exportTwoHopLinks)
 					.setIcon("download")
 					.setSection("action")
 					.onClick(async () => {
 						const result = await plugin.getTwoHopLinkResult(file);
-						await downloadAsFile(plugin.app, result);
+						await downloadAsFile(plugin.app, result, plugin.settings.language);
 					});
 			});
 		}),

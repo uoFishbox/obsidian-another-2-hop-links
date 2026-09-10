@@ -39,6 +39,7 @@ import {
 import { createCardGridVisibilityPolicyResolver } from "cards/grid/model/cardGridVisibilityPolicy";
 import type { InteractionHandle } from "cards/interactions/interactionTypes";
 import { createTwoHopCardSurfaceRuntime } from "./twoHopCardSurfaceRuntime";
+import type { Language } from "settings/model";
 
 /** Dependencies required to enable previews on the two-hop virtual surface. */
 export interface TwoHopPreviewDependencies {
@@ -63,6 +64,7 @@ export interface TwoHopVirtualGridProps {
 		item: TwoHopItemModel,
 		revision: unknown,
 	) => CardRenderModel;
+	readonly language?: Language;
 }
 
 /** Connects two-hop geometry and hydration to the shared bounded virtual-list runtime. */

@@ -5,6 +5,7 @@ import type { InteractionHandle } from "cards/interactions/interactionTypes";
 import type { CardLayoutSettings } from "cards/layout/cardLayoutCssVars";
 import type { SectionPaginationApplicationStore } from "cards/grid/pagination/sectionPagination";
 import type { FlatListScrollState } from "cards/list/model/listViewUiState";
+import type { Language } from "settings/model";
 
 /** Props passed to flat virtual list item render snippets. */
 export interface FlatCardGridItemRenderArgs<T> {
@@ -49,6 +50,7 @@ export interface FlatCardGridProps<T> {
 	/** Persists published scroll and pagination measurements outside the grid. */
 	onScrollStateChange?: (state: FlatListScrollState) => void;
 	onMoveFocusAboveGrid?: () => boolean | Promise<boolean>;
+	language?: Language;
 	/** Resolves immutable preview input for the surface-owned slot controller. */
 	resolveItemPreviewRequest?: (item: T, index: number) => CardPreviewRequest | null;
 	/** Resolves the current item descriptor without card-owned effects. */

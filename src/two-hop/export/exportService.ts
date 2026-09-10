@@ -2,6 +2,8 @@ import { App, Notice, TFile } from "obsidian";
 import { resolveFileByPath } from "obsidian-integration/files/resolveFileByPath";
 import type { TwoHopLinkResult } from "two-hop/model";
 import { resolveWorkspaceDocument } from "obsidian-integration/workspace/workspaceDocuments";
+import type { Language } from "settings/model";
+import { getMainUiTranslations } from "shared/i18n/mainUiTranslations";
 
 const PAGE_TYPE_SORT_ORDER = {
 	mainpage: 0,
@@ -17,23 +19,27 @@ interface ExportPageData {
 export async function exportToClipboard(
 	app: App,
 	result: TwoHopLinkResult,
+	language: Language = "en",
 ): Promise<void> {
+	const text = getMainUiTranslations(language);
 	try {
 		const content = await generateExportContent(app, result);
 		const ownerWindow = resolveWorkspaceDocument(app.workspace)?.defaultView;
 		if (!ownerWindow) throw new Error("No active workspace window");
 		await ownerWindow.navigator.clipboard.writeText(content);
-		new Notice("2-hop links exported to clipboard!");
+		new Notice(text.exportClipboardSuccess);
 	} catch (error) {
 		console.error("Failed to export 2-hop links:", error);
-		new Notice("Failed to export 2-hop links. Check console for details.");
+		new Notice(text.exportClipboardFailure);
 	}
 }
 
 export async function downloadAsFile(
 	app: App,
 	result: TwoHopLinkResult,
+	language: Language = "en",
 ): Promise<void> {
+	const text = getMainUiTranslations(language);
 	try {
 		const content = await generateExportContent(app, result);
 		const fileName = `2-Hop Links - ${result.originFile.basename}.txt`;
@@ -59,7 +65,7 @@ export async function downloadAsFile(
 		ownerWindow.setTimeout(() => URL.revokeObjectURL(url), 100);
 	} catch (error) {
 		console.error("Failed to download file:", error);
-		new Notice("Failed to download file. Check console for details.");
+		new Notice(text.exportDownloadFailure);
 	}
 }
 

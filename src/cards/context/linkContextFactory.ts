@@ -19,6 +19,7 @@ import {
 } from "obsidian-integration/workspace/fileOpener";
 import { resolveFileByPath } from "obsidian-integration/files/resolveFileByPath";
 import * as ErrorHandler from "shared/errors/errorHandler";
+import { getMainUiTranslations } from "shared/i18n/mainUiTranslations";
 
 export async function handleTagClick(
 	tag: string,
@@ -57,7 +58,9 @@ export function createLinkContextFactory(
 		try {
 			const menu = new Menu();
 			menu.addItem((item) => {
-				item.setTitle("Open in new tab")
+				item.setTitle(
+					getMainUiTranslations(plugin.settings.language).openInNewTab,
+				)
 					.setIcon("file-plus")
 					.setSection("open")
 					.onClick(() => {

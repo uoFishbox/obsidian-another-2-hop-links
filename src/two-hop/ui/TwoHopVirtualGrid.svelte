@@ -46,6 +46,7 @@
 			previewKey={mountedCell.cell.logicalKey}
 			registerCardModelConsumer={list.registerCardModelConsumer}
 			onLoadMore={list.loadMore}
+			language={props.language}
 		/>
 	{/snippet}
 </CardGridSurface>

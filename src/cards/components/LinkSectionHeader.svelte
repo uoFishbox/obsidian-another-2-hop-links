@@ -4,6 +4,8 @@
 	import type { Snippet } from "svelte";
 	import { useAppContext } from "cards/context/linkContext";
 	import type { CardSectionVariant } from "./cardPresentation";
+	import { getMainUiTranslations } from "shared/i18n/mainUiTranslations";
+	import type { Language } from "settings/model";
 
 	interface Props {
 		title: string;
@@ -13,6 +15,7 @@
 		containerClass?: string;
 		icon?: Snippet;
 		sectionVariant?: CardSectionVariant;
+		language?: Language;
 	}
 
 	let {
@@ -23,13 +26,15 @@
 		containerClass = "cosense-card-links__connected-links-header",
 		icon,
 		sectionVariant,
+		language = "en",
 	}: Props = $props();
 
-	const tooltip = $derived(
-		totalCount !== undefined ? `${totalCount} notes` : undefined,
-	);
-
 	const appContext = useAppContext();
+	const tooltip = $derived(
+		totalCount !== undefined
+			? getMainUiTranslations(language).noteCount(totalCount)
+			: undefined,
+	);
 
 	async function updateMergedLinksSection(
 		useMergedLinksSection: boolean,
@@ -63,7 +68,11 @@
 		const menu = new Menu();
 
 		menu.addItem((item) => {
-			item.setTitle("Use merged links section")
+			item.setTitle(
+				getMainUiTranslations(
+					appContext.applicationStore.settings.language,
+				).useMergedLinksSection,
+			)
 				.setChecked(mergedEnabled)
 				.onClick(() => {
 					void updateMergedLinksSection(!mergedEnabled).catch(

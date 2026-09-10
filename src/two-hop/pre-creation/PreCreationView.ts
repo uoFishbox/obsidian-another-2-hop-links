@@ -28,6 +28,7 @@ import { buildEditorLikeFrame } from "obsidian-integration/views/editorLikeFrame
 import { getCardItemKey, type CardItem } from "cards/CardItem";
 import { materializePreCreationFile } from "./preCreationFileWorkflow";
 import { isPlainEnterAtContentEnd } from "shared/ui/dom/contentEditableCaret";
+import { getMainUiTranslations } from "shared/i18n/mainUiTranslations";
 
 export const VIEW_TYPE_PRE_CREATE = "cosense-card-links-pre-create-view";
 export const PRE_CREATION_EPHEMERAL_STATE_KEY = "cosense-card-links-pre-create";
@@ -131,7 +132,7 @@ export class PreCreationView extends AbstractSvelteListView<IndexedLink> {
 	getDisplayText(): string {
 		const expectedPath = this.getDisplayExpectedPath();
 		if (!expectedPath) {
-			return "Create unresolved file";
+			return getMainUiTranslations(this.plugin.settings.language).createFile;
 		}
 		// Display the full path (remove the .md extension)
 		const displayPath = expectedPath.endsWith(".md")
@@ -425,6 +426,7 @@ export class PreCreationView extends AbstractSvelteListView<IndexedLink> {
 
 	protected render(): void {
 		const container = this.prepareRenderContainer();
+		const text = getMainUiTranslations(this.plugin.settings.language);
 
 		// Display and edit only the last segment of the path (the file name)
 		const titleText = this.expectedPath
@@ -435,7 +437,7 @@ export class PreCreationView extends AbstractSvelteListView<IndexedLink> {
 					// Extract only the last segment of the path
 					return getPathBasename(path);
 				})()
-			: "Unresolved link target";
+			: text.unresolvedLink;
 
 		const frame = buildEditorLikeFrame(container, {
 			title: titleText,
@@ -451,7 +453,7 @@ export class PreCreationView extends AbstractSvelteListView<IndexedLink> {
 		this.inlineTitleEl.setAttribute("autocapitalize", "on");
 		this.inlineTitleEl.tabIndex = -1;
 		this.inlineTitleEl.setAttribute("enterkeyhint", "done");
-		this.inlineTitleEl.setAttribute("placeholder", "Untitled");
+		this.inlineTitleEl.setAttribute("placeholder", text.untitled);
 		this.inlineTitleEl.textContent = titleText;
 
 		this.originalTitleText = titleText;
@@ -511,7 +513,7 @@ export class PreCreationView extends AbstractSvelteListView<IndexedLink> {
 		if (this.expectedPath) {
 		} else {
 			infoEl.createEl("p", {
-				text: "No target path is set for this temporary view.",
+				text: text.noTargetPath,
 			});
 		}
 
@@ -521,7 +523,7 @@ export class PreCreationView extends AbstractSvelteListView<IndexedLink> {
 
 		this.createButtonEl = actionsEl.createEl("button", {
 			cls: "mod-cta",
-			text: "Create file",
+			text: text.createFile,
 		});
 		this.createButtonEl.disabled = !this.expectedPath || this.isCreating;
 		this.createButtonEl.addEventListener("click", () => {
@@ -540,6 +542,7 @@ export class PreCreationView extends AbstractSvelteListView<IndexedLink> {
 	}
 
 	private mountBacklinksSection(parentEl: HTMLElement): void {
+		const text = getMainUiTranslations(this.plugin.settings.language);
 		const backlinks = this.getItems();
 		this.setCurrentItems(backlinks);
 
@@ -547,18 +550,18 @@ export class PreCreationView extends AbstractSvelteListView<IndexedLink> {
 		const sourceFile = this.resolveSourceFile() ?? ({ path: "" } as TFile);
 
 		const config: ListConfig<CardItem> = {
-			title: `Links to: ${this.linktext}`,
+			title: text.linksTo(this.linktext),
 			showSectionHeader: true,
 			sectionHeaderTitle: this.plugin.settings.useMergedLinksSection
-				? "Links"
-				: "Backlinks",
+				? text.links
+				: text.backlinks,
 			paginationMode: "infinite-scroll",
 			preserveResultsHeightOnSearch: false,
 			getItemKey: getCardItemKey,
 			// The unresolved origin has no outgoing links: every backlink scores 1.
 			allowRelevanceSort: true,
 			sectionId: "pre-create-backlinks",
-			emptyMessage: "他のノートからの未解決バックリンクは見つかりませんでした。",
+			emptyMessage: text.noUnresolvedBacklinks,
 		};
 
 		this.mountListSection({
@@ -613,7 +616,9 @@ export class PreCreationView extends AbstractSvelteListView<IndexedLink> {
 				"[Cosense card links] Failed to create unresolved file:",
 				error,
 			);
-			new Notice("Failed to create file.");
+			new Notice(
+				getMainUiTranslations(this.plugin.settings.language).createFileFailure,
+			);
 		} finally {
 			this.isCreating = false;
 			if (this.leaf.view === this) {

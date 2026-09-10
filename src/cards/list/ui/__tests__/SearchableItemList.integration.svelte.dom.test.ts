@@ -112,7 +112,7 @@ async function flushAsyncUi(): Promise<void> {
 }
 
 function getAllSearchableItems(): HTMLElement[] {
-	const items = queryAllByRoleDeep("button", { name: / を開く$/ });
+	const items = queryAllByRoleDeep("button", { name: /^Open "/ });
 	if (items.length === 0) {
 		throw new Error("Unable to find searchable items");
 	}
@@ -192,24 +192,24 @@ describe("SearchableItemList integration", () => {
 			"modified-date-reverse",
 		);
 		const trigger = screen.getByRole("button", { name: ARIA_LABELS.SORT_SELECT });
-		expect(trigger).toHaveTextContent("更新日時");
+		expect(trigger).toHaveTextContent("Modified date");
 		await fireEvent.click(trigger);
 		expect(
 			showAtPosition.mock.contexts[0].items.some(
-				(item) => item.title === "関連度",
+				(item) => item.title === "Relevance",
 			),
 		).toBe(false);
 
 		await view.rerender({ config: { ...config, allowRelevanceSort: true } });
 		await flushAsyncUi();
-		expect(trigger).toHaveTextContent("関連度");
+		expect(trigger).toHaveTextContent("Relevance");
 		expect(sortService.sort).toHaveBeenLastCalledWith(
 			expect.any(Array),
 			"modified-date-reverse",
 		);
 		expect(applicationStore.sortOption).toBe("relevance");
 		const relevanceDirection = screen.getByRole("button", {
-			name: "関連度の高い順（クリックで低い順に切り替え）",
+			name: "Highest relevance first (click for lowest first)",
 		});
 		expect(relevanceDirection).toBeEnabled();
 		expect(

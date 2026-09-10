@@ -38,6 +38,8 @@ import {
 } from "cards/interactions/interactionTypes";
 import type { TaggedNote, IndexedLink } from "indexing/model";
 import type { TagGroup, TwoHopLinkBranch } from "two-hop/model";
+import type { Language } from "settings/model";
+import { getMainUiTranslations } from "shared/i18n/mainUiTranslations";
 
 /** Materializes only the requested prefix while preserving existing item identities. */
 export function materializeItemPrefix<T>(
@@ -90,6 +92,7 @@ export interface CreatePrimarySectionDescriptorParams {
 	readonly itemLimit: number;
 	readonly previousItems: readonly TwoHopItemModel[];
 	readonly resolveItemInteractionId: (semanticKey: string) => string;
+	readonly language: Language;
 }
 
 /**
@@ -111,6 +114,7 @@ export function createPrimarySectionDescriptor(
 				toCardItem: (item) => ({ type: "branch", data: item }),
 				getSearchKey: getOutgoingSearchKey,
 				resolveItemInteractionId: params.resolveItemInteractionId,
+				title: getMainUiTranslations(params.language).outgoingLinks,
 			});
 		case "backlinks":
 			return createPrimaryDescriptor({
@@ -121,6 +125,7 @@ export function createPrimarySectionDescriptor(
 				toCardItem: (item) => ({ type: "backlink", data: item }),
 				getSearchKey: getBacklinkSearchKey,
 				resolveItemInteractionId: params.resolveItemInteractionId,
+				title: getMainUiTranslations(params.language).backlinks,
 			});
 		case "merged":
 			return createPrimaryDescriptor({
@@ -131,6 +136,7 @@ export function createPrimarySectionDescriptor(
 				toCardItem: toMergedViewItem,
 				getSearchKey: getMergedSearchKey,
 				resolveItemInteractionId: params.resolveItemInteractionId,
+				title: getMainUiTranslations(params.language).links,
 			});
 	}
 }
@@ -143,6 +149,7 @@ interface CreatePrimaryDescriptorParams<T> {
 	readonly toCardItem: (item: T) => CardItem;
 	readonly getSearchKey: (item: T) => string;
 	readonly resolveItemInteractionId: (semanticKey: string) => string;
+	readonly title: string;
 }
 
 function createPrimaryDescriptor<T>(
@@ -167,7 +174,7 @@ function createPrimaryDescriptor<T>(
 	return createTwoHopSectionModel({
 		kind: "primary-section",
 		id: params.config.sectionId,
-		title: params.config.title,
+		title: params.title,
 		items: rows,
 		totalCount: params.items.length,
 	});
@@ -333,6 +340,7 @@ export interface CreateNewLinksSectionDescriptorParams {
 	readonly itemLimit: number;
 	readonly previousItems: readonly TwoHopItemModel[];
 	readonly resolveItemInteractionId: (semanticKey: string) => string;
+	readonly language: Language;
 }
 
 /** Builds an immutable new-links publication with allocation-free viewport reads. */
@@ -358,7 +366,7 @@ export function createNewLinksSectionDescriptor(
 	return createTwoHopSectionModel({
 		kind: "new-links-section",
 		id: newLinksSectionConfig.sectionId,
-		title: newLinksSectionConfig.title,
+		title: getMainUiTranslations(params.language).newLinks,
 		items: rows,
 		totalCount: params.items.length,
 	});

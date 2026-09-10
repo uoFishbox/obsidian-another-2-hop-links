@@ -8,6 +8,25 @@ import ListControls from "../ListControls.svelte";
 describe("ListControls", () => {
 	afterEach(() => vi.restoreAllMocks());
 
+	it("uses Japanese labels when Japanese is selected", () => {
+		render(ListControls, {
+			props: {
+				sortOption: "alphabetical",
+				onSortChange: vi.fn(),
+				language: "ja",
+			},
+		});
+
+		expect(screen.getByRole("searchbox", { name: "カードを検索" })).toHaveAttribute(
+			"placeholder",
+			"検索...",
+		);
+		expect(
+			screen.getByRole("button", { name: "ソート方法を選択" }),
+		).toHaveTextContent("タイトル");
+		expect(screen.getByRole("button", { name: "更新日時" })).toBeEnabled();
+	});
+
 	it("offers relevance only when an origin is available and toggles its direction", async () => {
 		const showAtPosition = vi.spyOn(Menu.prototype, "showAtPosition");
 		const onSortChange = vi.fn();
@@ -18,20 +37,20 @@ describe("ListControls", () => {
 		await fireEvent.click(trigger);
 		expect(
 			showAtPosition.mock.contexts[0].items.some(
-				(item) => item.title === "関連度",
+				(item) => item.title === "Relevance",
 			),
 		).toBe(false);
 
 		await view.rerender({ allowRelevanceSort: true });
 		await fireEvent.click(trigger);
 		showAtPosition.mock.contexts[1].items
-			.find((item) => item.title === "関連度")
+			.find((item) => item.title === "Relevance")
 			?.clickHandler?.();
 		expect(onSortChange).toHaveBeenLastCalledWith("relevance");
 		await view.rerender({ sortOption: "relevance" });
-		expect(trigger).toHaveTextContent("関連度");
+		expect(trigger).toHaveTextContent("Relevance");
 		const directionButton = screen.getByRole("button", {
-			name: "関連度の高い順（クリックで低い順に切り替え）",
+			name: "Highest relevance first (click for lowest first)",
 		});
 		expect(directionButton).toBeEnabled();
 		await fireEvent.click(directionButton);
@@ -39,10 +58,10 @@ describe("ListControls", () => {
 		await view.rerender({ sortOption: "relevance-reverse" });
 		expect(
 			screen.getByRole("button", {
-				name: "関連度の低い順（クリックで高い順に切り替え）",
+				name: "Lowest relevance first (click for highest first)",
 			}),
 		).toBeEnabled();
-		await fireEvent.click(screen.getByRole("button", { name: "更新日時" }));
+		await fireEvent.click(screen.getByRole("button", { name: "Modified date" }));
 		expect(onSortChange).toHaveBeenLastCalledWith("modified-date");
 	});
 
@@ -60,7 +79,7 @@ describe("ListControls", () => {
 		expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
 		expect(button.tagName).toBe("DIV");
 		expect(button).toHaveAttribute("tabindex", "0");
-		expect(button).toHaveTextContent("作成日時");
+		expect(button).toHaveTextContent("Created date");
 		expect(button.querySelector(".twohop-sort-field-icon")).toHaveAttribute(
 			"data-icon",
 			"calendar-plus",
@@ -80,11 +99,11 @@ describe("ListControls", () => {
 		expect(
 			menu.items.map(({ title, icon, checked }) => ({ title, icon, checked })),
 		).toEqual([
-			{ title: "タイトル", icon: "type", checked: false },
-			{ title: "被リンク数", icon: "links-coming-in", checked: false },
-			{ title: "作成日時", icon: "calendar-plus", checked: true },
-			{ title: "更新日時", icon: "calendar-clock", checked: false },
-			{ title: "ファイルサイズ", icon: "hard-drive", checked: false },
+			{ title: "Title", icon: "type", checked: false },
+			{ title: "Backlinks", icon: "links-coming-in", checked: false },
+			{ title: "Created date", icon: "calendar-plus", checked: true },
+			{ title: "Modified date", icon: "calendar-clock", checked: false },
+			{ title: "File size", icon: "hard-drive", checked: false },
 		]);
 		expect(button).toHaveAttribute("aria-expanded", "true");
 
@@ -128,11 +147,11 @@ describe("ListControls", () => {
 	});
 
 	it.each([
-		["タイトル", "type", "alphabetical", "alphabetical-reverse"],
-		["被リンク数", "links-coming-in", "backlink-count-reverse", "backlink-count"],
-		["作成日時", "calendar-plus", "created-date-reverse", "created-date"],
-		["更新日時", "calendar-clock", "modified-date-reverse", "modified-date"],
-		["ファイルサイズ", "hard-drive", "file-size-reverse", "file-size"],
+		["Title", "type", "alphabetical", "alphabetical-reverse"],
+		["Backlinks", "links-coming-in", "backlink-count-reverse", "backlink-count"],
+		["Created date", "calendar-plus", "created-date-reverse", "created-date"],
+		["Modified date", "calendar-clock", "modified-date-reverse", "modified-date"],
+		["File size", "hard-drive", "file-size-reverse", "file-size"],
 	] as const)(
 		"selects %s while preserving the default/reverse state",
 		async (label, icon, defaultOption, reverseOption) => {
@@ -190,30 +209,30 @@ describe("ListControls", () => {
 		expect(
 			screen
 				.getByRole("button", {
-					name: "降順（クリックで昇順に切り替え）",
+					name: "Descending (click for ascending)",
 				})
 				.querySelector('[aria-hidden="true"]'),
 		).toHaveAttribute("data-icon", "arrow-down-wide-narrow");
 		await fireEvent.click(
-			screen.getByRole("button", { name: "降順（クリックで昇順に切り替え）" }),
+			screen.getByRole("button", { name: "Descending (click for ascending)" }),
 		);
 		expect(onSortChange).toHaveBeenLastCalledWith("file-size");
-		await fireEvent.click(screen.getByRole("button", { name: "更新日時" }));
+		await fireEvent.click(screen.getByRole("button", { name: "Modified date" }));
 		expect(onSortChange).toHaveBeenLastCalledWith("modified-date-reverse");
 
 		await view.rerender({ sortOption: "file-size" });
 		expect(
 			screen
 				.getByRole("button", {
-					name: "昇順（クリックで降順に切り替え）",
+					name: "Ascending (click for descending)",
 				})
 				.querySelector('[aria-hidden="true"]'),
 		).toHaveAttribute("data-icon", "arrow-up-wide-narrow");
 		await fireEvent.click(
-			screen.getByRole("button", { name: "昇順（クリックで降順に切り替え）" }),
+			screen.getByRole("button", { name: "Ascending (click for descending)" }),
 		);
 		expect(onSortChange).toHaveBeenLastCalledWith("file-size-reverse");
-		await fireEvent.click(screen.getByRole("button", { name: "更新日時" }));
+		await fireEvent.click(screen.getByRole("button", { name: "Modified date" }));
 		expect(onSortChange).toHaveBeenLastCalledWith("modified-date");
 	});
 
@@ -229,7 +248,7 @@ describe("ListControls", () => {
 
 			const iconElement = screen
 				.getByRole("button", {
-					name: sortOption === "alphabetical" ? /昇順/ : /降順/,
+					name: sortOption === "alphabetical" ? /Ascending/ : /Descending/,
 				})
 				.querySelector('[aria-hidden="true"]');
 			expect(iconElement).toHaveAttribute("data-icon", icon);

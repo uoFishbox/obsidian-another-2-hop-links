@@ -26,6 +26,7 @@ import {
 	createListViewUiState,
 	type ListViewUiState,
 } from "cards/list/model/listViewUiState";
+import { getMainUiTranslations } from "shared/i18n/mainUiTranslations";
 
 export const VIEW_TYPE_TAG_NOTES = "cosense-card-links-tag-notes-view";
 
@@ -122,12 +123,13 @@ export class TagNotesView extends AbstractSvelteListView<TaggedNote> {
 	}
 
 	getDisplayText(): string {
+		const text = getMainUiTranslations(this.plugin.settings.language);
 		if (!this.plugin.settings.enableTagFeatures) {
-			return "Tag features disabled";
+			return text.tagFeaturesDisabled;
 		}
 
 		if (!this.tag) {
-			return "Tag notes";
+			return text.tagNotes;
 		}
 		return `#${this.tag}`;
 	}
@@ -192,6 +194,11 @@ export class TagNotesView extends AbstractSvelteListView<TaggedNote> {
 		return this.plugin.settings.enableTagFeatures;
 	}
 
+	public override refreshFromSettings(): void {
+		super.refreshFromSettings();
+		this.refreshLeafHeader();
+	}
+
 	async onOpen(): Promise<void> {
 		this.autofocusNextRender = true;
 		await super.onOpen();
@@ -226,16 +233,17 @@ export class TagNotesView extends AbstractSvelteListView<TaggedNote> {
 
 	protected render(): void {
 		const autofocus = this.autofocusNextRender;
+		const text = getMainUiTranslations(this.plugin.settings.language);
 
 		const container = this.prepareRenderContainer();
 		this.infoTextEl = undefined;
 
 		const isEnabled = this.isTagFeatureEnabled();
 		const titleText = !isEnabled
-			? "Tag features disabled"
+			? text.tagFeaturesDisabled
 			: this.tag
 				? `#${this.tag}`
-				: "Tag notes";
+				: text.tagNotes;
 		const notes = this.getItems();
 		this.setCurrentItems(notes);
 
@@ -262,7 +270,7 @@ export class TagNotesView extends AbstractSvelteListView<TaggedNote> {
 
 		if (!isEnabled) {
 			this.infoTextEl = infoEl.createEl("p", {
-				text: "Tag features are disabled.",
+				text: text.tagFeaturesDisabledMessage,
 			}) as HTMLParagraphElement;
 			this.autofocusNextRender = false;
 			return;
@@ -271,7 +279,7 @@ export class TagNotesView extends AbstractSvelteListView<TaggedNote> {
 		if (this.tag) {
 			if (!this.hasLoadedNotes) {
 				this.infoTextEl = infoEl.createEl("p", {
-					text: `Loading notes tagged with #${this.tag}.`,
+					text: text.loadingNotesWithTag(this.tag),
 				}) as HTMLParagraphElement;
 				const loadingEl = infoEl.createDiv({
 					cls: "cosense-card-links__loading-container",
@@ -280,8 +288,8 @@ export class TagNotesView extends AbstractSvelteListView<TaggedNote> {
 				loadingEl.createEl("p", {
 					cls: "cosense-card-links__loading-message",
 					text: this.isLoadingNotes
-						? "Waiting for the tag index to finish building."
-						: "Preparing tag notes.",
+						? text.waitingForTagIndex
+						: text.preparingTagNotes,
 				});
 				return;
 			}
@@ -348,15 +356,16 @@ export class TagNotesView extends AbstractSvelteListView<TaggedNote> {
 	}
 
 	private mountTagNotesSection(parentEl: HTMLElement, autofocus: boolean): void {
+		const text = getMainUiTranslations(this.plugin.settings.language);
 		const sourceFile = this.resolveSourceFile() ?? ({ path: "" } as TFile);
 
 		const config: ListConfig<CardItem> = {
-			title: `Notes with #${this.tag}`,
+			title: text.notesWithTag(this.tag),
 			paginationMode: "infinite-scroll",
 			preserveResultsHeightOnSearch: false,
 			getItemKey: getCardItemKey,
 			sectionId: `tag-view-${this.tag}`,
-			emptyMessage: "No notes found with this tag.",
+			emptyMessage: text.noNotesFoundWithTag,
 		};
 
 		this.mountListSection({
@@ -381,12 +390,16 @@ export class TagNotesView extends AbstractSvelteListView<TaggedNote> {
 			return;
 		}
 
+		const text = getMainUiTranslations(this.plugin.settings.language);
 		if (this.tag) {
-			this.infoTextEl.textContent = `Showing ${this.notes.length} notes tagged with #${this.tag}.`;
+			this.infoTextEl.textContent = text.showingNotesWithTag(
+				this.notes.length,
+				this.tag,
+			);
 			return;
 		}
 
-		this.infoTextEl.textContent = "No tag is set for this temporary view.";
+		this.infoTextEl.textContent = text.noTagSet;
 	}
 
 	private async loadNotes(options: { reset: boolean }): Promise<void> {

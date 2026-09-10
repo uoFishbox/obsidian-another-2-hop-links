@@ -24,6 +24,7 @@ import {
 	type ListViewUiState,
 } from "cards/list/model/listViewUiState";
 import { registerSearchFocusShortcut } from "obsidian-integration/views/searchFocusShortcut";
+import { getMainUiTranslations } from "shared/i18n/mainUiTranslations";
 
 export const VIEW_TYPE_ALL_NOTES = "cosense-card-links-all-notes-view";
 
@@ -50,7 +51,7 @@ export class AllNotesView extends ItemView {
 	}
 
 	getDisplayText(): string {
-		return "All notes";
+		return getMainUiTranslations(this.plugin.settings.language).allNotes;
 	}
 
 	getIcon(): IconName {
@@ -85,6 +86,14 @@ export class AllNotesView extends ItemView {
 
 	public refreshFromSettings(): void {
 		this.render();
+		this.refreshLeafHeader();
+	}
+
+	private refreshLeafHeader(): void {
+		const leaf = this.leaf as WorkspaceLeaf & {
+			updateHeader?: () => void;
+		};
+		leaf.updateHeader?.();
 	}
 
 	private resolveSourceFile(): TFile {

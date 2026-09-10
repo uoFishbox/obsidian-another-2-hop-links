@@ -90,7 +90,7 @@ const translations: Record<Language, Record<TranslationKey, string>> = {
 		experimentalShadowDomCssDesc:
 			"Append CSS to card-rendering Shadow DOM surfaces. Changes apply immediately. Invalid CSS may break card display.",
 		language: "Language",
-		languageDesc: "Select the display language for settings.",
+		languageDesc: "Select the display language for the UI.",
 		display: "Display",
 		displayMode: "Display mode",
 		displayModeDesc:
@@ -200,7 +200,7 @@ const translations: Record<Language, Record<TranslationKey, string>> = {
 		experimentalShadowDomCssDesc:
 			"カード描画用 Shadow DOM に CSS を追加します。変更はすぐに反映されます。不正な CSS によりカード表示が崩れる場合があります。",
 		language: "言語",
-		languageDesc: "設定画面の表示言語を選択します。",
+		languageDesc: "UIの表示言語を選択します。",
 		display: "表示",
 		displayMode: "表示モード",
 		displayModeDesc:

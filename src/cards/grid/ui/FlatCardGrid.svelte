@@ -50,7 +50,10 @@
 					{/if}
 				{/if}
 			{:else}
-				<CardGridLoadMoreButton onClick={list.loadNextPage} />
+				<CardGridLoadMoreButton
+					onClick={list.loadNextPage}
+					language={props.language}
+				/>
 			{/if}
 		{/snippet}
 		{#snippet afterContent()}

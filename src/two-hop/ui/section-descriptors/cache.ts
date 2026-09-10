@@ -85,6 +85,7 @@ interface ResolveSnapshot {
 	readonly onTagClick: ResolveTwoHopSectionsParams["onTagClick"];
 	readonly mobileLongPressAction: PluginSettings["mobileLongPressAction"];
 	readonly highlightInPreviewOnHover: boolean;
+	readonly language: PluginSettings["language"];
 }
 
 /**
@@ -209,7 +210,7 @@ function appendPrimarySections(
 	for (const input of inputs) {
 		append(
 			input.kind,
-			[input.items, params.interactionIdentity],
+			[input.items, params.interactionIdentity, params.currentSettings.language],
 			input.items.length,
 			(itemLimit, previousItems) =>
 				createPrimarySectionDescriptor({
@@ -217,6 +218,7 @@ function appendPrimarySections(
 					itemLimit,
 					previousItems,
 					resolveItemInteractionId,
+					language: params.currentSettings.language,
 				}),
 		);
 	}
@@ -322,7 +324,7 @@ function appendNewLinksSection(
 	if (items.length === 0) return;
 	append(
 		"new-links",
-		[items, params.interactionIdentity],
+		[items, params.interactionIdentity, params.currentSettings.language],
 		items.length,
 		(itemLimit, previousItems) =>
 			createNewLinksSectionDescriptor({
@@ -331,6 +333,7 @@ function appendNewLinksSection(
 				previousItems,
 				resolveItemInteractionId:
 					params.interactionIdentity.resolveItemInteractionId,
+				language: params.currentSettings.language,
 			}),
 	);
 }
@@ -352,6 +355,7 @@ function createResolveSnapshot(params: ResolveTwoHopSectionsParams): ResolveSnap
 		onTagClick: params.onTagClick,
 		mobileLongPressAction: params.currentSettings.mobileLongPressAction,
 		highlightInPreviewOnHover: params.currentSettings.highlightInPreviewOnHover,
+		language: params.currentSettings.language,
 	};
 }
 

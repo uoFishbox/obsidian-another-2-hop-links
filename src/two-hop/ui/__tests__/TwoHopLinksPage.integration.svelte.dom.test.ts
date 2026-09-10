@@ -294,7 +294,7 @@ async function showEntireVirtualSurface(width = 1600): Promise<HTMLElement> {
 }
 
 function queryCardButtons(): HTMLElement[] {
-	return queryAllByRoleDeep("button", { name: / を開く$/ });
+	return queryAllByRoleDeep("button", { name: /^Open "/ });
 }
 
 function queryCard(label: string): HTMLElement | null {
@@ -377,6 +377,30 @@ describe("TwoHopLinksPage behavior", () => {
 		expect(queryCard("outgoing-parent")).toBeInTheDocument();
 		expect(queryCard("backlink-note")).toBeInTheDocument();
 		expect(queryCard("tagged-note")).toBeInTheDocument();
+	});
+
+	it("switches the placeholder between title and full-text search", async () => {
+		const file = createMockTFile("notes/target.md");
+		const parentFile = createMockTFile("notes/outgoing-parent.md");
+		const displayData = {
+			...createDisplayData(),
+			outgoing: [createBranch(file, parentFile, [], "outgoing-parent")],
+		};
+		const view = renderRoot(displayData, DEFAULT_SETTINGS, file);
+
+		expect(view.getByRole("searchbox", { name: "Find cards" })).toHaveAttribute(
+			"placeholder",
+			"Search note titles...",
+		);
+
+		await fireEvent.click(
+			view.getByRole("button", { name: "Enable full-text search" }),
+		);
+
+		expect(view.getByRole("searchbox", { name: "Find cards" })).toHaveAttribute(
+			"placeholder",
+			"Search note contents...",
+		);
 	});
 
 	it("moves focus from the top card row to search with ArrowUp in a one-column two-hop grid", async () => {

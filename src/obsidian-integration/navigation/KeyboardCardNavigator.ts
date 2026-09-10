@@ -27,6 +27,8 @@ import {
 	resolveKeyboardNavigationScrollTarget,
 	scrollKeyboardNavigationContainerBy,
 } from "./keyboardNavigationScroll";
+import type { Language } from "settings/model";
+import { getMainUiTranslations } from "shared/i18n/mainUiTranslations";
 
 export type {
 	KeyboardNavigationSurfaceRegistry,
@@ -59,6 +61,7 @@ export class KeyboardCardNavigator {
 		private readonly surfaceRegistry: KeyboardNavigationSurfaceRegistry,
 		private readonly notify: (message: string) => void = (message) =>
 			new Notice(message),
+		private readonly getLanguage: () => Language = () => "en",
 	) {}
 
 	public toggle(): void {
@@ -69,7 +72,9 @@ export class KeyboardCardNavigator {
 
 		const targetSurface = this.surfaceRegistry.findBestVisibleSurface();
 		if (!targetSurface) {
-			this.notify("No visible card surface found.");
+			this.notify(
+				getMainUiTranslations(this.getLanguage()).noVisibleCardSurface,
+			);
 			return;
 		}
 
@@ -95,7 +100,7 @@ export class KeyboardCardNavigator {
 		this.rootEl.focus({ preventScroll: true });
 
 		if (!this.refreshRows(false)) {
-			this.notify("No visible cards to navigate.");
+			this.notify(getMainUiTranslations(this.getLanguage()).noVisibleCards);
 			this.deactivate();
 		}
 	}

@@ -41,6 +41,7 @@
 	import { createItemInteractionKey } from "cards/interactions/interactionTypes";
 	import type { PreviewRuntime } from "card-preview/runtime/previewRuntime";
 	import type { ListViewUiState } from "cards/list/model/listViewUiState";
+	import { getMainUiTranslations } from "shared/i18n/mainUiTranslations";
 
 	interface SearchablePresentation {
 		readonly result: SearchMatchSnapshot | null;
@@ -74,6 +75,8 @@
 		uiState = undefined,
 		itemsRevision = 0,
 	}: Props = $props();
+	let language = $derived(applicationStore.settings?.language ?? "en");
+	let text = $derived(getMainUiTranslations(language));
 
 	function resolveAvailableSortOption(option: SortOption): SortOption {
 		if (config.allowRelevanceSort) return option;
@@ -406,8 +409,9 @@
 	onMoveFocusToResults={moveFocusToResults}
 	showSearchInput={searchEnabled}
 	showContentSearchToggle={allowContentSearch}
-	searchPlaceholder={config.searchPlaceholder ?? "Search..."}
+	searchPlaceholder={config.searchPlaceholder ?? text.search}
 	contentSearchPlaceholder={config.contentSearchPlaceholder}
+	{language}
 	{autofocus}
 	bind:searchInputEl
 />
@@ -424,6 +428,7 @@
 			<LinkSectionHeader
 				title={config.sectionHeaderTitle ?? config.title}
 				totalCount={filteredItems.length}
+				{language}
 			/>
 		{/snippet}
 
@@ -437,6 +442,7 @@
 			{initialVisibleCount}
 			{loadMoreIncrement}
 			paginationMode={config.paginationMode ?? "button"}
+			{language}
 			initialScrollState={uiState?.scrollState}
 			onMoveFocusAboveGrid={moveFocusToSearchInput}
 			onScrollStateChange={(scrollState) => {
@@ -465,15 +471,15 @@
 		</LinkList>
 		{#if isSearchLoading}
 			<div class="cosense-card-links__search-status" aria-live="polite">
-				Searching…
+				{text.searching}
 			</div>
 		{/if}
 	{:else}
 		<div class="modal-empty">
 			{#if isSearchLoading}
-				Searching…
+				{text.searching}
 			{:else if searchEnabled && search.normalized && searchSession.phase === "ready"}
-				No matches found.
+				{text.noMatchesFound}
 			{:else}
 				{config.emptyMessage}
 			{/if}

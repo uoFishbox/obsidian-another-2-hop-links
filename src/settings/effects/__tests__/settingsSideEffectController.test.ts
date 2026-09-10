@@ -86,6 +86,16 @@ describe("SettingsSideEffectController", () => {
 		expect(mocks.refreshEmptyView).toHaveBeenCalledOnce();
 	});
 
+	it("refreshes inline and dedicated views when language changes", () => {
+		const { apply, mocks } = createHarness();
+
+		apply("language");
+
+		expect(mocks.updateAllViews).toHaveBeenCalledOnce();
+		expect(mocks.getLeavesOfType).toHaveBeenCalledTimes(4);
+		expect(mocks.refreshEmptyView).toHaveBeenCalledOnce();
+	});
+
 	it("skips global work for the persisted sort option", () => {
 		const { apply, mocks } = createHarness();
 

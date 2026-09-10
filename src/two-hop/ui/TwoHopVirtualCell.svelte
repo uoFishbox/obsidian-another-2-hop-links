@@ -14,6 +14,8 @@
 		createInteractionHandle,
 		type InteractionHandle,
 	} from "cards/interactions/interactionTypes";
+	import type { Language } from "settings/model";
+	import { getMainUiTranslations } from "shared/i18n/mainUiTranslations";
 
 	interface Props {
 		cell: TwoHopVirtualCell;
@@ -25,6 +27,7 @@
 			consumer: (model: CardRenderModel | undefined) => void,
 		) => () => void;
 		onLoadMore: (sectionId: string) => void;
+		language?: Language;
 	}
 
 	let {
@@ -34,7 +37,9 @@
 		previewKey,
 		registerCardModelConsumer,
 		onLoadMore,
+		language = "en",
 	}: Props = $props();
+	const text = $derived(getMainUiTranslations(language));
 	let cardModel = $state.raw<CardRenderModel | undefined>(undefined);
 	let boundLogicalKey = cell.logicalKey;
 	const fallbackInteractionHandle = createInteractionHandle("c");
@@ -120,7 +125,7 @@
 		<div
 			class="cosense-card-links__box cosense-card-links__connected-links-header {headerProps.className ??
 				''}"
-			aria-label={`${section.totalCount} notes`}
+			aria-label={text.noteCount(section.totalCount)}
 			data-ccl-section-variant={sectionVariant}
 		>
 			<div class="cosense-card-links__title-container">
@@ -135,7 +140,10 @@
 		</div>
 	{/if}
 {:else if cell.kind === "load-more"}
-	<CardGridLoadMoreButton onClick={() => onLoadMore(cell.section.id)} />
+	<CardGridLoadMoreButton
+		onClick={() => onLoadMore(cell.section.id)}
+		{language}
+	/>
 {:else}
 	{@const model = cardModel}
 	<LinkItem

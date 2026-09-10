@@ -28,6 +28,7 @@ describe("section descriptor prefix materialization", () => {
 			itemLimit: 20,
 			previousItems: [],
 			resolveItemInteractionId,
+			language: "en",
 		});
 
 		expect(resolveItemInteractionId).toHaveBeenCalledTimes(20);
@@ -39,6 +40,7 @@ describe("section descriptor prefix materialization", () => {
 			itemLimit: 40,
 			previousItems: rows,
 			resolveItemInteractionId,
+			language: "en",
 		});
 
 		expect(resolveItemInteractionId).toHaveBeenCalledTimes(40);

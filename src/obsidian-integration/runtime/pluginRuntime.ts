@@ -250,6 +250,8 @@ export function createPluginRuntime(options: PluginRuntimeOptions): PluginRuntim
 	const emptyViewController = createEmptyViewController(options.app, options.plugin);
 	const keyboardCardNavigator = new KeyboardCardNavigator(
 		keyboardNavigationSurfaceRegistry,
+		undefined,
+		() => options.getSettings().language,
 	);
 
 	const unsubscribeIndexDataUpdate = indexingService.onDataUpdate((context) => {

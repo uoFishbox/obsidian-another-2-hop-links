@@ -1,6 +1,5 @@
 import type { TFile } from "obsidian";
 import { getItemClassName, getItemTargetFile, type CardItem } from "cards/CardItem";
-import { ARIA_LABELS } from "cards/ariaLabels";
 import { resolveFileCardTitle } from "cards/title/cardTitle";
 import {
 	compileCardPreviewRequest,
@@ -15,6 +14,7 @@ import {
 	createItemInteractionKey,
 	type ItemInteractionDescriptor,
 } from "cards/interactions/interactionTypes";
+import { getMainUiTranslations } from "shared/i18n/mainUiTranslations";
 
 export interface CardShellModel {
 	readonly item: CardItem;
@@ -70,6 +70,7 @@ export function createCardRenderModel(
 	const searchScope = params.searchScope ?? "title-and-content";
 	const contentPreview = params.contentPreview;
 	const interactionId = params.interactionId ?? createItemInteractionKey(params.item);
+	const text = getMainUiTranslations(params.settings.language);
 	let previewRequest: CardPreviewRequest | null | undefined;
 	let interactionDescriptor: ItemInteractionDescriptor | null | undefined;
 
@@ -107,8 +108,8 @@ export function createCardRenderModel(
 		title,
 		ariaLabel:
 			params.item.type === "newLink"
-				? ARIA_LABELS.UNRESOLVED_LINK
-				: ARIA_LABELS.OPEN_LINK(title),
+				? text.unresolvedLink
+				: text.openLink(title),
 		className,
 		extension: targetFile?.extension ?? null,
 		interactionId,

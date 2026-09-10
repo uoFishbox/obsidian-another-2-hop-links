@@ -21,6 +21,7 @@ const LAYOUT_AFFECTING_SETTINGS = new Set<keyof PluginSettings>([
 	"displayMode",
 	"enableTagFeatures",
 	"experimentalShadowDomCss",
+	"language",
 ]);
 
 interface RefreshableFromSettings {
@@ -76,6 +77,9 @@ export function createSettingsSideEffectController(
 		}
 		if (changedKeySet.has("enableEmptyViewAllNotesInNewTab")) {
 			deps.emptyViewController.sync();
+		}
+		if (changedKeySet.has("language")) {
+			deps.viewUpdateOrchestrator.updateAllViews();
 		}
 		if (changedKeySet.has("enableTagFeatures")) {
 			deps.indexingService.invalidateAll();

@@ -11,6 +11,7 @@ import {
 	type SvelteComponentInstance,
 } from "obsidian-integration/views/svelteLifecycle";
 import { mountTwoHopLinksRootView } from "./mountTwoHopLinksRootView";
+import { getMainUiTranslations } from "shared/i18n/mainUiTranslations";
 
 export const TWO_HOP_LINKS_VIEW_TYPE = "cosense-card-links-view";
 
@@ -168,7 +169,8 @@ export class TwoHopLinksView extends ItemView {
 		this.contentEl.empty();
 		this.resetSidebarScrollPosition();
 		this.contentEl.createDiv({
-			text: "Open a non-Markdown file to see links.",
+			text: getMainUiTranslations(this.plugin.settings.language)
+				.openNonMarkdownFile,
 			cls: "cosense-card-links__sidebar-placeholder",
 			attr: {
 				style: "padding: 20px; text-align: center; color: var(--text-muted);",

@@ -14,6 +14,7 @@
 	import type { ListViewUiState } from "cards/list/model/listViewUiState";
 	import type { AllNotesCatalog } from "./allNotesCatalog";
 	import type { KeyboardNavigationSurfaceRegistry } from "obsidian-integration/navigation/keyboardNavigationSurface";
+	import { getMainUiTranslations } from "shared/i18n/mainUiTranslations";
 
 	interface Props {
 		app: App;
@@ -38,6 +39,7 @@
 		allNotesCatalog,
 		keyboardNavigationSurfaceRegistry,
 	}: Props = $props();
+	const text = $derived(getMainUiTranslations(settings.language));
 
 	let catalogRevision = $state(allNotesCatalog.getRevision());
 	let cardLayoutCssText = $derived(getCardLayoutCssText(settings));
@@ -87,20 +89,20 @@
 				"[Cosense card links] Failed to create note from All notes search:",
 				error,
 			);
-			new Notice("Failed to create note.");
+			new Notice(text.createNoteFailure);
 		} finally {
 			isCreatingSearchNote = false;
 		}
 	}
 
-	const listConfig: ListConfig<CardItem> = {
-		title: "All notes",
+	let listConfig = $derived.by((): ListConfig<CardItem> => ({
+		title: text.allNotes,
 		paginationMode: "infinite-scroll",
 		preserveResultsHeightOnSearch: false,
 		searchEnabled: true,
 		allowContentSearch: true,
-		searchPlaceholder: "Search note titles...",
-		contentSearchPlaceholder: "Search note contents...",
+		searchPlaceholder: text.searchNoteTitles,
+		contentSearchPlaceholder: text.searchNoteContents,
 		getSearchText: (item: CardItem, ctx) => {
 			if (item.type !== "file") return "";
 			return getFileCardTitleSearchText(
@@ -115,9 +117,9 @@
 		getSortedItems: (sortOption) => allNotesCatalog.getSortedItems(sortOption),
 		sectionId: "empty-view-all-notes",
 		pinBookmarkedToTop: settings.pinBookmarkedToTopInAllNotes,
-		emptyMessage: "No notes found.",
+		emptyMessage: text.noNotesFound,
 		onSearchSubmit: createNoteFromSearchTitle,
-	};
+	}));
 
 	$effect(() => {
 		return allNotesCatalog.subscribe((revision) => {

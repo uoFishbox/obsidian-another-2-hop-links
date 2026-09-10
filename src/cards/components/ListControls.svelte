@@ -1,9 +1,10 @@
 <script lang="ts">
 	import { Menu, setIcon, type IconName } from "obsidian";
 	import { onDestroy } from "svelte";
-	import { ARIA_LABELS } from "cards/ariaLabels";
 	import type { VerticalNavigationDirection } from "cards/navigation/types";
 	import type { SortOption } from "cards/sorting";
+	import type { Language } from "settings/model";
+	import { getMainUiTranslations } from "shared/i18n/mainUiTranslations";
 
 	interface SortField {
 		label: string;
@@ -12,7 +13,7 @@
 		reverse: SortOption;
 	}
 	const RELEVANCE_FIELD: SortField = {
-		label: "関連度",
+		label: "Relevance",
 		icon: "network",
 		default: "relevance",
 		reverse: "relevance-reverse",
@@ -20,31 +21,31 @@
 
 	const SORT_FIELDS = [
 		{
-			label: "タイトル",
+			label: "Title",
 			icon: "type",
 			default: "alphabetical",
 			reverse: "alphabetical-reverse",
 		},
 		{
-			label: "被リンク数",
+			label: "Backlinks",
 			icon: "links-coming-in",
 			default: "backlink-count-reverse",
 			reverse: "backlink-count",
 		},
 		{
-			label: "作成日時",
+			label: "Created date",
 			icon: "calendar-plus",
 			default: "created-date-reverse",
 			reverse: "created-date",
 		},
 		{
-			label: "更新日時",
+			label: "Modified date",
 			icon: "calendar-clock",
 			default: "modified-date-reverse",
 			reverse: "modified-date",
 		},
 		{
-			label: "ファイルサイズ",
+			label: "File size",
 			icon: "hard-drive",
 			default: "file-size-reverse",
 			reverse: "file-size",
@@ -74,6 +75,7 @@
 		searchPlaceholder?: string;
 		contentSearchPlaceholder?: string;
 		searchInputEl?: HTMLInputElement | null;
+		language?: Language;
 	}
 
 	let {
@@ -89,18 +91,38 @@
 		autofocus = false,
 		showSearchInput = true,
 		showContentSearchToggle = true,
-		searchPlaceholder = "Search...",
+		searchPlaceholder = undefined,
 		contentSearchPlaceholder,
 		searchInputEl = $bindable<HTMLInputElement | null>(null),
+		language = "en",
 	}: Props = $props();
+	const text = $derived(getMainUiTranslations(language));
+	const localizedSortFields = $derived(
+		SORT_FIELDS.map((field, index) => ({
+			...field,
+			label: [
+				text.title,
+				text.backlinks,
+				text.createdDate,
+				text.modifiedDate,
+				text.fileSize,
+			][index] ?? field.label,
+		})),
+	);
+	const localizedRelevanceField = $derived({
+		...RELEVANCE_FIELD,
+		label: text.relevance,
+	});
 
 	const sortFields: readonly SortField[] = $derived(
-		allowRelevanceSort ? [RELEVANCE_FIELD, ...SORT_FIELDS] : SORT_FIELDS,
+		allowRelevanceSort
+			? [localizedRelevanceField, ...localizedSortFields]
+			: localizedSortFields,
 	);
 	const sortField = $derived(
 		sortFields.find(
 			(field) => field.default === sortOption || field.reverse === sortOption,
-		) ?? SORT_FIELDS[0],
+		) ?? localizedSortFields[0],
 	);
 	const isReversed = $derived(sortOption === sortField.reverse);
 	const isDescending = $derived(
@@ -112,13 +134,13 @@
 		isReversed ? "arrow-up-wide-narrow" : "arrow-down-wide-narrow",
 	);
 	const sortDirectionLabel = $derived(
-		sortField === RELEVANCE_FIELD
+		sortField.default === "relevance"
 			? isDescending
-				? "関連度の高い順（クリックで低い順に切り替え）"
-				: "関連度の低い順（クリックで高い順に切り替え）"
+				? text.relevanceDescending
+				: text.relevanceAscending
 			: isDescending
-				? "降順（クリックで昇順に切り替え）"
-				: "昇順（クリックで降順に切り替え）",
+				? text.descending
+				: text.ascending,
 	);
 
 	let sortMenu = $state<Menu | null>(null);
@@ -233,12 +255,14 @@
 	}
 
 	const contentSearchAriaLabel = $derived(
-		contentSearchEnabled ? "Disable full-text search" : "Enable full-text search",
+		contentSearchEnabled
+			? text.disableFullTextSearch
+			: text.enableFullTextSearch,
 	);
 	const activeSearchPlaceholder = $derived(
 		contentSearchEnabled
-			? (contentSearchPlaceholder ?? searchPlaceholder)
-			: searchPlaceholder,
+			? (contentSearchPlaceholder ?? searchPlaceholder ?? text.search)
+			: (searchPlaceholder ?? text.search),
 	);
 </script>
 
@@ -255,7 +279,7 @@
 					oninput={handleSearchInput}
 					onkeydown={handleSearchKeydown}
 					placeholder={activeSearchPlaceholder}
-					aria-label="Find cards"
+					aria-label={text.findCards}
 					spellcheck={false}
 					use:focusInput
 				/>
@@ -263,7 +287,7 @@
 					class="search-input-clear-button"
 					role="button"
 					tabindex="0"
-					aria-label="Clear search"
+					aria-label={text.clearSearch}
 					hidden={searchInputValue.length === 0}
 					onclick={handleClearSearch}
 					onkeydown={handleClearButtonKeydown}
@@ -352,10 +376,10 @@
 			type="button"
 			class:mod-cta={sortField.default === "modified-date-reverse"}
 			aria-pressed={sortField.default === "modified-date-reverse"}
-			title="更新日時で並べ替え"
+			title={text.sortByModifiedDate}
 			onclick={selectModifiedDate}
 		>
-			更新日時
+			{text.modifiedDate}
 		</button>
 		<div
 			class="twohop-sort-menu-trigger text-icon-button"
@@ -363,7 +387,7 @@
 			tabindex="0"
 			onclick={openSortMenu}
 			onkeydown={handleSortMenuKeydown}
-			aria-label={ARIA_LABELS.SORT_SELECT}
+			aria-label={text.selectSortMethod}
 			aria-haspopup="menu"
 			aria-expanded={sortMenu !== null}
 		>

@@ -7,6 +7,27 @@ import { createCardRenderModel, resolveCardTitleSnapshot } from "../cardRenderMo
 import type { CachedMetadata } from "obsidian";
 
 describe("createCardRenderModel", () => {
+	it("localizes the card action label from settings", () => {
+		const file = createMockTFile("notes/example.md");
+		const context: LinkUtilitiesContext = {
+			getPreview: vi.fn(),
+			resolveFile: vi.fn(() => null),
+			buildWikiLink: vi.fn(() => "[[example]]"),
+			fileToLinktext: vi.fn(() => "例"),
+			sourceFile: createMockTFile("notes/source.md"),
+			getMetadata: vi.fn(() => null),
+		};
+
+		const model = createCardRenderModel({
+			item: { type: "file", data: file },
+			settings: { ...DEFAULT_SETTINGS, language: "ja" },
+			context,
+			getPreviewRenderVersion: () => "0",
+		});
+
+		expect(model.ariaLabel).toBe("「例」を開く");
+	});
+
 	it("compiles card display values and preview activation identity", () => {
 		const sourceFile = createMockTFile("notes/source.md");
 		const targetFile = createMockTFile("attachments/report.pdf", "pdf");

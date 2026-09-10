@@ -46,6 +46,7 @@
 	} from "cards/rendering/cardRenderModel";
 	import type { TwoHopItemModel } from "two-hop/ui/twoHopSectionModel";
 	import type { KeyboardNavigationSurfaceRegistry } from "obsidian-integration/navigation/keyboardNavigationSurface";
+	import { getMainUiTranslations } from "shared/i18n/mainUiTranslations";
 
 	interface TwoHopCardModelRevision {
 		readonly settings: PluginSettings;
@@ -147,6 +148,7 @@
 		loadingPhase === "base-ready" && (linkResult?.branches.length ?? 0) > 0,
 	);
 	let currentSettings = $derived(applicationUiState.settings);
+	let text = $derived(getMainUiTranslations(currentSettings.language));
 	let useMergedLinks = $derived(currentSettings.useMergedLinksSection);
 	let showTags = $derived(currentSettings.showTagsSection);
 	let currentSort = $derived(applicationUiState.sortOption);
@@ -516,8 +518,11 @@
 			{contentSearchEnabled}
 			sortOption={currentSort}
 			allowRelevanceSort={true}
+			searchPlaceholder={text.searchNoteTitles}
+			contentSearchPlaceholder={text.searchNoteContents}
 			onSortChange={(opt) => applicationUiState.setSortOption(opt)}
 			onMoveFocusToResults={moveFocusToResults}
+			language={currentSettings.language}
 			bind:searchInputEl
 		/>
 	{/if}
@@ -529,7 +534,7 @@
 		style:min-height={resultsMinHeight}
 	>
 		{#if loading}
-			<LoadingState message="Waiting for the initial index to finish building." />
+			<LoadingState message={text.waitingForInitialIndex} />
 		{:else if linkResult}
 			<TwoHopVirtualGrid
 				sections={twoHopVirtualListSections}
@@ -539,18 +544,19 @@
 				{resolveItemCardModel}
 				{previewDependencies}
 				previewActive={previewSurfaceActive}
+				language={currentSettings.language}
 				onMoveFocusAboveGrid={moveFocusToSearchInput}
 			/>
 			{#if isSearchLoading}
 				<div class="cosense-card-links__search-status" aria-live="polite">
-					Searching…
+					{text.searching}
 				</div>
 			{:else if search.normalized && searchSession.phase === "ready" && twoHopVirtualListSections.length === 0}
-				<div class="modal-empty">No matches found.</div>
+				<div class="modal-empty">{text.noMatchesFound}</div>
 			{/if}
 			{#if !filteredDisplayData.twoHopBranches.length && showTwoHopPlaceholder}
 				<div class="cosense-card-links__phase-placeholder">
-					<LoadingState message="Loading two-hop links..." />
+					<LoadingState message={text.loadingTwoHopLinks} />
 				</div>
 			{/if}
 		{/if}
