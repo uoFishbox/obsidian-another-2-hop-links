@@ -426,7 +426,7 @@
 		</button>
 		{#each pinnedSortFields as pinnedField (pinnedField.id)}
 			<div
-				class="text-icon-button"
+				class="twohop-pinned-sort text-icon-button"
 				class:is-active={sortField.id === pinnedField.id}
 				role="button"
 				tabindex="0"
@@ -545,6 +545,9 @@
 	   .twohop-header can be styled from here (a container is never queried
 	   against itself), which is why the header itself keeps flex-wrap: wrap. */
 	@container (max-width: 500px) {
+		.twohop-pinned-sort:not(.is-active) .text-button-label {
+			display: none;
+		}
 		.twohop-header-search {
 			order: 2;
 			flex-basis: 100%;
@@ -557,6 +560,9 @@
 
 	/* Fallback for environments without container query support. */
 	@media (max-width: 500px) {
+		.twohop-pinned-sort:not(.is-active) .text-button-label {
+			display: none;
+		}
 		.twohop-header-search {
 			order: 2;
 			flex-basis: 100%;

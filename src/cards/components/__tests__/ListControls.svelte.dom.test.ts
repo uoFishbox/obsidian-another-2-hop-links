@@ -306,6 +306,12 @@ describe("ListControls", () => {
 
 		expect(screen.getByRole("button", { name: "Title" })).toBeEnabled();
 		expect(screen.getByRole("button", { name: "File size" })).toBeEnabled();
+		expect(screen.getByRole("button", { name: "Title" })).toHaveClass(
+			"twohop-pinned-sort",
+		);
+		expect(
+			screen.getByRole("button", { name: ARIA_LABELS.SORT_SELECT }),
+		).not.toHaveClass("twohop-pinned-sort");
 		expect(
 			screen.queryByRole("button", { name: "Modified" }),
 		).not.toBeInTheDocument();
