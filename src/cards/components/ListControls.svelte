@@ -312,9 +312,11 @@
 	const contentSearchAriaLabel = $derived(
 		contentSearchEnabled ? text.disableFullTextSearch : text.enableFullTextSearch,
 	);
+	// Each mode needs its own fallback: reusing the title placeholder while
+	// full-text search runs would leave the input labelled for the wrong mode.
 	const activeSearchPlaceholder = $derived(
 		contentSearchEnabled
-			? (contentSearchPlaceholder ?? searchPlaceholder ?? text.search)
+			? (contentSearchPlaceholder ?? text.searchNoteContents)
 			: (searchPlaceholder ?? text.search),
 	);
 </script>

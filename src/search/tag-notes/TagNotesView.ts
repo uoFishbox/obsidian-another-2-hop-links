@@ -364,6 +364,8 @@ export class TagNotesView extends AbstractSvelteListView<TaggedNote> {
 			paginationMode: "infinite-scroll",
 			preserveResultsHeightOnSearch: false,
 			getItemKey: getCardItemKey,
+			searchPlaceholder: text.searchNoteTitles,
+			contentSearchPlaceholder: text.searchNoteContents,
 			sectionId: `tag-view-${this.tag}`,
 			emptyMessage: text.noNotesFoundWithTag,
 		};

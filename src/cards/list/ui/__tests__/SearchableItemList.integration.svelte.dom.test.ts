@@ -586,4 +586,61 @@ describe("SearchableItemList integration", () => {
 		await flushAsyncUi();
 		expectComposedFocus(secondItem);
 	});
+
+	it("switches the search placeholder with the search mode when the config omits placeholders", async () => {
+		const sourceFile = createMockTFile("notes/source.md");
+		const items = [
+			createTaggedNoteItem(createMockTFile("notes/alpha-note.md")),
+		] as CardItem[];
+		const expandedLimits = new Map<string, number>();
+		const setContentSearchEnabled = vi.fn();
+		const applicationStore = {
+			sortOption: "alphabetical",
+			initialVisibleCount: 10,
+			loadMoreIncrement: 10,
+			settings: { ...DEFAULT_SETTINGS, enableContentSearch: false },
+			setSortOption: vi.fn(),
+			setContentSearchEnabled,
+			getDefaultSectionVisibleLimit: vi.fn(() => 10),
+			getSectionExpandedLimit: vi.fn((sectionId: string) =>
+				expandedLimits.get(sectionId),
+			),
+			setSectionExpandedLimit: vi.fn((sectionId: string, limit: number) => {
+				expandedLimits.set(sectionId, limit);
+			}),
+			previewState: {
+				globalVersion: 0,
+				pathVersions: {},
+				getRenderVersion: () => "0:0",
+			},
+			updateVersion: 0,
+		} as unknown as ListViewState;
+		const sortService: ISortService = {
+			sort: vi.fn((nextItems) => nextItems),
+		};
+
+		render(SearchableItemList, {
+			props: {
+				items,
+				config: createConfig(),
+				linkContext: createLinkContext(sourceFile),
+				applicationStore,
+				sortService,
+				app: { vault: { cachedRead: vi.fn(async () => "") } } as never,
+				autofocus: false,
+			},
+		});
+
+		await flushAsyncUi();
+		const input = screen.getByRole("searchbox");
+		expect(input).toHaveAttribute("placeholder", "Search...");
+
+		await fireEvent.click(
+			screen.getByRole("button", { name: "Enable full-text search" }),
+		);
+		await flushAsyncUi();
+
+		expect(input).toHaveAttribute("placeholder", "Search note contents...");
+		expect(setContentSearchEnabled).toHaveBeenCalledWith(true);
+	});
 });

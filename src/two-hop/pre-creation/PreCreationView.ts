@@ -560,6 +560,8 @@ export class PreCreationView extends AbstractSvelteListView<IndexedLink> {
 			getItemKey: getCardItemKey,
 			// The unresolved origin has no outgoing links: every backlink scores 1.
 			allowRelevanceSort: true,
+			searchPlaceholder: text.searchNoteTitles,
+			contentSearchPlaceholder: text.searchNoteContents,
 			sectionId: "pre-create-backlinks",
 			emptyMessage: text.noUnresolvedBacklinks,
 		};

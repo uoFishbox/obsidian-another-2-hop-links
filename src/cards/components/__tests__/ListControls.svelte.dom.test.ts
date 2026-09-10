@@ -611,4 +611,29 @@ describe("ListControls", () => {
 			screen.getByPlaceholderText("Search note contents..."),
 		).toBeInTheDocument();
 	});
+
+	it("falls back to the full-text placeholder when no content placeholder is configured", async () => {
+		const view = render(ListControls, {
+			props: {
+				searchInputValue: "",
+				sortOption: "alphabetical",
+				onSortChange: vi.fn(),
+				searchPlaceholder: "Search note titles...",
+				contentSearchEnabled: false,
+			},
+		});
+
+		expect(
+			screen.getByPlaceholderText("Search note titles..."),
+		).toBeInTheDocument();
+
+		await view.rerender({ contentSearchEnabled: true });
+
+		expect(
+			screen.getByPlaceholderText("Search note contents..."),
+		).toBeInTheDocument();
+		expect(
+			screen.queryByPlaceholderText("Search note titles..."),
+		).not.toBeInTheDocument();
+	});
 });
