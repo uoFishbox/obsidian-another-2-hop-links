@@ -191,8 +191,13 @@ describe("SearchableItemList integration", () => {
 			expect.any(Array),
 			"modified-date-reverse",
 		);
+		// The pinned modified-date sort owns the label while it is active; the
+		// menu trigger only offers a different field to sort by.
 		const trigger = screen.getByRole("button", { name: ARIA_LABELS.SORT_SELECT });
-		expect(trigger).toHaveTextContent("Modified");
+		const modifiedShortcut = screen.getByRole("button", { name: "Modified" });
+		expect(modifiedShortcut).toHaveClass("is-active");
+		expect(modifiedShortcut).toHaveAttribute("aria-pressed", "true");
+		expect(trigger).toHaveTextContent("Select");
 		await fireEvent.click(trigger);
 		expect(
 			showAtPosition.mock.contexts[0].items.some(
@@ -209,7 +214,7 @@ describe("SearchableItemList integration", () => {
 		);
 		expect(applicationStore.sortOption).toBe("relevance");
 		const relevanceDirection = screen.getByRole("button", {
-			name: "Relevance: highest first (click for lowest first)",
+			name: "Related: highest first (click for lowest first)",
 		});
 		expect(relevanceDirection).toBeEnabled();
 		expect(
