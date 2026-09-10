@@ -572,6 +572,11 @@ describe("SearchableItemList integration", () => {
 			resultsContainer?.querySelectorAll(":scope > .cosense-card-links__section"),
 		).toHaveLength(1);
 		const input = screen.getByRole("searchbox");
+		input.focus();
+		await fireEvent.keyDown(input, { key: "ArrowUp" });
+		await flushAsyncUi();
+		expect(document.activeElement).toBe(input);
+
 		await fireEvent.keyDown(input, { key: "ArrowDown" });
 		await flushAsyncUi();
 

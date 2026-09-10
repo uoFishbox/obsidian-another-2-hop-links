@@ -425,7 +425,7 @@ describe("ListControls", () => {
 		expect(onSearchInput).toHaveBeenCalledWith("alpha");
 	});
 
-	it("requests result focus movement on ArrowUp / ArrowDown", async () => {
+	it("requests result focus movement on ArrowDown only", async () => {
 		const onMoveFocusToResults = vi.fn();
 
 		render(ListControls, {
@@ -439,11 +439,39 @@ describe("ListControls", () => {
 		});
 
 		const input = screen.getByRole("searchbox");
-		await fireEvent.keyDown(input, { key: "ArrowDown" });
 		await fireEvent.keyDown(input, { key: "ArrowUp" });
 
+		expect(onMoveFocusToResults).not.toHaveBeenCalled();
+
+		await fireEvent.keyDown(input, { key: "ArrowDown" });
+
+		expect(onMoveFocusToResults).toHaveBeenCalledTimes(1);
 		expect(onMoveFocusToResults).toHaveBeenNthCalledWith(1, "down");
-		expect(onMoveFocusToResults).toHaveBeenNthCalledWith(2, "up");
+	});
+
+	it("leaves ArrowUp in the search input unconsumed and without side effects", async () => {
+		const onMoveFocusToResults = vi.fn();
+		const onMoveFocusToEditor = vi.fn(() => true);
+
+		render(ListControls, {
+			props: {
+				searchInputValue: "",
+				sortOption: "alphabetical",
+				onSortChange: vi.fn(),
+				onSearchInput: vi.fn(),
+				onMoveFocusToResults,
+				onMoveFocusToEditor,
+			},
+		});
+
+		const input = screen.getByRole("searchbox");
+		input.focus();
+		const notPrevented = await fireEvent.keyDown(input, { key: "ArrowUp" });
+
+		expect(notPrevented).toBe(true);
+		expect(onMoveFocusToResults).not.toHaveBeenCalled();
+		expect(onMoveFocusToEditor).not.toHaveBeenCalled();
+		expect(document.activeElement).toBe(input);
 	});
 
 	it("requests editor focus on Escape while the search input is empty", async () => {

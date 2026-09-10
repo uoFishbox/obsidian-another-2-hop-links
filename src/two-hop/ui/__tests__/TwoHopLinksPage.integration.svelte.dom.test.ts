@@ -539,7 +539,7 @@ describe("TwoHopLinksPage behavior", () => {
 		expect(focusEditor).not.toHaveBeenCalled();
 	});
 
-	it("moves focus from the search bar to the last result on ArrowUp", async () => {
+	it("keeps focus in the search bar on ArrowUp", async () => {
 		const file = createMockTFile("notes/target.md");
 		const parentFile = createMockTFile("notes/outgoing-parent.md");
 		const displayData = {
@@ -559,7 +559,8 @@ describe("TwoHopLinksPage behavior", () => {
 		await flushAsyncUi();
 
 		expect(focusEditor).not.toHaveBeenCalled();
-		expectComposedFocus(lastCard!);
+		expect(document.activeElement).toBe(input);
+		expectComposedFocus(input);
 	});
 
 	it("hides the two-hop section when only its parent matches the search", async () => {

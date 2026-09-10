@@ -279,9 +279,9 @@
 			return;
 		}
 
-		if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+		if (e.key === "ArrowDown") {
 			e.preventDefault();
-			void onMoveFocusToResults(e.key === "ArrowDown" ? "down" : "up");
+			void onMoveFocusToResults("down");
 		}
 	}
 
