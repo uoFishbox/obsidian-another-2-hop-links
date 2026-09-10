@@ -100,13 +100,14 @@
 	const localizedSortFields = $derived(
 		SORT_FIELDS.map((field, index) => ({
 			...field,
-			label: [
-				text.title,
-				text.backlinks,
-				text.createdDate,
-				text.modifiedDate,
-				text.fileSize,
-			][index] ?? field.label,
+			label:
+				[
+					text.title,
+					text.backlinks,
+					text.createdDate,
+					text.modifiedDate,
+					text.fileSize,
+				][index] ?? field.label,
 		})),
 	);
 	const localizedRelevanceField = $derived({
@@ -130,6 +131,7 @@
 			(sortOption !== "relevance-reverse" && sortOption.endsWith("-reverse")),
 	);
 	const isTitleSort = $derived(sortField.default === "alphabetical");
+	const isModifiedDateSort = $derived(sortField.default === "modified-date-reverse");
 	const sortDirectionIcon = $derived(
 		isReversed ? "arrow-up-wide-narrow" : "arrow-down-wide-narrow",
 	);
@@ -198,6 +200,13 @@
 		onSortChange(isReversed ? "modified-date" : "modified-date-reverse");
 	}
 
+	function handleModifiedDateKeydown(event: KeyboardEvent): void {
+		if (event.isComposing || (event.key !== "Enter" && event.key !== " ")) return;
+		event.preventDefault();
+		if (event.repeat) return;
+		selectModifiedDate();
+	}
+
 	function handleSearchInput(e: Event) {
 		const target = e.target as HTMLInputElement;
 		onSearchInput(target.value);
@@ -255,9 +264,7 @@
 	}
 
 	const contentSearchAriaLabel = $derived(
-		contentSearchEnabled
-			? text.disableFullTextSearch
-			: text.enableFullTextSearch,
+		contentSearchEnabled ? text.disableFullTextSearch : text.enableFullTextSearch,
 	);
 	const activeSearchPlaceholder = $derived(
 		contentSearchEnabled
@@ -372,17 +379,27 @@
 				></span>
 			{/if}
 		</button>
-		<button
-			type="button"
-			class:mod-cta={sortField.default === "modified-date-reverse"}
-			aria-pressed={sortField.default === "modified-date-reverse"}
+		<div
+			class="text-icon-button"
+			class:is-active={isModifiedDateSort}
+			role="button"
+			tabindex="0"
+			aria-label={text.modifiedDate}
+			aria-pressed={isModifiedDateSort}
 			title={text.sortByModifiedDate}
 			onclick={selectModifiedDate}
+			onkeydown={handleModifiedDateKeydown}
 		>
-			{text.modifiedDate}
-		</button>
+			<span
+				class="text-button-icon"
+				aria-hidden="true"
+				use:renderSortFieldIcon={"calendar-clock"}
+			></span>
+			<span class="text-button-label">{text.modifiedDate}</span>
+		</div>
 		<div
 			class="twohop-sort-menu-trigger text-icon-button"
+			class:is-active={!isModifiedDateSort}
 			role="button"
 			tabindex="0"
 			onclick={openSortMenu}
@@ -441,7 +458,7 @@
 
 	.twohop-header-controls .text-icon-button {
 		--icon-color-hover: var(--text-normal);
-		color: var(--text-normal);
+		margin: 2px;
 	}
 
 	/* .twohop-sort-menu-trigger {
@@ -466,11 +483,7 @@
 		border-radius: var(--vault-profile-radius);
 		height: var(--input-height);
 	} */
-	.twohop-sort-menu-trigger.text-icon-button {
-		margin: 2px;
-	}
-
-	.twohop-sort-menu-trigger:focus-visible {
+	.twohop-header-controls .text-icon-button:focus-visible {
 		outline: 2px solid var(--interactive-accent);
 		outline-offset: 2px;
 	}

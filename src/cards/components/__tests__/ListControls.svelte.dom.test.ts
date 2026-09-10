@@ -236,6 +236,39 @@ describe("ListControls", () => {
 		expect(onSortChange).toHaveBeenLastCalledWith("modified-date");
 	});
 
+	it("renders the modified-date shortcut as an active text-icon button", async () => {
+		const onSortChange = vi.fn();
+		const view = render(ListControls, {
+			props: { sortOption: "modified-date-reverse", onSortChange },
+		});
+		const shortcut = screen.getByRole("button", { name: "Modified date" });
+		const sortMenuTrigger = screen.getByRole("button", {
+			name: ARIA_LABELS.SORT_SELECT,
+		});
+
+		expect(shortcut.tagName).toBe("DIV");
+		expect(shortcut).toHaveClass("text-icon-button", "is-active");
+		expect(sortMenuTrigger).not.toHaveClass("is-active");
+		expect(shortcut).toHaveAttribute("tabindex", "0");
+		expect(shortcut).toHaveAttribute("aria-pressed", "true");
+		expect(shortcut.querySelector(".text-button-icon")).toHaveAttribute(
+			"data-icon",
+			"calendar-clock",
+		);
+		expect(shortcut.querySelector(".text-button-label")).toHaveTextContent(
+			"Modified date",
+		);
+
+		await view.rerender({ sortOption: "alphabetical" });
+		expect(shortcut).not.toHaveClass("is-active");
+		expect(sortMenuTrigger).toHaveClass("is-active");
+		expect(shortcut).toHaveAttribute("aria-pressed", "false");
+
+		const defaultAllowed = await fireEvent.keyDown(shortcut, { key: "Enter" });
+		expect(defaultAllowed).toBe(false);
+		expect(onSortChange).toHaveBeenCalledWith("modified-date-reverse");
+	});
+
 	it.each([
 		["alphabetical", "arrow-down-a-z"],
 		["alphabetical-reverse", "arrow-up-a-z"],
