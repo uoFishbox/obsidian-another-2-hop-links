@@ -42,8 +42,6 @@ export const DEFAULT_SETTINGS: PluginSettings = {
 	enableEmptyViewAllNotesInNewTab: true,
 	pinBookmarkedToTopInAllNotes: true,
 	enableUnresolvedLinkDecoration: true,
-	enableSearchArrowUpToEditorBottom: true,
-	enableEditorArrowDownToSearchInput: true,
 	experimentalCosenseTitleEditing: false,
 	experimentalShadowDomCss: "",
 	priorityFrontmatterKeyForPreview: "",

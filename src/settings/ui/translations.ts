@@ -76,10 +76,6 @@ export type TranslationKey =
 	| "frontmatterKeyCreationDateDesc"
 	| "frontmatterKeyModificationDate"
 	| "frontmatterKeyModificationDateDesc"
-	| "enableSearchArrowUpToEditorBottom"
-	| "enableSearchArrowUpToEditorBottomDesc"
-	| "enableEditorArrowDownToSearchInput"
-	| "enableEditorArrowDownToSearchInputDesc"
 	| "belowEditor"
 	| "sidebar"
 	| "hybrid"
@@ -195,13 +191,6 @@ const translations: Record<Language, Record<TranslationKey, string>> = {
 		frontmatterKeyModificationDate: "Frontmatter key to use for modification date",
 		frontmatterKeyModificationDateDesc:
 			"If specified, use the value of this key instead of the file's modification date (e.g., updated). If empty, use the file's modification date.",
-		enableSearchArrowUpToEditorBottom: "ArrowUp from search moves to editor bottom",
-		enableSearchArrowUpToEditorBottomDesc:
-			"When enabled, pressing ArrowUp in the search bar focuses the bottom of the inline editor. If that is not available, nothing happens.",
-		enableEditorArrowDownToSearchInput:
-			"ArrowDown from editor bottom moves to search",
-		enableEditorArrowDownToSearchInputDesc:
-			"When enabled, pressing ArrowDown at the bottom of the inline editor focuses the search bar instead of moving the cursor down.",
 		belowEditor: "Below editor",
 		sidebar: "Sidebar",
 		hybrid: "Hybrid",
@@ -315,12 +304,6 @@ const translations: Record<Language, Record<TranslationKey, string>> = {
 		frontmatterKeyModificationDate: "更新日に使用するフロントマターキー",
 		frontmatterKeyModificationDateDesc:
 			"指定した場合、ファイルの更新日の代わりにこのキーの値を使用します（例: updated）。空の場合、ファイルの更新日を使用します。",
-		enableSearchArrowUpToEditorBottom: "検索欄のArrowUpでエディタ最下行へ移動",
-		enableSearchArrowUpToEditorBottomDesc:
-			"有効にすると、検索欄でArrowUpを押したときにインラインエディタの最下行へフォーカスします。利用可能なエディタがない場合は何もしません。",
-		enableEditorArrowDownToSearchInput: "エディタ最下行のArrowDownで検索欄へ移動",
-		enableEditorArrowDownToSearchInputDesc:
-			"有効にすると、インラインエディタの最下行でArrowDownを押したときにカーソルを下げる代わりに検索欄へフォーカスします。",
 		belowEditor: "エディタの下",
 		sidebar: "サイドバー",
 		hybrid: "ハイブリッド",

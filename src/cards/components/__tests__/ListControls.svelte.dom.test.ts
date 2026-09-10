@@ -440,6 +440,65 @@ describe("ListControls", () => {
 		expect(onMoveFocusToResults).toHaveBeenNthCalledWith(2, "up");
 	});
 
+	it("requests editor focus on Escape while the search input is empty", async () => {
+		const onMoveFocusToEditor = vi.fn(() => true);
+
+		render(ListControls, {
+			props: {
+				searchInputValue: "",
+				sortOption: "alphabetical",
+				onSortChange: vi.fn(),
+				onSearchInput: vi.fn(),
+				onMoveFocusToEditor,
+			},
+		});
+
+		const input = screen.getByRole("searchbox");
+		const notPrevented = await fireEvent.keyDown(input, { key: "Escape" });
+
+		expect(onMoveFocusToEditor).toHaveBeenCalledTimes(1);
+		expect(notPrevented).toBe(false);
+	});
+
+	it("keeps Escape for the host app while a search query is present", async () => {
+		const onMoveFocusToEditor = vi.fn(() => true);
+
+		render(ListControls, {
+			props: {
+				searchInputValue: "alpha",
+				sortOption: "alphabetical",
+				onSortChange: vi.fn(),
+				onSearchInput: vi.fn(),
+				onMoveFocusToEditor,
+			},
+		});
+
+		const input = screen.getByRole("searchbox");
+		await fireEvent.keyDown(input, { key: "Escape" });
+
+		expect(onMoveFocusToEditor).not.toHaveBeenCalled();
+	});
+
+	it("keeps Escape for the host app when no editor can take focus", async () => {
+		const onMoveFocusToEditor = vi.fn(() => false);
+
+		render(ListControls, {
+			props: {
+				searchInputValue: "",
+				sortOption: "alphabetical",
+				onSortChange: vi.fn(),
+				onSearchInput: vi.fn(),
+				onMoveFocusToEditor,
+			},
+		});
+
+		const input = screen.getByRole("searchbox");
+		const notPrevented = await fireEvent.keyDown(input, { key: "Escape" });
+
+		expect(onMoveFocusToEditor).toHaveBeenCalledTimes(1);
+		expect(notPrevented).toBe(true);
+	});
+
 	it("submits the trimmed search value on Ctrl+Enter", async () => {
 		const onSearchSubmit = vi.fn();
 

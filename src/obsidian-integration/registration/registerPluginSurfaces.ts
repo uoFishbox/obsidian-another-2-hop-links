@@ -8,7 +8,6 @@ import type { IndexingService } from "indexing/index-service/IndexingService";
 import type { StylingService } from "obsidian-integration/link-decoration/stylingService";
 import type { RenderedMdElementsRegistry } from "obsidian-integration/markdown/RenderedMdElementsRegistry";
 import { buildLivePreviewPlugin } from "obsidian-integration/markdown/livePreview";
-import { buildEditorInlineFocusBridgeExtension } from "obsidian-integration/navigation/editorInlineFocusBridge";
 import { markdownPostProcessor } from "obsidian-integration/markdown/markdownHandlers";
 import { downloadAsFile, exportToClipboard } from "two-hop/export/exportService";
 import { TwoHopLinksView, TWO_HOP_LINKS_VIEW_TYPE } from "two-hop/ui/TwoHopLinksView";
@@ -107,7 +106,6 @@ function registerEditorExtensions(
 	linkStatusService: LinkStatusService,
 ): void {
 	plugin.registerEditorExtension(buildLivePreviewPlugin(linkStatusService));
-	plugin.registerEditorExtension(buildEditorInlineFocusBridgeExtension(plugin));
 }
 
 function registerMarkdownProcessors(
@@ -139,7 +137,11 @@ function registerFileMenu(plugin: PluginHost): void {
 					.setSection("action")
 					.onClick(async () => {
 						const result = await plugin.getTwoHopLinkResult(file);
-						await exportToClipboard(plugin.app, result, plugin.settings.language);
+						await exportToClipboard(
+							plugin.app,
+							result,
+							plugin.settings.language,
+						);
 					});
 			});
 
@@ -149,7 +151,11 @@ function registerFileMenu(plugin: PluginHost): void {
 					.setSection("action")
 					.onClick(async () => {
 						const result = await plugin.getTwoHopLinkResult(file);
-						await downloadAsFile(plugin.app, result, plugin.settings.language);
+						await downloadAsFile(
+							plugin.app,
+							result,
+							plugin.settings.language,
+						);
 					});
 			});
 		}),

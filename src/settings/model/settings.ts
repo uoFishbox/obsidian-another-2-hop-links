@@ -68,8 +68,6 @@ export interface PluginSettings {
 	enableEmptyViewAllNotesInNewTab: boolean;
 	pinBookmarkedToTopInAllNotes: boolean;
 	enableUnresolvedLinkDecoration: boolean;
-	enableSearchArrowUpToEditorBottom: boolean;
-	enableEditorArrowDownToSearchInput: boolean;
 	/** Enables experimental Cosense-style title/body editing and note creation. */
 	experimentalCosenseTitleEditing: boolean;
 	/** CSS appended to each card-rendering Shadow DOM surface. */

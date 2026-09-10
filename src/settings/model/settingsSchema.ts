@@ -95,12 +95,6 @@ const PluginSettingsSchema = z.object({
 	enableUnresolvedLinkDecoration: booleanSetting(
 		DEFAULT_SETTINGS.enableUnresolvedLinkDecoration,
 	),
-	enableSearchArrowUpToEditorBottom: booleanSetting(
-		DEFAULT_SETTINGS.enableSearchArrowUpToEditorBottom,
-	),
-	enableEditorArrowDownToSearchInput: booleanSetting(
-		DEFAULT_SETTINGS.enableEditorArrowDownToSearchInput,
-	),
 	enableContentSearch: booleanSetting(DEFAULT_SETTINGS.enableContentSearch),
 	experimentalCosenseTitleEditing: booleanSetting(
 		DEFAULT_SETTINGS.experimentalCosenseTitleEditing,

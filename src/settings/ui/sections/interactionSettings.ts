@@ -27,20 +27,6 @@ export const INTERACTION_SETTING_DEFINITIONS: ReadonlyArray<SettingDefinition> =
 	},
 	{
 		section: "interaction",
-		settingKey: "enableSearchArrowUpToEditorBottom",
-		controlType: "toggle",
-		translationKey: "enableSearchArrowUpToEditorBottom",
-		descriptionKey: "enableSearchArrowUpToEditorBottomDesc",
-	},
-	{
-		section: "interaction",
-		settingKey: "enableEditorArrowDownToSearchInput",
-		controlType: "toggle",
-		translationKey: "enableEditorArrowDownToSearchInput",
-		descriptionKey: "enableEditorArrowDownToSearchInputDesc",
-	},
-	{
-		section: "interaction",
 		settingKey: "highlightInPreviewOnHover",
 		controlType: "toggle",
 		translationKey: "highlightInPopoverOnHover",

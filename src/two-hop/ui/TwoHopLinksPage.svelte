@@ -417,49 +417,23 @@
 		});
 	});
 
-	type EditorWithCm = {
-		cm?: {
-			state: {
-				doc: {
-					length: number;
-				};
-			};
-			dispatch: (transaction: {
-				selection: {
-					anchor: number;
-				};
-				scrollIntoView?: boolean;
-			}) => void;
-			focus: () => void;
-		};
-	};
+	/**
+	 * Hands focus back to the editor hosting this inline surface. Returns false
+	 * when no editable markdown view can take focus, so callers can fall back to
+	 * the default key behavior.
+	 */
+	function focusActiveEditor(): boolean {
+		if (isSidebar) {
+			return false;
+		}
 
-	function focusActiveEditorToBottom(app: App): boolean {
 		const view = app.workspace.getActiveViewOfType(MarkdownView);
+		// Reading mode has no caret to hand focus back to.
 		if (!view || view.getMode() !== "source") {
 			return false;
 		}
 
-		const inlineRoot = view.containerEl.querySelector<HTMLElement>(
-			'.cosense-card-links__root[data-ccl-card-surface="editor"]',
-		);
-		if (!inlineRoot) {
-			return false;
-		}
-
-		const cm = (view.editor as EditorWithCm | undefined)?.cm;
-		if (!cm) {
-			return false;
-		}
-
-		const pos = cm.state.doc.length;
-		cm.dispatch({
-			selection: {
-				anchor: pos,
-			},
-			scrollIntoView: true,
-		});
-		cm.focus();
+		view.editor.focus();
 		return true;
 	}
 
@@ -472,16 +446,6 @@
 
 	async function moveFocusToResults(direction: "up" | "down") {
 		await tick();
-
-		if (
-			direction === "up" &&
-			!isSidebar &&
-			currentSettings.enableSearchArrowUpToEditorBottom
-		) {
-			focusActiveEditorToBottom(app);
-			return;
-		}
-
 		focusResultEdge(resultsContainerEl, direction);
 	}
 </script>
@@ -526,6 +490,7 @@
 			contentSearchPlaceholder={text.searchNoteContents}
 			onSortChange={(opt) => applicationUiState.setSortOption(opt)}
 			onMoveFocusToResults={moveFocusToResults}
+			onMoveFocusToEditor={focusActiveEditor}
 			language={currentSettings.language}
 			bind:searchInputEl
 		/>

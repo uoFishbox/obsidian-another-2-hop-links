@@ -76,6 +76,11 @@
 		onMoveFocusToResults?: (
 			direction: VerticalNavigationDirection,
 		) => void | Promise<void>;
+		/**
+		 * Called when Escape is pressed in the search input while the query is
+		 * empty. Return true when focus was moved, so the key event is consumed.
+		 */
+		onMoveFocusToEditor?: () => boolean | void;
 		contentSearchEnabled?: boolean;
 		onToggleContentSearch?: () => void;
 		autofocus?: boolean;
@@ -96,6 +101,7 @@
 		onSearchInput = () => {},
 		onSearchSubmit = () => {},
 		onMoveFocusToResults = () => {},
+		onMoveFocusToEditor = () => false,
 		contentSearchEnabled = false,
 		onToggleContentSearch = () => {},
 		autofocus = false,
@@ -256,6 +262,20 @@
 		}
 
 		if (e.altKey || e.ctrlKey || e.metaKey) {
+			return;
+		}
+
+		if (e.key === "Escape") {
+			const target = e.currentTarget as HTMLInputElement;
+			if (target.value.trim() !== "") {
+				return;
+			}
+
+			// Leaving the event unconsumed keeps the host app's Escape behavior
+			// when this surface has no editor to hand focus back to.
+			if (onMoveFocusToEditor()) {
+				e.preventDefault();
+			}
 			return;
 		}
 

@@ -1,5 +1,5 @@
 import { fireEvent, render } from "@testing-library/svelte";
-import { TFile } from "obsidian";
+import { TFile, type App } from "obsidian";
 import { createMockTFile } from "testing/__mocks__/testHelpers";
 import { tick, type ComponentProps } from "svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -217,11 +217,18 @@ function collectFiles(originFile: TFile, displayData: DisplayData): Map<string, 
 	return files;
 }
 
+interface RootPropsOverrides {
+	app?: App;
+	isSidebar?: boolean;
+}
+
 function createRootProps(
 	displayData: DisplayData,
 	settings: typeof DEFAULT_SETTINGS,
 	originFile: TFile,
+	overrides: RootPropsOverrides = {},
 ): ComponentProps<typeof TwoHopLinksPage> {
+	const app = overrides.app ?? ({} as App);
 	const filesByPath = collectFiles(originFile, displayData);
 	const applicationStore = createTwoHopState(displayData, settings, originFile);
 	const linkContext = {
@@ -239,7 +246,6 @@ function createRootProps(
 		onHop2Click: vi.fn(),
 		onTagClick: vi.fn(),
 	};
-	const app = {} as never;
 	const previewRuntime = createPreviewRuntime({
 		app,
 		getPreview: linkContext.getPreview,
@@ -253,7 +259,7 @@ function createRootProps(
 		app,
 		previewRuntime,
 		lazyLoaderCache: new Set<string>(),
-		isSidebar: false,
+		isSidebar: overrides.isSidebar ?? false,
 		keyboardNavigationSurfaceRegistry: createKeyboardNavigationSurfaceRegistry(),
 	} as unknown as ComponentProps<typeof TwoHopLinksPage>;
 }
@@ -262,9 +268,10 @@ function renderRoot(
 	displayData: DisplayData,
 	settings: typeof DEFAULT_SETTINGS,
 	originFile: TFile,
+	overrides: RootPropsOverrides = {},
 ) {
 	return render(TwoHopLinksPage, {
-		props: createRootProps(displayData, settings, originFile),
+		props: createRootProps(displayData, settings, originFile, overrides),
 	});
 }
 
@@ -318,6 +325,28 @@ function expectComposedFocus(element: HTMLElement): void {
 	expect(
 		root instanceof ShadowRoot ? root.activeElement : document.activeElement,
 	).toBe(element);
+}
+
+/** Builds an app stub whose active markdown view reports the given editor mode. */
+function createEditorApp(mode: "source" | "preview" | null): {
+	app: App;
+	focusEditor: ReturnType<typeof vi.fn>;
+} {
+	const focusEditor = vi.fn();
+	const activeView =
+		mode === null
+			? null
+			: {
+					getMode: () => mode,
+					editor: { focus: focusEditor },
+				};
+
+	return {
+		app: {
+			workspace: { getActiveViewOfType: () => activeView },
+		} as unknown as App,
+		focusEditor,
+	};
 }
 
 describe("TwoHopLinksPage behavior", () => {
@@ -429,6 +458,108 @@ describe("TwoHopLinksPage behavior", () => {
 		await flushAsyncUi();
 
 		expectComposedFocus(input);
+	});
+
+	it("returns focus to the editor on Escape while the search query is empty", async () => {
+		const file = createMockTFile("notes/target.md");
+		const parentFile = createMockTFile("notes/outgoing-parent.md");
+		const displayData = {
+			...createDisplayData(),
+			outgoing: [createBranch(file, parentFile, [], "outgoing-parent")],
+		};
+		const { app, focusEditor } = createEditorApp("source");
+
+		const view = renderRoot(displayData, DEFAULT_SETTINGS, file, { app });
+		const input = view.getByRole("searchbox", { name: "Find cards" });
+		input.focus();
+
+		const notPrevented = await fireEvent.keyDown(input, { key: "Escape" });
+
+		expect(focusEditor).toHaveBeenCalledTimes(1);
+		expect(notPrevented).toBe(false);
+	});
+
+	it("keeps Escape in the search input while a query is present", async () => {
+		const file = createMockTFile("notes/target.md");
+		const parentFile = createMockTFile("notes/outgoing-parent.md");
+		const displayData = {
+			...createDisplayData(),
+			outgoing: [createBranch(file, parentFile, [], "outgoing-parent")],
+		};
+		const { app, focusEditor } = createEditorApp("source");
+
+		const view = renderRoot(displayData, DEFAULT_SETTINGS, file, { app });
+		const input = view.getByRole("searchbox", { name: "Find cards" });
+		input.focus();
+		await fireEvent.input(input, { target: { value: "alpha" } });
+
+		await fireEvent.keyDown(input, { key: "Escape" });
+
+		expect(focusEditor).not.toHaveBeenCalled();
+		expectComposedFocus(input);
+	});
+
+	it("leaves Escape unhandled when the active markdown view has no editable editor", async () => {
+		const file = createMockTFile("notes/target.md");
+		const parentFile = createMockTFile("notes/outgoing-parent.md");
+		const displayData = {
+			...createDisplayData(),
+			outgoing: [createBranch(file, parentFile, [], "outgoing-parent")],
+		};
+		const { app, focusEditor } = createEditorApp("preview");
+
+		const view = renderRoot(displayData, DEFAULT_SETTINGS, file, { app });
+		const input = view.getByRole("searchbox", { name: "Find cards" });
+		input.focus();
+
+		const notPrevented = await fireEvent.keyDown(input, { key: "Escape" });
+
+		expect(focusEditor).not.toHaveBeenCalled();
+		expect(notPrevented).toBe(true);
+	});
+
+	it("does not focus an editor from a sidebar search bar on Escape", async () => {
+		const file = createMockTFile("notes/target.md");
+		const parentFile = createMockTFile("notes/outgoing-parent.md");
+		const displayData = {
+			...createDisplayData(),
+			outgoing: [createBranch(file, parentFile, [], "outgoing-parent")],
+		};
+		const { app, focusEditor } = createEditorApp("source");
+
+		const view = renderRoot(displayData, DEFAULT_SETTINGS, file, {
+			app,
+			isSidebar: true,
+		});
+		const input = view.getByRole("searchbox", { name: "Find cards" });
+		input.focus();
+
+		await fireEvent.keyDown(input, { key: "Escape" });
+
+		expect(focusEditor).not.toHaveBeenCalled();
+	});
+
+	it("moves focus from the search bar to the last result on ArrowUp", async () => {
+		const file = createMockTFile("notes/target.md");
+		const parentFile = createMockTFile("notes/outgoing-parent.md");
+		const displayData = {
+			...createDisplayData(),
+			outgoing: [createBranch(file, parentFile, [], "outgoing-parent")],
+		};
+		const { app, focusEditor } = createEditorApp("source");
+
+		const view = renderRoot(displayData, DEFAULT_SETTINGS, file, { app });
+		await showEntireVirtualSurface();
+		const input = view.getByRole("searchbox", { name: "Find cards" });
+		const lastCard = queryCard("outgoing-parent");
+		expect(lastCard).not.toBeNull();
+		input.focus();
+
+		await fireEvent.keyDown(input, { key: "ArrowUp" });
+		await flushAsyncUi();
+
+		expect(focusEditor).not.toHaveBeenCalled();
+		expectComposedFocus(lastCard!);
 	});
 
 	it("hides the two-hop section when only its parent matches the search", async () => {
