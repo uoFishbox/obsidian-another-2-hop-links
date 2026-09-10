@@ -1,5 +1,18 @@
 export type MainUiLanguage = "en" | "ja";
 
+type MainUiSortField =
+	| "relevance"
+	| "title"
+	| "backlinks"
+	| "created-date"
+	| "modified-date"
+	| "file-size";
+
+interface SortDirectionLabels {
+	readonly ascending: string;
+	readonly descending: string;
+}
+
 export interface MainUiTranslations {
 	readonly allNotes: string;
 	readonly backlinks: string;
@@ -30,6 +43,7 @@ export interface MainUiTranslations {
 	readonly searchNoteContents: string;
 	readonly searchNoteTitles: string;
 	readonly searching: string;
+	readonly select: string;
 	readonly selectSortMethod: string;
 	readonly sortByModifiedDate: string;
 	readonly tagFeaturesDisabled: string;
@@ -58,10 +72,7 @@ export interface MainUiTranslations {
 	readonly loadingNotesWithTag: (tag: string) => string;
 	readonly showingNotesWithTag: (count: number, tag: string) => string;
 	readonly noUnresolvedBacklinks: string;
-	readonly relevanceDescending: string;
-	readonly relevanceAscending: string;
-	readonly descending: string;
-	readonly ascending: string;
+	readonly sortDirections: Readonly<Record<MainUiSortField, SortDirectionLabels>>;
 }
 
 const TRANSLATIONS: Readonly<Record<MainUiLanguage, MainUiTranslations>> = {
@@ -79,7 +90,7 @@ const TRANSLATIONS: Readonly<Record<MainUiLanguage, MainUiTranslations>> = {
 		links: "Links",
 		loadMore: "Load more",
 		loadingTwoHopLinks: "Loading two-hop links...",
-		modifiedDate: "Modified date",
+		modifiedDate: "Modified",
 		newLinks: "New links",
 		noMatchesFound: "No matches found.",
 		noNotesFound: "No notes found.",
@@ -90,25 +101,27 @@ const TRANSLATIONS: Readonly<Record<MainUiLanguage, MainUiTranslations>> = {
 		openNonMarkdownFile: "Open a non-Markdown file to see links.",
 		outgoingLinks: "Outgoing links",
 		preparingTagNotes: "Preparing tag notes.",
-		relevance: "Relevance",
+		relevance: "Related",
 		search: "Search...",
 		searchNoteContents: "Search note contents...",
 		searchNoteTitles: "Search note titles...",
 		searching: "Searching…",
+		select: "Select",
 		selectSortMethod: "Select sort method",
 		sortByModifiedDate: "Sort by modified date",
 		tagFeaturesDisabled: "Tag features disabled",
 		tagFeaturesDisabledMessage: "Tag features are disabled.",
 		tagNotes: "Tag notes",
 		title: "Title",
-		createdDate: "Created date",
+		createdDate: "Created",
 		untitled: "Untitled",
 		unresolvedLink: "Unresolved link",
 		useMergedLinksSection: "Use merged links section",
 		waitingForInitialIndex: "Waiting for the initial index to finish building.",
 		waitingForTagIndex: "Waiting for the tag index to finish building.",
 		exportClipboardSuccess: "2-hop links exported to clipboard!",
-		exportClipboardFailure: "Failed to export 2-hop links. Check console for details.",
+		exportClipboardFailure:
+			"Failed to export 2-hop links. Check console for details.",
 		exportDownloadFailure: "Failed to download file. Check console for details.",
 		createFileFailure: "Failed to create file.",
 		createNoteFailure: "Failed to create note.",
@@ -124,10 +137,32 @@ const TRANSLATIONS: Readonly<Record<MainUiLanguage, MainUiTranslations>> = {
 		showingNotesWithTag: (count, tag) =>
 			`Showing ${count} notes tagged with #${tag}.`,
 		noUnresolvedBacklinks: "No unresolved backlinks from other notes were found.",
-		relevanceDescending: "Highest relevance first (click for lowest first)",
-		relevanceAscending: "Lowest relevance first (click for highest first)",
-		descending: "Descending (click for ascending)",
-		ascending: "Ascending (click for descending)",
+		sortDirections: {
+			relevance: {
+				ascending: "Related: lowest first (click for highest first)",
+				descending: "Related: highest first (click for lowest first)",
+			},
+			title: {
+				ascending: "Title: A–Z (click for Z–A)",
+				descending: "Title: Z–A (click for A–Z)",
+			},
+			backlinks: {
+				ascending: "Backlinks: fewest first (click for most first)",
+				descending: "Backlinks: most first (click for fewest first)",
+			},
+			"created-date": {
+				ascending: "Created: oldest first (click for newest first)",
+				descending: "Created: newest first (click for oldest first)",
+			},
+			"modified-date": {
+				ascending: "Modified: oldest first (click for newest first)",
+				descending: "Modified: newest first (click for oldest first)",
+			},
+			"file-size": {
+				ascending: "File size: smallest first (click for largest first)",
+				descending: "File size: largest first (click for smallest first)",
+			},
+		},
 	},
 	ja: {
 		allNotes: "すべてのノート",
@@ -151,7 +186,8 @@ const TRANSLATIONS: Readonly<Record<MainUiLanguage, MainUiTranslations>> = {
 		noTargetPath: "この一時ビューには作成先のパスが設定されていません。",
 		noTagSet: "この一時ビューにはタグが設定されていません。",
 		openInNewTab: "新しいタブで開く",
-		openNonMarkdownFile: "リンクを表示するにはMarkdown以外のファイルを開いてください。",
+		openNonMarkdownFile:
+			"リンクを表示するにはMarkdown以外のファイルを開いてください。",
 		outgoingLinks: "発リンク",
 		preparingTagNotes: "タグ付きノートを準備しています。",
 		relevance: "関連度",
@@ -159,6 +195,7 @@ const TRANSLATIONS: Readonly<Record<MainUiLanguage, MainUiTranslations>> = {
 		searchNoteContents: "ノート本文を検索...",
 		searchNoteTitles: "ノートのタイトルを検索...",
 		searching: "検索中…",
+		select: "選択",
 		selectSortMethod: "ソート方法を選択",
 		sortByModifiedDate: "更新日時で並べ替え",
 		tagFeaturesDisabled: "タグ機能は無効です",
@@ -172,8 +209,10 @@ const TRANSLATIONS: Readonly<Record<MainUiLanguage, MainUiTranslations>> = {
 		waitingForInitialIndex: "初回インデックスの構築完了を待っています。",
 		waitingForTagIndex: "タグインデックスの構築完了を待っています。",
 		exportClipboardSuccess: "2ホップリンクをクリップボードにコピーしました。",
-		exportClipboardFailure: "2ホップリンクを書き出せませんでした。詳細はコンソールを確認してください。",
-		exportDownloadFailure: "ファイルをダウンロードできませんでした。詳細はコンソールを確認してください。",
+		exportClipboardFailure:
+			"2ホップリンクを書き出せませんでした。詳細はコンソールを確認してください。",
+		exportDownloadFailure:
+			"ファイルをダウンロードできませんでした。詳細はコンソールを確認してください。",
 		createFileFailure: "ファイルを作成できませんでした。",
 		createNoteFailure: "ノートを作成できませんでした。",
 		noVisibleCardSurface: "表示中のカード領域が見つかりません。",
@@ -185,18 +224,40 @@ const TRANSLATIONS: Readonly<Record<MainUiLanguage, MainUiTranslations>> = {
 		linksTo: (linktext) => `${linktext}へのリンク`,
 		notesWithTag: (tag) => `#${tag} のノート`,
 		loadingNotesWithTag: (tag) => `#${tag} のノートを読み込んでいます。`,
-		showingNotesWithTag: (count, tag) => `#${tag} のノートを${count}件表示しています。`,
-		noUnresolvedBacklinks: "他のノートからの未解決バックリンクは見つかりませんでした。",
-		relevanceDescending: "関連度の高い順（クリックで低い順に切り替え）",
-		relevanceAscending: "関連度の低い順（クリックで高い順に切り替え）",
-		descending: "降順（クリックで昇順に切り替え）",
-		ascending: "昇順（クリックで降順に切り替え）",
+		showingNotesWithTag: (count, tag) =>
+			`#${tag} のノートを${count}件表示しています。`,
+		noUnresolvedBacklinks:
+			"他のノートからの未解決バックリンクは見つかりませんでした。",
+		sortDirections: {
+			relevance: {
+				ascending: "関連度：低い順（クリックで高い順に切り替え）",
+				descending: "関連度：高い順（クリックで低い順に切り替え）",
+			},
+			title: {
+				ascending: "タイトル：昇順（クリックで降順に切り替え）",
+				descending: "タイトル：降順（クリックで昇順に切り替え）",
+			},
+			backlinks: {
+				ascending: "バックリンク：少ない順（クリックで多い順に切り替え）",
+				descending: "バックリンク：多い順（クリックで少ない順に切り替え）",
+			},
+			"created-date": {
+				ascending: "作成日時：古い順（クリックで新しい順に切り替え）",
+				descending: "作成日時：新しい順（クリックで古い順に切り替え）",
+			},
+			"modified-date": {
+				ascending: "更新日時：古い順（クリックで新しい順に切り替え）",
+				descending: "更新日時：新しい順（クリックで古い順に切り替え）",
+			},
+			"file-size": {
+				ascending: "ファイルサイズ：小さい順（クリックで大きい順に切り替え）",
+				descending: "ファイルサイズ：大きい順（クリックで小さい順に切り替え）",
+			},
+		},
 	},
 };
 
 /** Returns the complete translation table for the selected main-UI language. */
-export function getMainUiTranslations(
-	language: MainUiLanguage,
-): MainUiTranslations {
+export function getMainUiTranslations(language: MainUiLanguage): MainUiTranslations {
 	return TRANSLATIONS[language];
 }

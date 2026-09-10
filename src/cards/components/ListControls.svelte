@@ -2,18 +2,20 @@
 	import { Menu, setIcon, type IconName } from "obsidian";
 	import { onDestroy } from "svelte";
 	import type { VerticalNavigationDirection } from "cards/navigation/types";
-	import type { SortOption } from "cards/sorting";
+	import type { QuickSortField, SortOption } from "cards/sorting";
 	import type { Language } from "settings/model";
 	import { getMainUiTranslations } from "shared/i18n/mainUiTranslations";
 
 	interface SortField {
+		id: Exclude<QuickSortField, "none">;
 		label: string;
 		icon: IconName;
 		default: SortOption;
 		reverse: SortOption;
 	}
 	const RELEVANCE_FIELD: SortField = {
-		label: "Relevance",
+		id: "relevance",
+		label: "Related",
 		icon: "network",
 		default: "relevance",
 		reverse: "relevance-reverse",
@@ -21,36 +23,42 @@
 
 	const SORT_FIELDS = [
 		{
+			id: "title",
 			label: "Title",
 			icon: "type",
 			default: "alphabetical",
 			reverse: "alphabetical-reverse",
 		},
 		{
+			id: "backlinks",
 			label: "Backlinks",
 			icon: "links-coming-in",
 			default: "backlink-count-reverse",
 			reverse: "backlink-count",
 		},
 		{
-			label: "Created date",
+			id: "created-date",
+			label: "Created",
 			icon: "calendar-plus",
 			default: "created-date-reverse",
 			reverse: "created-date",
 		},
 		{
-			label: "Modified date",
+			id: "modified-date",
+			label: "Modified",
 			icon: "calendar-clock",
 			default: "modified-date-reverse",
 			reverse: "modified-date",
 		},
 		{
+			id: "file-size",
 			label: "File size",
 			icon: "hard-drive",
 			default: "file-size-reverse",
 			reverse: "file-size",
 		},
 	] as const satisfies readonly {
+		id: Exclude<QuickSortField, "none">;
 		label: string;
 		icon: IconName;
 		default: SortOption;
@@ -61,6 +69,7 @@
 		searchInputValue?: string;
 		sortOption: SortOption;
 		allowRelevanceSort?: boolean;
+		quickSortFields?: readonly QuickSortField[];
 		onSortChange: (option: SortOption) => void;
 		onSearchInput?: (value: string) => void;
 		onSearchSubmit?: (value: string) => void | Promise<void>;
@@ -82,6 +91,7 @@
 		searchInputValue = "",
 		sortOption,
 		allowRelevanceSort = false,
+		quickSortFields = ["modified-date"],
 		onSortChange,
 		onSearchInput = () => {},
 		onSearchSubmit = () => {},
@@ -114,16 +124,36 @@
 		...RELEVANCE_FIELD,
 		label: text.relevance,
 	});
-
-	const sortFields: readonly SortField[] = $derived(
+	const availableSortFields: readonly SortField[] = $derived(
 		allowRelevanceSort
 			? [localizedRelevanceField, ...localizedSortFields]
 			: localizedSortFields,
 	);
+	const pinnedSortFields = $derived.by(() => {
+		const seen = new Set<QuickSortField>();
+		const fields: SortField[] = [];
+
+		for (const id of quickSortFields) {
+			if (id === "none" || seen.has(id)) continue;
+			seen.add(id);
+			const field = availableSortFields.find((candidate) => candidate.id === id);
+			if (field) fields.push(field);
+		}
+
+		return fields.slice(0, 2);
+	});
+	const menuSortFields = $derived(
+		availableSortFields.filter(
+			(field) => !pinnedSortFields.some((pinned) => pinned.id === field.id),
+		),
+	);
 	const sortField = $derived(
-		sortFields.find(
+		availableSortFields.find(
 			(field) => field.default === sortOption || field.reverse === sortOption,
 		) ?? localizedSortFields[0],
+	);
+	const isPinnedSortActive = $derived(
+		pinnedSortFields.some((field) => field.id === sortField.id),
 	);
 	const isReversed = $derived(sortOption === sortField.reverse);
 	const isDescending = $derived(
@@ -131,18 +161,11 @@
 			(sortOption !== "relevance-reverse" && sortOption.endsWith("-reverse")),
 	);
 	const isTitleSort = $derived(sortField.default === "alphabetical");
-	const isModifiedDateSort = $derived(sortField.default === "modified-date-reverse");
 	const sortDirectionIcon = $derived(
 		isReversed ? "arrow-up-wide-narrow" : "arrow-down-wide-narrow",
 	);
 	const sortDirectionLabel = $derived(
-		sortField.default === "relevance"
-			? isDescending
-				? text.relevanceDescending
-				: text.relevanceAscending
-			: isDescending
-				? text.descending
-				: text.ascending,
+		text.sortDirections[sortField.id][isDescending ? "descending" : "ascending"],
 	);
 
 	let sortMenu = $state<Menu | null>(null);
@@ -168,7 +191,7 @@
 		sortMenu?.hide();
 
 		const menu = new Menu();
-		for (const field of sortFields) {
+		for (const field of menuSortFields) {
 			menu.addItem((item) => {
 				item.setTitle(field.label)
 					.setIcon(field.icon)
@@ -196,15 +219,18 @@
 		onSortChange(isReversed ? sortField.default : sortField.reverse);
 	}
 
-	function selectModifiedDate(): void {
-		onSortChange(isReversed ? "modified-date" : "modified-date-reverse");
+	function selectPinnedSortField(field: SortField): void {
+		onSortChange(isReversed ? field.reverse : field.default);
 	}
 
-	function handleModifiedDateKeydown(event: KeyboardEvent): void {
+	function handlePinnedSortFieldKeydown(
+		event: KeyboardEvent,
+		field: SortField,
+	): void {
 		if (event.isComposing || (event.key !== "Enter" && event.key !== " ")) return;
 		event.preventDefault();
 		if (event.repeat) return;
-		selectModifiedDate();
+		selectPinnedSortField(field);
 	}
 
 	function handleSearchInput(e: Event) {
@@ -340,7 +366,6 @@
 			type="button"
 			class="clickable-icon"
 			aria-label={sortDirectionLabel}
-			title={sortDirectionLabel}
 			onclick={toggleSortDirection}
 		>
 			{#if isTitleSort}
@@ -379,27 +404,28 @@
 				></span>
 			{/if}
 		</button>
-		<div
-			class="text-icon-button"
-			class:is-active={isModifiedDateSort}
-			role="button"
-			tabindex="0"
-			aria-label={text.modifiedDate}
-			aria-pressed={isModifiedDateSort}
-			title={text.sortByModifiedDate}
-			onclick={selectModifiedDate}
-			onkeydown={handleModifiedDateKeydown}
-		>
-			<span
-				class="text-button-icon"
-				aria-hidden="true"
-				use:renderSortFieldIcon={"calendar-clock"}
-			></span>
-			<span class="text-button-label">{text.modifiedDate}</span>
-		</div>
+		{#each pinnedSortFields as pinnedField (pinnedField.id)}
+			<div
+				class="text-icon-button"
+				class:is-active={sortField.id === pinnedField.id}
+				role="button"
+				tabindex="0"
+				aria-label={pinnedField.label}
+				aria-pressed={sortField.id === pinnedField.id}
+				onclick={() => selectPinnedSortField(pinnedField)}
+				onkeydown={(event) => handlePinnedSortFieldKeydown(event, pinnedField)}
+			>
+				<span
+					class="text-button-icon"
+					aria-hidden="true"
+					use:renderSortFieldIcon={pinnedField.icon}
+				></span>
+				<span class="text-button-label">{pinnedField.label}</span>
+			</div>
+		{/each}
 		<div
 			class="twohop-sort-menu-trigger text-icon-button"
-			class:is-active={!isModifiedDateSort}
+			class:is-active={!isPinnedSortActive}
 			role="button"
 			tabindex="0"
 			onclick={openSortMenu}
@@ -408,12 +434,16 @@
 			aria-haspopup="menu"
 			aria-expanded={sortMenu !== null}
 		>
-			<span
-				class="twohop-sort-field-icon text-button-icon"
-				aria-hidden="true"
-				use:renderSortFieldIcon={sortField.icon}
-			></span>
-			<span class="text-button-label">{sortField.label}</span>
+			{#if !isPinnedSortActive}
+				<span
+					class="twohop-sort-field-icon text-button-icon"
+					aria-hidden="true"
+					use:renderSortFieldIcon={sortField.icon}
+				></span>
+				<span class="text-button-label">{sortField.label}</span>
+			{:else}
+				<span class="text-button-label">{text.select}</span>
+			{/if}
 			<span
 				class="text-button-icon mod-aux"
 				aria-hidden="true"
@@ -438,8 +468,11 @@
 	}
 
 	.twohop-header-search {
-		flex: 1 1 220px;
-		min-width: 180px;
+		/* Grow from zero so the row never wraps while the search input still
+		   has room to spare: wrapping is decided solely by the @container rule
+		   below (500px), not by the search input's hypothetical width. */
+		flex: 1 1 0;
+		min-width: 0;
 		order: 1;
 	}
 
@@ -488,6 +521,9 @@
 		outline-offset: 2px;
 	}
 
+	/* Stacking below 500px of the header width. Only descendants of
+	   .twohop-header can be styled from here (a container is never queried
+	   against itself), which is why the header itself keeps flex-wrap: wrap. */
 	@container (max-width: 500px) {
 		.twohop-header-search {
 			order: 2;

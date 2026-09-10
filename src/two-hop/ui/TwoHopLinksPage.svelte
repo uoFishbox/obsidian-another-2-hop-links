@@ -518,6 +518,10 @@
 			{contentSearchEnabled}
 			sortOption={currentSort}
 			allowRelevanceSort={true}
+			quickSortFields={[
+				currentSettings.quickSortField1,
+				currentSettings.quickSortField2,
+			]}
 			searchPlaceholder={text.searchNoteTitles}
 			contentSearchPlaceholder={text.searchNoteContents}
 			onSortChange={(opt) => applicationUiState.setSortOption(opt)}

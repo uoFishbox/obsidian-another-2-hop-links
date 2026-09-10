@@ -37,31 +37,32 @@ describe("ListControls", () => {
 		await fireEvent.click(trigger);
 		expect(
 			showAtPosition.mock.contexts[0].items.some(
-				(item) => item.title === "Relevance",
+				(item) => item.title === "Related",
 			),
 		).toBe(false);
 
 		await view.rerender({ allowRelevanceSort: true });
 		await fireEvent.click(trigger);
 		showAtPosition.mock.contexts[1].items
-			.find((item) => item.title === "Relevance")
+			.find((item) => item.title === "Related")
 			?.clickHandler?.();
 		expect(onSortChange).toHaveBeenLastCalledWith("relevance");
 		await view.rerender({ sortOption: "relevance" });
-		expect(trigger).toHaveTextContent("Relevance");
+		expect(trigger).toHaveTextContent("Related");
 		const directionButton = screen.getByRole("button", {
-			name: "Highest relevance first (click for lowest first)",
+			name: "Related: highest first (click for lowest first)",
 		});
 		expect(directionButton).toBeEnabled();
+		expect(directionButton).not.toHaveAttribute("title");
 		await fireEvent.click(directionButton);
 		expect(onSortChange).toHaveBeenLastCalledWith("relevance-reverse");
 		await view.rerender({ sortOption: "relevance-reverse" });
 		expect(
 			screen.getByRole("button", {
-				name: "Lowest relevance first (click for highest first)",
+				name: "Related: lowest first (click for highest first)",
 			}),
 		).toBeEnabled();
-		await fireEvent.click(screen.getByRole("button", { name: "Modified date" }));
+		await fireEvent.click(screen.getByRole("button", { name: "Modified" }));
 		expect(onSortChange).toHaveBeenLastCalledWith("modified-date");
 	});
 
@@ -79,7 +80,7 @@ describe("ListControls", () => {
 		expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
 		expect(button.tagName).toBe("DIV");
 		expect(button).toHaveAttribute("tabindex", "0");
-		expect(button).toHaveTextContent("Created date");
+		expect(button).toHaveTextContent("Created");
 		expect(button.querySelector(".twohop-sort-field-icon")).toHaveAttribute(
 			"data-icon",
 			"calendar-plus",
@@ -101,8 +102,7 @@ describe("ListControls", () => {
 		).toEqual([
 			{ title: "Title", icon: "type", checked: false },
 			{ title: "Backlinks", icon: "links-coming-in", checked: false },
-			{ title: "Created date", icon: "calendar-plus", checked: true },
-			{ title: "Modified date", icon: "calendar-clock", checked: false },
+			{ title: "Created", icon: "calendar-plus", checked: true },
 			{ title: "File size", icon: "hard-drive", checked: false },
 		]);
 		expect(button).toHaveAttribute("aria-expanded", "true");
@@ -149,8 +149,8 @@ describe("ListControls", () => {
 	it.each([
 		["Title", "type", "alphabetical", "alphabetical-reverse"],
 		["Backlinks", "links-coming-in", "backlink-count-reverse", "backlink-count"],
-		["Created date", "calendar-plus", "created-date-reverse", "created-date"],
-		["Modified date", "calendar-clock", "modified-date-reverse", "modified-date"],
+		["Created", "calendar-plus", "created-date-reverse", "created-date"],
+		["Modified", "calendar-clock", "modified-date-reverse", "modified-date"],
 		["File size", "hard-drive", "file-size-reverse", "file-size"],
 	] as const)(
 		"selects %s while preserving the default/reverse state",
@@ -158,7 +158,11 @@ describe("ListControls", () => {
 			const showAtPosition = vi.spyOn(Menu.prototype, "showAtPosition");
 			const onSortChange = vi.fn();
 			const view = render(ListControls, {
-				props: { sortOption: "alphabetical", onSortChange },
+				props: {
+					sortOption: "alphabetical",
+					onSortChange,
+					quickSortFields: ["none"],
+				},
 			});
 			const button = screen.getByRole("button", {
 				name: ARIA_LABELS.SORT_SELECT,
@@ -209,30 +213,34 @@ describe("ListControls", () => {
 		expect(
 			screen
 				.getByRole("button", {
-					name: "Descending (click for ascending)",
+					name: "File size: largest first (click for smallest first)",
 				})
 				.querySelector('[aria-hidden="true"]'),
 		).toHaveAttribute("data-icon", "arrow-down-wide-narrow");
 		await fireEvent.click(
-			screen.getByRole("button", { name: "Descending (click for ascending)" }),
+			screen.getByRole("button", {
+				name: "File size: largest first (click for smallest first)",
+			}),
 		);
 		expect(onSortChange).toHaveBeenLastCalledWith("file-size");
-		await fireEvent.click(screen.getByRole("button", { name: "Modified date" }));
+		await fireEvent.click(screen.getByRole("button", { name: "Modified" }));
 		expect(onSortChange).toHaveBeenLastCalledWith("modified-date-reverse");
 
 		await view.rerender({ sortOption: "file-size" });
 		expect(
 			screen
 				.getByRole("button", {
-					name: "Ascending (click for descending)",
+					name: "File size: smallest first (click for largest first)",
 				})
 				.querySelector('[aria-hidden="true"]'),
 		).toHaveAttribute("data-icon", "arrow-up-wide-narrow");
 		await fireEvent.click(
-			screen.getByRole("button", { name: "Ascending (click for descending)" }),
+			screen.getByRole("button", {
+				name: "File size: smallest first (click for largest first)",
+			}),
 		);
 		expect(onSortChange).toHaveBeenLastCalledWith("file-size-reverse");
-		await fireEvent.click(screen.getByRole("button", { name: "Modified date" }));
+		await fireEvent.click(screen.getByRole("button", { name: "Modified" }));
 		expect(onSortChange).toHaveBeenLastCalledWith("modified-date");
 	});
 
@@ -241,7 +249,7 @@ describe("ListControls", () => {
 		const view = render(ListControls, {
 			props: { sortOption: "modified-date-reverse", onSortChange },
 		});
-		const shortcut = screen.getByRole("button", { name: "Modified date" });
+		const shortcut = screen.getByRole("button", { name: "Modified" });
 		const sortMenuTrigger = screen.getByRole("button", {
 			name: ARIA_LABELS.SORT_SELECT,
 		});
@@ -249,24 +257,100 @@ describe("ListControls", () => {
 		expect(shortcut.tagName).toBe("DIV");
 		expect(shortcut).toHaveClass("text-icon-button", "is-active");
 		expect(sortMenuTrigger).not.toHaveClass("is-active");
+		expect(
+			sortMenuTrigger.querySelector(".twohop-sort-field-icon"),
+		).not.toBeInTheDocument();
+		expect(sortMenuTrigger.querySelector(".text-button-label")).toHaveTextContent(
+			"Select",
+		);
+		expect(sortMenuTrigger.querySelector(".mod-aux")).toHaveAttribute(
+			"data-icon",
+			"chevrons-up-down",
+		);
 		expect(shortcut).toHaveAttribute("tabindex", "0");
 		expect(shortcut).toHaveAttribute("aria-pressed", "true");
+		expect(shortcut).not.toHaveAttribute("title");
 		expect(shortcut.querySelector(".text-button-icon")).toHaveAttribute(
 			"data-icon",
 			"calendar-clock",
 		);
 		expect(shortcut.querySelector(".text-button-label")).toHaveTextContent(
-			"Modified date",
+			"Modified",
 		);
 
 		await view.rerender({ sortOption: "alphabetical" });
 		expect(shortcut).not.toHaveClass("is-active");
 		expect(sortMenuTrigger).toHaveClass("is-active");
+		expect(
+			sortMenuTrigger.querySelector(".twohop-sort-field-icon"),
+		).toHaveAttribute("data-icon", "type");
+		expect(sortMenuTrigger.querySelector(".text-button-label")).toHaveTextContent(
+			"Title",
+		);
 		expect(shortcut).toHaveAttribute("aria-pressed", "false");
 
 		const defaultAllowed = await fireEvent.keyDown(shortcut, { key: "Enter" });
 		expect(defaultAllowed).toBe(false);
 		expect(onSortChange).toHaveBeenCalledWith("modified-date-reverse");
+	});
+
+	it("renders zero to two configured pinned sorts and removes duplicates", async () => {
+		const onSortChange = vi.fn();
+		const view = render(ListControls, {
+			props: {
+				sortOption: "alphabetical-reverse",
+				onSortChange,
+				quickSortFields: ["title", "file-size"],
+			},
+		});
+
+		expect(screen.getByRole("button", { name: "Title" })).toBeEnabled();
+		expect(screen.getByRole("button", { name: "File size" })).toBeEnabled();
+		expect(
+			screen.queryByRole("button", { name: "Modified" }),
+		).not.toBeInTheDocument();
+
+		await fireEvent.click(screen.getByRole("button", { name: "File size" }));
+		expect(onSortChange).toHaveBeenLastCalledWith("file-size");
+
+		await view.rerender({ quickSortFields: ["backlinks", "backlinks"] });
+		expect(screen.getAllByRole("button", { name: "Backlinks" })).toHaveLength(1);
+		expect(screen.queryByRole("button", { name: "Title" })).not.toBeInTheDocument();
+
+		await view.rerender({ quickSortFields: ["none", "none"] });
+		expect(
+			screen.queryByRole("button", { name: "Backlinks" }),
+		).not.toBeInTheDocument();
+	});
+
+	it("excludes pinned sorts from the menu and hides unsupported pinned relevance", async () => {
+		const showAtPosition = vi.spyOn(Menu.prototype, "showAtPosition");
+		const view = render(ListControls, {
+			props: {
+				sortOption: "relevance",
+				onSortChange: vi.fn(),
+				allowRelevanceSort: true,
+				quickSortFields: ["relevance", "file-size"],
+			},
+		});
+		const trigger = screen.getByRole("button", { name: ARIA_LABELS.SORT_SELECT });
+
+		expect(screen.getByRole("button", { name: "Related" })).toBeEnabled();
+		expect(screen.getByRole("button", { name: "File size" })).toBeEnabled();
+		await fireEvent.click(trigger);
+		expect(showAtPosition.mock.contexts[0].items.map((item) => item.title)).toEqual(
+			["Title", "Backlinks", "Created", "Modified"],
+		);
+
+		await view.rerender({ allowRelevanceSort: false });
+		expect(
+			screen.queryByRole("button", { name: "Related" }),
+		).not.toBeInTheDocument();
+		expect(screen.getByRole("button", { name: "File size" })).toBeEnabled();
+		await fireEvent.click(trigger);
+		expect(showAtPosition.mock.contexts[1].items.map((item) => item.title)).toEqual(
+			["Title", "Backlinks", "Created", "Modified"],
+		);
 	});
 
 	it.each([
@@ -281,7 +365,10 @@ describe("ListControls", () => {
 
 			const iconElement = screen
 				.getByRole("button", {
-					name: sortOption === "alphabetical" ? /Ascending/ : /Descending/,
+					name:
+						sortOption === "alphabetical"
+							? "Title: A–Z (click for Z–A)"
+							: "Title: Z–A (click for A–Z)",
 				})
 				.querySelector('[aria-hidden="true"]');
 			expect(iconElement).toHaveAttribute("data-icon", icon);

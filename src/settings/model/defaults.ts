@@ -27,6 +27,8 @@ export const DEFAULT_SETTINGS: PluginSettings = {
 	highlightInPreviewOnHover: true,
 	twoHopHeaderSortOrder: "appearance",
 	lastUsedSortOption: "alphabetical",
+	quickSortField1: "modified-date",
+	quickSortField2: "none",
 	previewMaxLines: 15,
 	previewMaxChars: 500,
 	previewVisualLineSafetyMargin: 0,

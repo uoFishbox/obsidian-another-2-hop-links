@@ -107,6 +107,19 @@ describe("SettingsSideEffectController", () => {
 		expect(mocks.refreshEmptyView).not.toHaveBeenCalled();
 	});
 
+	it("refreshes views without invalidating sort data for pinned sort changes", () => {
+		const { apply, mocks } = createHarness();
+
+		apply("quickSortField1");
+
+		expect(mocks.updateAllViews).not.toHaveBeenCalled();
+		expect(mocks.getLeavesOfType).toHaveBeenCalledTimes(4);
+		expect(mocks.refreshEmptyView).toHaveBeenCalledOnce();
+		expect(mocks.invalidateSortCache).not.toHaveBeenCalled();
+		expect(mocks.invalidateAllNotesSorting).not.toHaveBeenCalled();
+		expect(mocks.handleSettingsChange).toHaveBeenCalledOnce();
+	});
+
 	it("does not reactivate display mode for content search", () => {
 		const { apply, mocks } = createHarness();
 

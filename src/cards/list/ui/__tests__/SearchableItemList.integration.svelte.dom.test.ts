@@ -192,24 +192,24 @@ describe("SearchableItemList integration", () => {
 			"modified-date-reverse",
 		);
 		const trigger = screen.getByRole("button", { name: ARIA_LABELS.SORT_SELECT });
-		expect(trigger).toHaveTextContent("Modified date");
+		expect(trigger).toHaveTextContent("Modified");
 		await fireEvent.click(trigger);
 		expect(
 			showAtPosition.mock.contexts[0].items.some(
-				(item) => item.title === "Relevance",
+				(item) => item.title === "Related",
 			),
 		).toBe(false);
 
 		await view.rerender({ config: { ...config, allowRelevanceSort: true } });
 		await flushAsyncUi();
-		expect(trigger).toHaveTextContent("Relevance");
+		expect(trigger).toHaveTextContent("Related");
 		expect(sortService.sort).toHaveBeenLastCalledWith(
 			expect.any(Array),
 			"modified-date-reverse",
 		);
 		expect(applicationStore.sortOption).toBe("relevance");
 		const relevanceDirection = screen.getByRole("button", {
-			name: "Highest relevance first (click for lowest first)",
+			name: "Relevance: highest first (click for lowest first)",
 		});
 		expect(relevanceDirection).toBeEnabled();
 		expect(

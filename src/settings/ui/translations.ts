@@ -24,6 +24,16 @@ export type TranslationKey =
 	| "mergeBacklinkOutgoingDesc"
 	| "twoHopHeaderSortOrder"
 	| "twoHopHeaderSortOrderDesc"
+	| "quickSortField1"
+	| "quickSortField2"
+	| "quickSortFieldDesc"
+	| "none"
+	| "sortRelevance"
+	| "sortTitle"
+	| "sortBacklinks"
+	| "sortCreatedDate"
+	| "sortModifiedDate"
+	| "sortFileSize"
 	| "hideDuplicateNotes"
 	| "hideDuplicateNotesDesc"
 	| "enableTagFeatures"
@@ -120,6 +130,17 @@ const translations: Record<Language, Record<TranslationKey, string>> = {
 		twoHopHeaderSortOrder: "2-hop link header sort order",
 		twoHopHeaderSortOrderDesc:
 			"The display order of headers within the '2-hop link' section.",
+		quickSortField1: "Pinned sort 1",
+		quickSortField2: "Pinned sort 2",
+		quickSortFieldDesc:
+			"Show this sort field beside the sort menu. Select None to leave the slot empty; duplicate fields are shown only once.",
+		none: "None",
+		sortRelevance: "Related",
+		sortTitle: "Title",
+		sortBacklinks: "Backlinks",
+		sortCreatedDate: "Created",
+		sortModifiedDate: "Modified",
+		sortFileSize: "File size",
 		hideDuplicateNotes: "Hide duplicate notes",
 		hideDuplicateNotesDesc:
 			"Hide notes that are already displayed in higher sections.",
@@ -229,6 +250,17 @@ const translations: Record<Language, Record<TranslationKey, string>> = {
 		twoHopHeaderSortOrder: "2ホップリンクヘッダーの並び順",
 		twoHopHeaderSortOrderDesc:
 			"「2ホップリンク」セクション内のヘッダーの表示順序を設定します。",
+		quickSortField1: "固定ソート 1",
+		quickSortField2: "固定ソート 2",
+		quickSortFieldDesc:
+			"ソートメニューの横に表示する項目を選びます。「なし」で空欄になり、同じ項目を2つ選んだ場合は1つだけ表示されます。",
+		none: "なし",
+		sortRelevance: "関連度",
+		sortTitle: "タイトル",
+		sortBacklinks: "バックリンク",
+		sortCreatedDate: "作成日時",
+		sortModifiedDate: "更新日時",
+		sortFileSize: "ファイルサイズ",
 		hideDuplicateNotes: "重複ノートを非表示",
 		hideDuplicateNotesDesc:
 			"既に上位セクションに表示されているノートを非表示にします。",

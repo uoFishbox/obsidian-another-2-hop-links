@@ -61,11 +61,25 @@ describe("parsePluginSettings", () => {
 			language: "fr",
 			displayMode: "floating",
 			lastUsedSortOption: "unknown-sort",
+			quickSortField1: "unknown-field",
+			quickSortField2: 2,
 		});
 
 		expect(settings.language).toBe("en");
 		expect(settings.displayMode).toBe("editor-inline");
 		expect(settings.lastUsedSortOption).toBe("alphabetical");
+		expect(settings.quickSortField1).toBe(DEFAULT_SETTINGS.quickSortField1);
+		expect(settings.quickSortField2).toBe(DEFAULT_SETTINGS.quickSortField2);
+	});
+
+	it("restores configured pinned sort fields", () => {
+		const settings = parsePluginSettings({
+			quickSortField1: "relevance",
+			quickSortField2: "file-size",
+		});
+
+		expect(settings.quickSortField1).toBe("relevance");
+		expect(settings.quickSortField2).toBe("file-size");
 	});
 
 	it("falls back to defaults for invalid boolean and string values", () => {

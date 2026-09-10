@@ -1,4 +1,4 @@
-import type { SortOption } from "cards/sorting";
+import type { QuickSortField, SortOption } from "cards/sorting";
 export {
 	DEFAULT_CARD_GAP_PX,
 	DEFAULT_CARD_HEIGHT_PX,
@@ -53,6 +53,8 @@ export interface PluginSettings {
 	highlightInPreviewOnHover: boolean;
 	twoHopHeaderSortOrder: TwoHopHeaderSortOrder;
 	lastUsedSortOption: SortOption;
+	quickSortField1: QuickSortField;
+	quickSortField2: QuickSortField;
 	previewMaxLines: number;
 	previewMaxChars: number;
 	previewVisualLineSafetyMargin: number;

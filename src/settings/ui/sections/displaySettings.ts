@@ -1,5 +1,15 @@
 import { parsePositiveInteger, parseTrimmedString } from "./settingDefinition";
-import type { SettingDefinition } from "./settingDefinition";
+import type { SelectOption, SettingDefinition } from "./settingDefinition";
+
+const QUICK_SORT_OPTIONS: readonly SelectOption[] = [
+	{ value: "none", label: "none", isTranslationKey: true },
+	{ value: "relevance", label: "sortRelevance", isTranslationKey: true },
+	{ value: "title", label: "sortTitle", isTranslationKey: true },
+	{ value: "backlinks", label: "sortBacklinks", isTranslationKey: true },
+	{ value: "created-date", label: "sortCreatedDate", isTranslationKey: true },
+	{ value: "modified-date", label: "sortModifiedDate", isTranslationKey: true },
+	{ value: "file-size", label: "sortFileSize", isTranslationKey: true },
+];
 
 export const DISPLAY_SETTING_DEFINITIONS: ReadonlyArray<SettingDefinition> = [
 	{
@@ -80,6 +90,24 @@ export const DISPLAY_SETTING_DEFINITIONS: ReadonlyArray<SettingDefinition> = [
 				isTranslationKey: true,
 			},
 		],
+	},
+	{
+		section: "display",
+		settingKey: "quickSortField1",
+		controlType: "dropdown",
+		translationKey: "quickSortField1",
+		descriptionKey: "quickSortFieldDesc",
+		immediate: true,
+		options: QUICK_SORT_OPTIONS,
+	},
+	{
+		section: "display",
+		settingKey: "quickSortField2",
+		controlType: "dropdown",
+		translationKey: "quickSortField2",
+		descriptionKey: "quickSortFieldDesc",
+		immediate: true,
+		options: QUICK_SORT_OPTIONS,
 	},
 	{
 		section: "display",

@@ -8,6 +8,7 @@ export type {
 	SortingConfiguration,
 	SortMetricKind,
 	SortOption,
+	QuickSortField,
 	SortResult,
 	SortableItem,
 } from "./types";

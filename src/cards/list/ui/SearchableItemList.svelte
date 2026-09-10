@@ -405,6 +405,10 @@
 	{contentSearchEnabled}
 	{sortOption}
 	allowRelevanceSort={config.allowRelevanceSort}
+	quickSortFields={[
+		applicationStore.settings?.quickSortField1 ?? "modified-date",
+		applicationStore.settings?.quickSortField2 ?? "none",
+	]}
 	onSortChange={(opt) => applicationStore.setSortOption(opt)}
 	onMoveFocusToResults={moveFocusToResults}
 	showSearchInput={searchEnabled}

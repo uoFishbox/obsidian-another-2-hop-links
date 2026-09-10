@@ -19,6 +19,19 @@ export const SORT_OPTIONS = [
 
 export type SortOption = (typeof SORT_OPTIONS)[number];
 
+export const QUICK_SORT_FIELDS = [
+	"none",
+	"relevance",
+	"title",
+	"backlinks",
+	"created-date",
+	"modified-date",
+	"file-size",
+] as const;
+
+/** A sort field that can be pinned beside the sort menu, or an empty slot. */
+export type QuickSortField = (typeof QUICK_SORT_FIELDS)[number];
+
 export type SortableItem = CardLinkBranch | IndexedLink | TaggedNote | TFile;
 
 export type Comparator<T = SortableItem> = (a: T, b: T) => number;

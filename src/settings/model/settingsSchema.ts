@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { SORT_OPTIONS } from "cards/sorting/types";
+import { QUICK_SORT_FIELDS, SORT_OPTIONS } from "cards/sorting/types";
 import { DEFAULT_SETTINGS } from "./defaults";
 import {
 	DISPLAY_MODES,
@@ -60,6 +60,8 @@ const PluginSettingsSchema = z.object({
 		.enum(TWO_HOP_HEADER_SORT_ORDERS)
 		.catch(DEFAULT_SETTINGS.twoHopHeaderSortOrder),
 	lastUsedSortOption: z.enum(SORT_OPTIONS).catch(DEFAULT_SETTINGS.lastUsedSortOption),
+	quickSortField1: z.enum(QUICK_SORT_FIELDS).catch(DEFAULT_SETTINGS.quickSortField1),
+	quickSortField2: z.enum(QUICK_SORT_FIELDS).catch(DEFAULT_SETTINGS.quickSortField2),
 	previewMaxLines: nonNegativeInteger(DEFAULT_SETTINGS.previewMaxLines),
 	previewMaxChars: nonNegativeInteger(DEFAULT_SETTINGS.previewMaxChars),
 	previewVisualLineSafetyMargin: nonNegativeInteger(

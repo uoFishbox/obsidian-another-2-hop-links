@@ -22,6 +22,14 @@ const LAYOUT_AFFECTING_SETTINGS = new Set<keyof PluginSettings>([
 	"enableTagFeatures",
 	"experimentalShadowDomCss",
 	"language",
+	"quickSortField1",
+	"quickSortField2",
+]);
+
+const NON_SORT_INVALIDATING_SETTINGS = new Set<keyof PluginSettings>([
+	"lastUsedSortOption",
+	"quickSortField1",
+	"quickSortField2",
 ]);
 
 interface RefreshableFromSettings {
@@ -97,11 +105,11 @@ export function createSettingsSideEffectController(
 		let reactivatesDisplayMode = false;
 		let refreshesLayout = false;
 		for (const key of changedKeySet) {
-			if (key !== "lastUsedSortOption") {
+			if (!NON_SORT_INVALIDATING_SETTINGS.has(key)) {
 				invalidatesSort = true;
-				if (key !== "enableContentSearch") {
-					reactivatesDisplayMode = true;
-				}
+			}
+			if (key !== "lastUsedSortOption" && key !== "enableContentSearch") {
+				reactivatesDisplayMode = true;
 			}
 			if (LAYOUT_AFFECTING_SETTINGS.has(key)) {
 				refreshesLayout = true;
