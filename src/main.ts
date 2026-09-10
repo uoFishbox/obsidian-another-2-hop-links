@@ -1,5 +1,8 @@
-import { Plugin, TFile, loadMathJax, requireApiVersion } from "obsidian";
-import { installMathShadowPatch } from "shared/ui/dom/mathShadowStyles";
+import { Plugin, TFile, loadMathJax } from "obsidian";
+import {
+	installMathShadowPatch,
+	usesTemmlMathRenderer,
+} from "shared/ui/dom/mathShadowStyles";
 import { SettingsManager } from "settings/persistence/SettingsManager";
 import { DEFAULT_SETTINGS } from "settings/model";
 import type { PluginSettings } from "settings/model";
@@ -102,7 +105,7 @@ export default class CosenseCardLinksPlugin extends Plugin implements PluginHost
 			await loadMathJax();
 			if (this.isUnloaded) return;
 
-			if (!requireApiVersion("1.14.0")) {
+			if (!usesTemmlMathRenderer()) {
 				installMathShadowPatch();
 			}
 

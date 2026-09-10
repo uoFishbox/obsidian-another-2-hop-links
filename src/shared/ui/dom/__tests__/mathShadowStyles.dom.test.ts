@@ -8,6 +8,7 @@ import {
 	resetMathShadowStylesStateForTests,
 	syncMathStylesForNode,
 	syncMathStylesToShadowRoot,
+	usesTemmlMathRenderer,
 } from "../mathShadowStyles";
 
 describe("mathShadowStyles", () => {
@@ -23,6 +24,21 @@ describe("mathShadowStyles", () => {
 		resetMathShadowStylesStateForTests();
 		vi.restoreAllMocks();
 	});
+
+	test.each([
+		{ availableVersions: [] as string[], expected: false },
+		{ availableVersions: ["1.14.0"], expected: true },
+		{ availableVersions: ["1.14.0", "1.14.1"], expected: false },
+	])(
+		"uses Temml only when the host is exactly Obsidian 1.14.0",
+		({ availableVersions, expected }) => {
+			vi.mocked(obsidian.requireApiVersion).mockImplementation((version) =>
+				availableVersions.includes(version),
+			);
+
+			expect(usesTemmlMathRenderer()).toBe(expected);
+		},
+	);
 
 	test("copies the current MathJax CHTML stylesheet into a shadow root", () => {
 		const sourceStyle = document.createElement("style");
@@ -96,7 +112,10 @@ describe("mathShadowStyles", () => {
 		).toBeNull();
 	});
 
-	test("patches MathJax updateDocument to queue shadow root sync", async () => {
+	test("patches MathJax updateDocument on Obsidian 1.14.1 and later", async () => {
+		vi.mocked(obsidian.requireApiVersion).mockImplementation((version) =>
+			["1.14.0", "1.14.1"].includes(version),
+		);
 		const sourceStyle = document.createElement("style");
 		sourceStyle.id = "MJX-CHTML-styles";
 		sourceStyle.textContent = "mjx-container { color: red; }";
@@ -140,7 +159,9 @@ describe("mathShadowStyles", () => {
 
 	describe("Temml", () => {
 		beforeEach(() => {
-			vi.mocked(obsidian.requireApiVersion).mockReturnValue(true);
+			vi.mocked(obsidian.requireApiVersion).mockImplementation(
+				(version) => version === "1.14.0",
+			);
 		});
 
 		function createSurface(ownerDocument: Document = document) {

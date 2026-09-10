@@ -28,6 +28,10 @@ type MathJaxWithStylesheet = {
 	};
 };
 
+export function usesTemmlMathRenderer(): boolean {
+	return requireApiVersion("1.14.0") && !requireApiVersion("1.14.1");
+}
+
 function getMathJax(): MathJaxWithStylesheet | undefined {
 	return (globalThis as { MathJax?: MathJaxWithStylesheet }).MathJax;
 }
@@ -194,7 +198,7 @@ export function resetMathShadowStylesStateForTests(): void {
 
 /** Registers a plugin surface and installs the styles for its math renderer. */
 export function registerMathShadowRoot(shadowRoot: ShadowRoot): void {
-	if (requireApiVersion("1.14.0")) {
+	if (usesTemmlMathRenderer()) {
 		registeredTemmlShadowRoots.add(shadowRoot);
 		syncTemmlStylesToShadowRoot(shadowRoot);
 		return;
@@ -229,10 +233,9 @@ function syncRegisteredMathJaxShadowRoots(): boolean {
 	return didSync;
 }
 
-/** Batches updates of the dynamically generated MathJax CSS on older hosts. */
 export function queueMathShadowStylesSync(): void {
 	// Temml CSS is static and installed at registration, without a global scan.
-	if (requireApiVersion("1.14.0")) return;
+	if (usesTemmlMathRenderer()) return;
 	if (isMathJaxShadowSyncQueued) {
 		return;
 	}
@@ -270,7 +273,7 @@ export function queueMathShadowStylesSync(): void {
 
 /** Hooks MathJax updates only on hosts that still use MathJax. */
 export function installMathShadowPatch(): void {
-	if (requireApiVersion("1.14.0")) return;
+	if (usesTemmlMathRenderer()) return;
 	if (hasInstalledMathJaxShadowPatch) {
 		return;
 	}
@@ -309,7 +312,7 @@ export function installMathShadowPatch(): void {
 
 /** Registers and synchronizes math CSS, returning whether styles are ready. */
 export function syncMathStylesToShadowRoot(shadowRoot: ShadowRoot): boolean {
-	if (requireApiVersion("1.14.0")) {
+	if (usesTemmlMathRenderer()) {
 		registeredTemmlShadowRoots.add(shadowRoot);
 		return syncTemmlStylesToShadowRoot(shadowRoot);
 	}

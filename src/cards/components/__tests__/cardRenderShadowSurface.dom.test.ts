@@ -131,7 +131,9 @@ describe("cardRenderShadowSurface", () => {
 
 describe("cardRenderShadowSurface math styles (Temml)", () => {
 	beforeEach(() => {
-		vi.spyOn(obsidian, "requireApiVersion").mockReturnValue(true);
+		vi.spyOn(obsidian, "requireApiVersion").mockImplementation(
+			(version) => version === "1.14.0",
+		);
 		resetMathShadowStylesStateForTests();
 	});
 
@@ -169,6 +171,7 @@ describe("cardRenderShadowSurface math styles (Temml)", () => {
 		);
 		expect(replace).toHaveBeenCalledTimes(1);
 		expect(obsidian.requireApiVersion).toHaveBeenCalledWith("1.14.0");
+		expect(obsidian.requireApiVersion).toHaveBeenCalledWith("1.14.1");
 		expect(first.root.querySelectorAll("style")).toHaveLength(1);
 		expect(
 			first.root.querySelector("style[data-ccl-mathjax-shadow-style]"),
