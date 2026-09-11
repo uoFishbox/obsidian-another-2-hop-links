@@ -1,5 +1,5 @@
 import type { PluginHost } from "obsidian-integration/pluginHost";
-import { openTagNotesView } from "search/tag-notes/TagNotesView";
+import { openTagNotesView } from "search/tag-notes/openTagNotesView";
 import { getGlobalSearchOpenGlobalSearch } from "obsidian-integration/capabilities/obsidianInternals";
 import { applyPatch } from "obsidian-integration/capabilities/applyPatch";
 import type { TaggedNote } from "indexing/model";

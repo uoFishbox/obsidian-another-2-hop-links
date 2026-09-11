@@ -4,8 +4,9 @@ import type { SortOption } from "cards/sorting";
 import type { DisplayDataBuilder } from "two-hop/display/displayDataBuilder";
 import { TwoHopState } from "two-hop/state/TwoHopState.svelte";
 import type { ResolveTwoHopLinks } from "two-hop/state/TwoHopLinksLoader";
+import { RECENT_TWO_HOP_STATE_LIMIT } from "./twoHopStatePoolConfig";
 
-export const RECENT_TWO_HOP_STATE_LIMIT = 6;
+export { RECENT_TWO_HOP_STATE_LIMIT } from "./twoHopStatePoolConfig";
 
 export interface TwoHopStatePoolOptions {
 	indexingService: IIndexingService;

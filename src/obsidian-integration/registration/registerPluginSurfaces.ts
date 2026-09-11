@@ -10,13 +10,12 @@ import type { RenderedMdElementsRegistry } from "obsidian-integration/markdown/R
 import { buildLivePreviewPlugin } from "obsidian-integration/markdown/livePreview";
 import { markdownPostProcessor } from "obsidian-integration/markdown/markdownHandlers";
 import { downloadAsFile, exportToClipboard } from "two-hop/export/exportService";
-import { TwoHopLinksView, TWO_HOP_LINKS_VIEW_TYPE } from "two-hop/ui/TwoHopLinksView";
 import {
-	PreCreationView,
+	TWO_HOP_LINKS_VIEW_TYPE,
+	VIEW_TYPE_ALL_NOTES,
 	VIEW_TYPE_PRE_CREATE,
-} from "two-hop/pre-creation/PreCreationView";
-import { TagNotesView, VIEW_TYPE_TAG_NOTES } from "search/tag-notes/TagNotesView";
-import { AllNotesView, VIEW_TYPE_ALL_NOTES } from "search/all-notes/AllNotesView";
+	VIEW_TYPE_TAG_NOTES,
+} from "obsidian-integration/views/viewTypes";
 import {
 	COSENSE_CARD_LINKS_HOVER_SOURCE_DISPLAY,
 	COSENSE_CARD_LINKS_HOVER_SOURCE_ID,
@@ -49,22 +48,26 @@ export function registerPluginSurfaces(
 }
 
 function registerViews(plugin: PluginHost, viewServices: ViewServices): void {
-	plugin.registerView(
-		TWO_HOP_LINKS_VIEW_TYPE,
-		(leaf) => new TwoHopLinksView(leaf, plugin, viewServices),
-	);
-	plugin.registerView(
-		VIEW_TYPE_PRE_CREATE,
-		(leaf) => new PreCreationView(leaf, plugin, viewServices),
-	);
-	plugin.registerView(
-		VIEW_TYPE_TAG_NOTES,
-		(leaf) => new TagNotesView(leaf, plugin, viewServices),
-	);
-	plugin.registerView(
-		VIEW_TYPE_ALL_NOTES,
-		(leaf) => new AllNotesView(leaf, plugin, viewServices),
-	);
+	plugin.registerView(TWO_HOP_LINKS_VIEW_TYPE, (leaf) => {
+		const { TwoHopLinksView } =
+			require("two-hop/ui/TwoHopLinksView") as typeof import("two-hop/ui/TwoHopLinksView");
+		return new TwoHopLinksView(leaf, plugin, viewServices);
+	});
+	plugin.registerView(VIEW_TYPE_PRE_CREATE, (leaf) => {
+		const { PreCreationView } =
+			require("two-hop/pre-creation/PreCreationView") as typeof import("two-hop/pre-creation/PreCreationView");
+		return new PreCreationView(leaf, plugin, viewServices);
+	});
+	plugin.registerView(VIEW_TYPE_TAG_NOTES, (leaf) => {
+		const { TagNotesView } =
+			require("search/tag-notes/TagNotesView") as typeof import("search/tag-notes/TagNotesView");
+		return new TagNotesView(leaf, plugin, viewServices);
+	});
+	plugin.registerView(VIEW_TYPE_ALL_NOTES, (leaf) => {
+		const { AllNotesView } =
+			require("search/all-notes/AllNotesView") as typeof import("search/all-notes/AllNotesView");
+		return new AllNotesView(leaf, plugin, viewServices);
+	});
 	plugin.registerHoverLinkSource(COSENSE_CARD_LINKS_HOVER_SOURCE_ID, {
 		display: COSENSE_CARD_LINKS_HOVER_SOURCE_DISPLAY,
 		defaultMod: true,

@@ -1,20 +1,13 @@
 import { Platform } from "obsidian";
 import type { CliFlags } from "obsidian";
-import { z } from "zod";
 import type { PluginHost } from "obsidian-integration/pluginHost";
-import { TwoHopLinksView, TWO_HOP_LINKS_VIEW_TYPE } from "two-hop/ui/TwoHopLinksView";
-import { inspectCliPage, runCliQuery, type CliQueryAction } from "./cliQueries";
-import { replaceCliLinks } from "./cliReplaceLinks";
-import {
-	cliBoolean,
-	cliFailure,
-	findCliFile,
-	notePath,
-	paginationShape,
-	searchShape,
-	type CliContext,
-	type CliResult,
-} from "./cliProtocol";
+import type { CliAction } from "./executeCliHandler";
+
+interface CliCommandDefinition {
+	readonly action: CliAction;
+	readonly description: string;
+	readonly flags: CliFlags;
+}
 
 const pathFlags: CliFlags = {
 	path: {
@@ -36,110 +29,111 @@ const queryFlags: CliFlags = {
 	},
 	or: { description: "Match any search term" },
 };
-/** Adds capabilities absent from the core CLI and cancels them when the plugin unloads. */
-export function registerCliHandlers(plugin: PluginHost): void {
-	if (!Platform.isDesktopApp) return;
-	const controller = new AbortController();
-	const context: CliContext = { host: plugin, signal: controller.signal };
-	plugin.register(() => controller.abort());
-	const commands: { command: string; description: string; flags: CliFlags }[] = [];
-
-	function register<T>(
-		action: string,
-		description: string,
-		flags: CliFlags,
-		schema: z.ZodType<T>,
-		handler: (params: T) => Promise<CliResult>,
-	): void {
-		const command = `${plugin.manifest.id}:${action}`;
-		commands.push({ command, description, flags });
-		plugin.registerCliHandler(command, description, flags, async (params) => {
-			if (controller.signal.aborted)
-				return JSON.stringify(cliFailure("cancelled", "Plugin unloaded"));
-			const parsed = schema.safeParse(params);
-			if (!parsed.success)
-				return JSON.stringify(
-					cliFailure("invalid-params", parsed.error.message),
-				);
-			try {
-				return JSON.stringify(await handler(parsed.data));
-			} catch (error) {
-				return JSON.stringify(
-					cliFailure(
-						controller.signal.aborted ? "cancelled" : "io-error",
-						error instanceof Error ? error.message : String(error),
-					),
-				);
-			}
-		});
-	}
-
-	const queries: [CliQueryAction, string, boolean][] = [
-		[
-			"list1hopLinks",
-			"Merge incoming/outgoing links with direction and metadata",
-			false,
-		],
-		["list2hopLinks", "List unique two-hop pages with intermediate paths", false],
-		["search1hopLinks", "Search only one-hop pages", true],
-		["search2hopLinks", "Search only two-hop pages", true],
-	];
-	for (const [action, description, search] of queries) {
-		register(
-			action,
-			description,
-			{ ...pathFlags, ...pageFlags, ...(search ? queryFlags : {}) },
-			z.object({
-				...paginationShape,
-				path: notePath,
-				query: search ? searchShape.query : z.undefined().optional(),
-				or: cliBoolean,
-			}),
-			(params) => runCliQuery(context, action, params),
-		);
-	}
-	register(
-		"inspectPage",
-		"Inspect a page, semantic embeds, and its one-hop/two-hop context",
-		{ ...pathFlags, ...pageFlags },
-		z.object({ ...paginationShape, path: notePath }),
-		(params) => inspectCliPage(context, params),
-	);
-	register(
-		"replaceLinks",
-		"Replace link targets without renaming the target page",
-		{
+const commandDefinitions: readonly CliCommandDefinition[] = [
+	{
+		action: "list1hopLinks",
+		description: "Merge incoming/outgoing links with direction and metadata",
+		flags: { ...pathFlags, ...pageFlags },
+	},
+	{
+		action: "list2hopLinks",
+		description: "List unique two-hop pages with intermediate paths",
+		flags: { ...pathFlags, ...pageFlags },
+	},
+	{
+		action: "search1hopLinks",
+		description: "Search only one-hop pages",
+		flags: { ...pathFlags, ...pageFlags, ...queryFlags },
+	},
+	{
+		action: "search2hopLinks",
+		description: "Search only two-hop pages",
+		flags: { ...pathFlags, ...pageFlags, ...queryFlags },
+	},
+	{
+		action: "inspectPage",
+		description: "Inspect a page, semantic embeds, and its one-hop/two-hop context",
+		flags: { ...pathFlags, ...pageFlags },
+	},
+	{
+		action: "replaceLinks",
+		description: "Replace link targets without renaming the target page",
+		flags: {
 			from: {
 				description: "Old target path",
 				value: "<path.md>",
 				required: true,
 			},
-			to: { description: "New target path", value: "<path.md>", required: true },
+			to: {
+				description: "New target path",
+				value: "<path.md>",
+				required: true,
+			},
 			dryRun: { description: "Report affected files without writing" },
 		},
-		z.object({ from: notePath, to: notePath, dryRun: cliBoolean }),
-		(params) => replaceCliLinks(context, params),
-	);
-	register(
-		"openRelatedPagesView",
-		"Open the plugin's two-hop card view",
-		pathFlags,
-		z.object({ path: notePath }),
-		async ({ path }) => {
-			const found = findCliFile(plugin.app, path);
-			if (!found.ok) return found;
-			const leaf = plugin.app.workspace.getLeaf("tab");
-			await leaf.setViewState({ type: TWO_HOP_LINKS_VIEW_TYPE, active: true });
-			if (!(leaf.view instanceof TwoHopLinksView))
-				return cliFailure("not-ready", "Two-hop view could not be opened");
-			leaf.view.renderForFile(found.file);
-			return { ok: true, path };
-		},
-	);
+	},
+	{
+		action: "openRelatedPagesView",
+		description: "Open the plugin's two-hop card view",
+		flags: pathFlags,
+	},
+];
+
+/** Registers lightweight CLI entry points and loads implementations on demand. */
+export function registerCliHandlers(plugin: PluginHost): void {
+	if (!Platform.isDesktopApp) return;
+
+	const controller = new AbortController();
+	plugin.register(() => controller.abort());
+
+	for (const definition of commandDefinitions) {
+		const command = `${plugin.manifest.id}:${definition.action}`;
+		plugin.registerCliHandler(
+			command,
+			definition.description,
+			definition.flags,
+			async (params) => {
+				if (controller.signal.aborted) {
+					return serializeFailure("cancelled", "Plugin unloaded");
+				}
+
+				try {
+					const { executeCliHandler } = await import("./executeCliHandler");
+					return JSON.stringify(
+						await executeCliHandler(
+							plugin,
+							controller.signal,
+							definition.action,
+							params,
+						),
+					);
+				} catch (error) {
+					return serializeFailure(
+						controller.signal.aborted ? "cancelled" : "io-error",
+						error instanceof Error ? error.message : String(error),
+					);
+				}
+			},
+		);
+	}
+
 	plugin.registerCliHandler(
 		plugin.manifest.id,
 		"Cosense-style card links CLI: list extension commands",
 		null,
-		() => JSON.stringify({ ok: true, version: plugin.manifest.version, commands }),
+		() =>
+			JSON.stringify({
+				ok: true,
+				version: plugin.manifest.version,
+				commands: commandDefinitions.map(({ action, description, flags }) => ({
+					command: `${plugin.manifest.id}:${action}`,
+					description,
+					flags,
+				})),
+			}),
 	);
+}
+
+function serializeFailure(code: "cancelled" | "io-error", message: string): string {
+	return JSON.stringify({ ok: false, error: { code, message } });
 }

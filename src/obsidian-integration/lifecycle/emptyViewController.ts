@@ -1,5 +1,5 @@
 import type { App, WorkspaceLeaf } from "obsidian";
-import { VIEW_TYPE_ALL_NOTES } from "search/all-notes/AllNotesView";
+import { VIEW_TYPE_ALL_NOTES } from "obsidian-integration/views/viewTypes";
 import { getLeafId } from "obsidian-integration/workspace/workspaceLeafIdentity";
 import type { PluginHost } from "obsidian-integration/pluginHost";
 

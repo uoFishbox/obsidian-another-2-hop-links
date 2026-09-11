@@ -1,9 +1,7 @@
 import {
 	TFile,
 	type IconName,
-	type PaneType,
 	setIcon,
-	type ViewState,
 	type ViewStateResult,
 	type WorkspaceLeaf,
 } from "obsidian";
@@ -27,8 +25,9 @@ import {
 	type ListViewUiState,
 } from "cards/list/model/listViewUiState";
 import { getMainUiTranslations } from "shared/i18n/mainUiTranslations";
-
-export const VIEW_TYPE_TAG_NOTES = "cosense-card-links-tag-notes-view";
+import { VIEW_TYPE_TAG_NOTES } from "obsidian-integration/views/viewTypes";
+export { openTagNotesView } from "./openTagNotesView";
+export { VIEW_TYPE_TAG_NOTES } from "obsidian-integration/views/viewTypes";
 
 export interface TagNotesRefreshDecisionInput {
 	readonly tagFeaturesEnabled: boolean;
@@ -64,35 +63,6 @@ interface TagNotesViewState {
 	tag?: unknown;
 	sourcePath?: unknown;
 	listUiState?: unknown;
-}
-
-export async function openTagNotesView(
-	plugin: PluginHost,
-	tag: string,
-	sourcePath: string,
-	newLeaf: PaneType | boolean = false,
-): Promise<void> {
-	if (!plugin.settings.enableTagFeatures) {
-		return;
-	}
-
-	const normalizedTag = normalizeTag(tag);
-	if (!normalizedTag) {
-		return;
-	}
-
-	const leaf = plugin.app.workspace.getLeaf(newLeaf);
-	const viewState: ViewState = {
-		type: VIEW_TYPE_TAG_NOTES,
-		state: {
-			tag: normalizedTag,
-			sourcePath,
-		},
-		active: true,
-	};
-
-	await leaf.setViewState(viewState);
-	plugin.app.workspace.revealLeaf(leaf);
 }
 
 export class TagNotesView extends AbstractSvelteListView<TaggedNote> {

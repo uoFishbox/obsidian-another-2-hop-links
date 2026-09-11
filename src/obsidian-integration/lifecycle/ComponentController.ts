@@ -1,5 +1,4 @@
 import { App, MarkdownView, TFile, WorkspaceLeaf, MarkdownRenderChild } from "obsidian";
-import { unmount } from "svelte";
 import {
 	getActiveInlineContainer,
 	type ActiveInlineContainer,
@@ -14,17 +13,16 @@ import type { DisplayDataBuilder } from "two-hop/display/displayDataBuilder";
 import type { IIndexingService } from "indexing/index-service/IndexingService";
 import type { PluginHost } from "obsidian-integration/pluginHost";
 import type { ResolveTwoHopLinks } from "two-hop/state/TwoHopLinksLoader";
-import { mountTwoHopLinksRootView } from "two-hop/ui/mountTwoHopLinksRootView";
 import type { LinkContext } from "cards/context/linkContext";
 import type { PreviewRuntime } from "card-preview/runtime/previewRuntime";
 import { createViewLinkContext } from "obsidian-integration/views/createViewLinkContext";
 import type { TwoHopLinksRootUiState } from "two-hop/ui/twoHopLinksRootUiState";
 import type { SvelteComponentInstance } from "obsidian-integration/views/svelteLifecycle";
 import { createInlineSurfaceLayoutController } from "shared/ui/dom/inlineSurfaceLayoutController";
-import { TwoHopStatePool } from "./TwoHopStatePool";
+import type { TwoHopStatePool, TwoHopStatePoolOptions } from "./TwoHopStatePool";
 import type { KeyboardNavigationSurfaceRegistry } from "obsidian-integration/navigation/keyboardNavigationSurface";
 
-export { RECENT_TWO_HOP_STATE_LIMIT } from "./TwoHopStatePool";
+export { RECENT_TWO_HOP_STATE_LIMIT } from "./twoHopStatePoolConfig";
 
 export type ComponentInstance = SvelteComponentInstance;
 
@@ -50,6 +48,12 @@ export interface ComponentControllerViewDeps {
 	readonly keyboardNavigationSurfaceRegistry: KeyboardNavigationSurfaceRegistry;
 }
 
+export interface ComponentControllerRuntimeLoader {
+	createTwoHopStatePool(options: TwoHopStatePoolOptions): TwoHopStatePool;
+	mountTwoHopLinksRootView: typeof import("two-hop/ui/mountTwoHopLinksRootView").mountTwoHopLinksRootView;
+	unmount: typeof import("svelte").unmount;
+}
+
 export interface IComponentManager {
 	mountComponentsForView(
 		view: MarkdownView,
@@ -68,7 +72,8 @@ export class ComponentController implements IComponentManager {
 	private readonly lazyLoaderCaches = new WeakMap<MarkdownView, Set<string>>();
 	private readonly inlineUiStates = new WeakMap<MarkdownView, InlineViewUiState>();
 
-	private readonly twoHopStatePool: TwoHopStatePool;
+	private twoHopStatePool: TwoHopStatePool | undefined = undefined;
+	private readonly twoHopStatePoolOptions: TwoHopStatePoolOptions;
 
 	constructor(
 		private readonly app: App,
@@ -79,13 +84,23 @@ export class ComponentController implements IComponentManager {
 		updateSortOption: (option: SortOption) => void,
 		private readonly viewDeps: ComponentControllerViewDeps,
 		updateContentSearch: (enabled: boolean) => void = () => {},
+		private readonly runtimeLoader: ComponentControllerRuntimeLoader = createComponentControllerRuntimeLoader(),
 	) {
-		this.twoHopStatePool = new TwoHopStatePool({
+		this.twoHopStatePoolOptions = {
 			indexingService,
 			createDisplayDataBuilder: viewDeps.createDisplayDataBuilder,
 			updateSortOption,
 			updateContentSearch,
-		});
+		};
+	}
+
+	private getTwoHopStatePool(): TwoHopStatePool {
+		if (!this.twoHopStatePool) {
+			this.twoHopStatePool = this.runtimeLoader.createTwoHopStatePool(
+				this.twoHopStatePoolOptions,
+			);
+		}
+		return this.twoHopStatePool;
 	}
 
 	private getLazyLoaderCache(view: MarkdownView): Set<string> {
@@ -192,7 +207,7 @@ export class ComponentController implements IComponentManager {
 		buildDisplayData: DisplayDataBuilder,
 		resolveTwoHopLinks: ResolveTwoHopLinks,
 	): TwoHopState {
-		return this.twoHopStatePool.create(
+		return this.getTwoHopStatePool().create(
 			settings,
 			buildDisplayData,
 			resolveTwoHopLinks,
@@ -206,7 +221,7 @@ export class ComponentController implements IComponentManager {
 		buildDisplayData: DisplayDataBuilder,
 		resolveTwoHopLinks: ResolveTwoHopLinks,
 	): TwoHopState {
-		return this.twoHopStatePool.acquire(
+		return this.getTwoHopStatePool().acquire(
 			leafId,
 			filePath,
 			settings,
@@ -216,7 +231,7 @@ export class ComponentController implements IComponentManager {
 	}
 
 	public clearStore(leafId: string, filePath: string): void {
-		this.twoHopStatePool.clearIdleStore(leafId, filePath);
+		this.twoHopStatePool?.clearIdleStore(leafId, filePath);
 	}
 
 	// ========== Component Lifecycle Management ==========
@@ -271,6 +286,7 @@ export class ComponentController implements IComponentManager {
 	): MountedComponent {
 		let applicationStore: TwoHopState | undefined;
 		let shouldReleaseStoreOnError = false;
+		const twoHopStatePool = this.getTwoHopStatePool();
 		const layoutController = createInlineSurfaceLayoutController({
 			container,
 			surface,
@@ -286,7 +302,7 @@ export class ComponentController implements IComponentManager {
 				leafId,
 				file.path,
 				settings,
-				this.twoHopStatePool.getOrCreateDisplayDataBuilder(leafId),
+				twoHopStatePool.getOrCreateDisplayDataBuilder(leafId),
 				this.resolveTwoHopLinks,
 			);
 			shouldReleaseStoreOnError = true;
@@ -295,7 +311,7 @@ export class ComponentController implements IComponentManager {
 				this.viewDeps.createLinkContext(file, settings),
 				() => {},
 			);
-			const { component } = mountTwoHopLinksRootView({
+			const { component } = this.runtimeLoader.mountTwoHopLinksRootView({
 				target: container,
 				app: this.app,
 				file,
@@ -325,7 +341,7 @@ export class ComponentController implements IComponentManager {
 				this.unmountComponent(component);
 				layoutController.dispose();
 
-				this.twoHopStatePool.release(leafId, file.path);
+				twoHopStatePool.release(leafId, file.path);
 			};
 
 			// Register it as a child of the View so it follows the View lifecycle
@@ -344,7 +360,7 @@ export class ComponentController implements IComponentManager {
 		} catch (error) {
 			layoutController.dispose();
 			if (shouldReleaseStoreOnError) {
-				this.twoHopStatePool.dispose(leafId, file.path);
+				twoHopStatePool.dispose(leafId, file.path);
 			}
 			ErrorHandler.handleMountError(error, file.path);
 			throw error;
@@ -357,7 +373,7 @@ export class ComponentController implements IComponentManager {
 		}
 
 		try {
-			unmount(component);
+			this.runtimeLoader.unmount(component);
 		} catch (error) {
 			ErrorHandler.handleUnmountError(error);
 		}
@@ -382,6 +398,26 @@ export class ComponentController implements IComponentManager {
 			}
 		});
 
-		this.twoHopStatePool.destroy();
+		this.twoHopStatePool?.destroy();
+		this.twoHopStatePool = undefined;
 	}
+}
+
+function createComponentControllerRuntimeLoader(): ComponentControllerRuntimeLoader {
+	return {
+		createTwoHopStatePool: (options) => {
+			const { TwoHopStatePool } =
+				require("./TwoHopStatePool") as typeof import("./TwoHopStatePool");
+			return new TwoHopStatePool(options);
+		},
+		mountTwoHopLinksRootView: (options) => {
+			const { mountTwoHopLinksRootView } =
+				require("two-hop/ui/mountTwoHopLinksRootView") as typeof import("two-hop/ui/mountTwoHopLinksRootView");
+			return mountTwoHopLinksRootView(options);
+		},
+		unmount: (component, options) => {
+			const { unmount } = require("svelte") as typeof import("svelte");
+			return unmount(component, options);
+		},
+	};
 }

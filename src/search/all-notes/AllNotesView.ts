@@ -25,8 +25,9 @@ import {
 } from "cards/list/model/listViewUiState";
 import { registerSearchFocusShortcut } from "obsidian-integration/views/searchFocusShortcut";
 import { getMainUiTranslations } from "shared/i18n/mainUiTranslations";
+import { VIEW_TYPE_ALL_NOTES } from "obsidian-integration/views/viewTypes";
 
-export const VIEW_TYPE_ALL_NOTES = "cosense-card-links-all-notes-view";
+export { VIEW_TYPE_ALL_NOTES } from "obsidian-integration/views/viewTypes";
 
 export class AllNotesView extends ItemView {
 	private component: SvelteComponentInstance | undefined = undefined;

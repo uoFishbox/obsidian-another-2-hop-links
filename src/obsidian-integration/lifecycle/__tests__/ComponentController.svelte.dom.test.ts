@@ -93,6 +93,9 @@ import {
 	ComponentController,
 	RECENT_TWO_HOP_STATE_LIMIT,
 } from "../ComponentController";
+import { TwoHopStatePool } from "../TwoHopStatePool";
+import { mountTwoHopLinksRootView } from "two-hop/ui/mountTwoHopLinksRootView";
+import { unmount } from "svelte";
 
 function createController() {
 	const view = new MarkdownView({} as any);
@@ -155,6 +158,12 @@ function createController() {
 				register: vi.fn(() => vi.fn()),
 			},
 		} as never,
+		undefined,
+		{
+			createTwoHopStatePool: (options) => new TwoHopStatePool(options),
+			mountTwoHopLinksRootView,
+			unmount,
+		},
 	);
 
 	return {

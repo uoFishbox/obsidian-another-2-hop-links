@@ -17,6 +17,9 @@ import {
 import { createCardPreviewSharedCache } from "card-preview/ui/cardPreviewSharedCache";
 import { createPreviewRenderQueue } from "card-preview/renderers/previewRenderQueue";
 import type { RawContentLoader } from "card-preview/pipeline/rawContentReader";
+import { DISABLED_PREVIEW_SURFACE } from "./disabledPreviewSurface";
+
+export { DISABLED_PREVIEW_SURFACE } from "./disabledPreviewSurface";
 
 /** Configuration shared by every preview surface owned by one plugin load. */
 export interface PreviewRuntimeOptions {
@@ -125,10 +128,3 @@ export function createPreviewRuntime(options: PreviewRuntimeOptions): PreviewRun
 
 	return { createSurface, dispose };
 }
-
-/** Stateless preview surface used when preview rendering is unavailable. */
-export const DISABLED_PREVIEW_SURFACE: VirtualPreviewSurface = {
-	registerHost: () => ({ dispose: () => {} }),
-	publish: () => {},
-	dispose: () => {},
-};

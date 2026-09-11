@@ -9,7 +9,6 @@ import {
 } from "obsidian";
 import { resolveExpectedPath } from "obsidian-integration/files/resolveExpectedPath";
 import { resolveFileByPath } from "obsidian-integration/files/resolveFileByPath";
-import { getLeafId } from "obsidian-integration/workspace/workspaceLeafIdentity";
 import {
 	normalizeLinkToMarkdownPath,
 	toCaseInsensitiveLookupKey,
@@ -29,19 +28,21 @@ import { getCardItemKey, type CardItem } from "cards/CardItem";
 import { materializePreCreationFile } from "./preCreationFileWorkflow";
 import { isPlainEnterAtContentEnd } from "shared/ui/dom/contentEditableCaret";
 import { getMainUiTranslations } from "shared/i18n/mainUiTranslations";
+import { VIEW_TYPE_PRE_CREATE } from "obsidian-integration/views/viewTypes";
+import {
+	PRE_CREATION_EPHEMERAL_STATE_KEY,
+	getPersistedPreCreationBootstrapState,
+	setPersistedPreCreationBootstrapState,
+	takePendingPreCreationBootstrapState,
+} from "./preCreationBootstrapState";
 
-export const VIEW_TYPE_PRE_CREATE = "cosense-card-links-pre-create-view";
-export const PRE_CREATION_EPHEMERAL_STATE_KEY = "cosense-card-links-pre-create";
-
-type PreCreationBootstrapState = {
-	linktext: string;
-	sourcePath: string;
-	expectedPath: string;
-	creationPath: string;
-};
-
-const pendingBootstrapStateByLeafId = new Map<string, PreCreationBootstrapState>();
-const persistedBootstrapStateByLeafId = new Map<string, PreCreationBootstrapState>();
+export { VIEW_TYPE_PRE_CREATE } from "obsidian-integration/views/viewTypes";
+export {
+	PRE_CREATION_EPHEMERAL_STATE_KEY,
+	hasAnyPreCreationBootstrapState,
+	setPendingPreCreationBootstrapState,
+	setPersistedPreCreationBootstrapState,
+} from "./preCreationBootstrapState";
 
 function getPathBasename(path: string): string {
 	const slash = path.lastIndexOf("/");
@@ -61,35 +62,6 @@ function dedupeBySourceFile(
 		result.push(link);
 	}
 	return result;
-}
-
-export function hasAnyPreCreationBootstrapState(): boolean {
-	return (
-		pendingBootstrapStateByLeafId.size > 0 ||
-		persistedBootstrapStateByLeafId.size > 0
-	);
-}
-
-export function setPendingPreCreationBootstrapState(
-	leaf: WorkspaceLeaf,
-	state: PreCreationBootstrapState,
-): void {
-	const leafId = getLeafId(leaf);
-	if (!leafId) {
-		return;
-	}
-	pendingBootstrapStateByLeafId.set(leafId, state);
-}
-
-export function setPersistedPreCreationBootstrapState(
-	leaf: WorkspaceLeaf,
-	state: PreCreationBootstrapState,
-): void {
-	const leafId = getLeafId(leaf);
-	if (!leafId) {
-		return;
-	}
-	persistedBootstrapStateByLeafId.set(leafId, state);
 }
 
 type PreCreationState = {
@@ -271,11 +243,7 @@ export class PreCreationView extends AbstractSvelteListView<IndexedLink> {
 	}
 
 	private hydrateFromPersistedBootstrapState(): void {
-		const leafId = getLeafId(this.leaf);
-		if (!leafId) {
-			return;
-		}
-		const persisted = persistedBootstrapStateByLeafId.get(leafId);
+		const persisted = getPersistedPreCreationBootstrapState(this.leaf);
 		if (!persisted) {
 			return;
 		}
@@ -294,11 +262,7 @@ export class PreCreationView extends AbstractSvelteListView<IndexedLink> {
 	}
 
 	private hydrateFromPendingBootstrapState(): void {
-		const leafId = getLeafId(this.leaf);
-		if (!leafId) {
-			return;
-		}
-		const pending = pendingBootstrapStateByLeafId.get(leafId);
+		const pending = takePendingPreCreationBootstrapState(this.leaf);
 		if (!pending) {
 			return;
 		}
@@ -306,8 +270,6 @@ export class PreCreationView extends AbstractSvelteListView<IndexedLink> {
 		this.sourcePath = pending.sourcePath;
 		this.expectedPath = pending.expectedPath;
 		this.creationPath = pending.creationPath;
-		persistedBootstrapStateByLeafId.set(leafId, pending);
-		pendingBootstrapStateByLeafId.delete(leafId);
 	}
 
 	private readEphemeralState(): {
@@ -354,11 +316,7 @@ export class PreCreationView extends AbstractSvelteListView<IndexedLink> {
 	}
 
 	private persistCurrentBootstrapState(): void {
-		const leafId = getLeafId(this.leaf);
-		if (!leafId) {
-			return;
-		}
-		persistedBootstrapStateByLeafId.set(leafId, {
+		setPersistedPreCreationBootstrapState(this.leaf, {
 			linktext: this.linktext,
 			sourcePath: this.sourcePath,
 			expectedPath: this.expectedPath,

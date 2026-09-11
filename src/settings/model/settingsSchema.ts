@@ -1,4 +1,3 @@
-import { z } from "zod";
 import { QUICK_SORT_FIELDS, SORT_OPTIONS } from "cards/sorting/types";
 import { DEFAULT_SETTINGS } from "./defaults";
 import {
@@ -10,117 +9,203 @@ import {
 	type PluginSettings,
 } from "./settings";
 
-const positiveInteger = (fallback: number) =>
-	z
-		.number()
-		.positive()
-		.transform((value) => Math.floor(value))
-		.catch(fallback);
-
-const nonNegativeInteger = (fallback: number) =>
-	z
-		.number()
-		.nonnegative()
-		.transform((value) => Math.floor(value))
-		.catch(fallback);
-
-const positiveNumber = (fallback: number) => z.number().positive().catch(fallback);
-
-const booleanSetting = (fallback: boolean) => z.boolean().catch(fallback);
-
-const stringSetting = (fallback: string) => z.string().catch(fallback);
-
-/**
- * Parses persisted settings. Every field falls back to its default on an
- * invalid value, so a corrupt data.json can never inject a wrong type into
- * the running plugin.
- */
-const PluginSettingsSchema = z.object({
-	settingsSchemaVersion: z
-		.literal(SETTINGS_SCHEMA_VERSION)
-		.catch(SETTINGS_SCHEMA_VERSION),
-	language: z.enum(LANGUAGES).catch(DEFAULT_SETTINGS.language),
-	displayMode: z.enum(DISPLAY_MODES).catch(DEFAULT_SETTINGS.displayMode),
-	useMergedLinksSection: booleanSetting(DEFAULT_SETTINGS.useMergedLinksSection),
-	dedupeCards: booleanSetting(DEFAULT_SETTINGS.dedupeCards),
-	enableTagFeatures: booleanSetting(DEFAULT_SETTINGS.enableTagFeatures),
-	showTagsSection: booleanSetting(DEFAULT_SETTINGS.showTagsSection),
-	defaultVisibleLinkCount: positiveInteger(DEFAULT_SETTINGS.defaultVisibleLinkCount),
-	loadMoreLinkIncrement: positiveInteger(DEFAULT_SETTINGS.loadMoreLinkIncrement),
-	cardWidthPx: positiveInteger(DEFAULT_SETTINGS.cardWidthPx),
-	cardHeightRatio: positiveNumber(DEFAULT_SETTINGS.cardHeightRatio),
-	cardGapPx: nonNegativeInteger(DEFAULT_SETTINGS.cardGapPx),
-	cardMaxColumns: positiveInteger(DEFAULT_SETTINGS.cardMaxColumns),
-	sectionMarginBottomPx: positiveInteger(DEFAULT_SETTINGS.sectionMarginBottomPx),
-	highlightOnOpen: booleanSetting(DEFAULT_SETTINGS.highlightOnOpen),
-	highlightInPreviewOnHover: booleanSetting(
-		DEFAULT_SETTINGS.highlightInPreviewOnHover,
-	),
-	twoHopHeaderSortOrder: z
-		.enum(TWO_HOP_HEADER_SORT_ORDERS)
-		.catch(DEFAULT_SETTINGS.twoHopHeaderSortOrder),
-	lastUsedSortOption: z.enum(SORT_OPTIONS).catch(DEFAULT_SETTINGS.lastUsedSortOption),
-	quickSortField1: z.enum(QUICK_SORT_FIELDS).catch(DEFAULT_SETTINGS.quickSortField1),
-	quickSortField2: z.enum(QUICK_SORT_FIELDS).catch(DEFAULT_SETTINGS.quickSortField2),
-	previewMaxLines: nonNegativeInteger(DEFAULT_SETTINGS.previewMaxLines),
-	previewMaxChars: nonNegativeInteger(DEFAULT_SETTINGS.previewMaxChars),
-	previewVisualLineSafetyMargin: nonNegativeInteger(
-		DEFAULT_SETTINGS.previewVisualLineSafetyMargin,
-	),
-	showTwoHopForSelectedCanvasFileNode: booleanSetting(
-		DEFAULT_SETTINGS.showTwoHopForSelectedCanvasFileNode,
-	),
-	mobileLongPressAction: z
-		.enum(MOBILE_LONG_PRESS_ACTIONS)
-		.catch(DEFAULT_SETTINGS.mobileLongPressAction),
-	excludeAttachments: booleanSetting(DEFAULT_SETTINGS.excludeAttachments),
-	frontmatterKeyCreatedDate: stringSetting(
-		DEFAULT_SETTINGS.frontmatterKeyCreatedDate,
-	),
-	frontmatterKeyModifiedDate: stringSetting(
-		DEFAULT_SETTINGS.frontmatterKeyModifiedDate,
-	),
-	enableGlobalSearchTagModal: booleanSetting(
-		DEFAULT_SETTINGS.enableGlobalSearchTagModal,
-	),
-	enableUnresolvedLinkModal: booleanSetting(
-		DEFAULT_SETTINGS.enableUnresolvedLinkModal,
-	),
-	enableEmptyViewAllNotesInNewTab: booleanSetting(
-		DEFAULT_SETTINGS.enableEmptyViewAllNotesInNewTab,
-	),
-	pinBookmarkedToTopInAllNotes: booleanSetting(
-		DEFAULT_SETTINGS.pinBookmarkedToTopInAllNotes,
-	),
-	enableUnresolvedLinkDecoration: booleanSetting(
-		DEFAULT_SETTINGS.enableUnresolvedLinkDecoration,
-	),
-	enableContentSearch: booleanSetting(DEFAULT_SETTINGS.enableContentSearch),
-	experimentalCosenseTitleEditing: booleanSetting(
-		DEFAULT_SETTINGS.experimentalCosenseTitleEditing,
-	),
-	experimentalShadowDomCss: stringSetting(DEFAULT_SETTINGS.experimentalShadowDomCss),
-	priorityFrontmatterKeyForPreview: stringSetting(
-		DEFAULT_SETTINGS.priorityFrontmatterKeyForPreview,
-	),
-	priorityFrontmatterKeyForTitle: stringSetting(
-		DEFAULT_SETTINGS.priorityFrontmatterKeyForTitle,
-	),
-});
+type UnknownSettings = Readonly<Record<string, unknown>>;
 
 /**
  * Validates unknown persisted data into PluginSettings, normalizing each
- * invalid field to its default. Non-object input falls back to full defaults.
+ * invalid field to its default. Unknown and obsolete fields are discarded.
  */
 export function parsePluginSettings(raw: unknown): PluginSettings {
-	if (typeof raw !== "object" || raw === null) {
-		return { ...DEFAULT_SETTINGS };
-	}
+	const settings = isUnknownSettings(raw) ? raw : {};
 
-	const result = PluginSettingsSchema.safeParse(raw);
-	if (!result.success) {
-		return { ...DEFAULT_SETTINGS };
-	}
+	return {
+		settingsSchemaVersion: SETTINGS_SCHEMA_VERSION,
+		language: enumSetting(settings.language, LANGUAGES, DEFAULT_SETTINGS.language),
+		displayMode: enumSetting(
+			settings.displayMode,
+			DISPLAY_MODES,
+			DEFAULT_SETTINGS.displayMode,
+		),
+		useMergedLinksSection: booleanSetting(
+			settings.useMergedLinksSection,
+			DEFAULT_SETTINGS.useMergedLinksSection,
+		),
+		dedupeCards: booleanSetting(settings.dedupeCards, DEFAULT_SETTINGS.dedupeCards),
+		enableTagFeatures: booleanSetting(
+			settings.enableTagFeatures,
+			DEFAULT_SETTINGS.enableTagFeatures,
+		),
+		showTagsSection: booleanSetting(
+			settings.showTagsSection,
+			DEFAULT_SETTINGS.showTagsSection,
+		),
+		defaultVisibleLinkCount: positiveIntegerSetting(
+			settings.defaultVisibleLinkCount,
+			DEFAULT_SETTINGS.defaultVisibleLinkCount,
+		),
+		loadMoreLinkIncrement: positiveIntegerSetting(
+			settings.loadMoreLinkIncrement,
+			DEFAULT_SETTINGS.loadMoreLinkIncrement,
+		),
+		cardWidthPx: positiveIntegerSetting(
+			settings.cardWidthPx,
+			DEFAULT_SETTINGS.cardWidthPx,
+		),
+		cardHeightRatio: positiveNumberSetting(
+			settings.cardHeightRatio,
+			DEFAULT_SETTINGS.cardHeightRatio,
+		),
+		cardGapPx: nonNegativeIntegerSetting(
+			settings.cardGapPx,
+			DEFAULT_SETTINGS.cardGapPx,
+		),
+		cardMaxColumns: positiveIntegerSetting(
+			settings.cardMaxColumns,
+			DEFAULT_SETTINGS.cardMaxColumns,
+		),
+		sectionMarginBottomPx: positiveIntegerSetting(
+			settings.sectionMarginBottomPx,
+			DEFAULT_SETTINGS.sectionMarginBottomPx,
+		),
+		highlightOnOpen: booleanSetting(
+			settings.highlightOnOpen,
+			DEFAULT_SETTINGS.highlightOnOpen,
+		),
+		highlightInPreviewOnHover: booleanSetting(
+			settings.highlightInPreviewOnHover,
+			DEFAULT_SETTINGS.highlightInPreviewOnHover,
+		),
+		twoHopHeaderSortOrder: enumSetting(
+			settings.twoHopHeaderSortOrder,
+			TWO_HOP_HEADER_SORT_ORDERS,
+			DEFAULT_SETTINGS.twoHopHeaderSortOrder,
+		),
+		lastUsedSortOption: enumSetting(
+			settings.lastUsedSortOption,
+			SORT_OPTIONS,
+			DEFAULT_SETTINGS.lastUsedSortOption,
+		),
+		quickSortField1: enumSetting(
+			settings.quickSortField1,
+			QUICK_SORT_FIELDS,
+			DEFAULT_SETTINGS.quickSortField1,
+		),
+		quickSortField2: enumSetting(
+			settings.quickSortField2,
+			QUICK_SORT_FIELDS,
+			DEFAULT_SETTINGS.quickSortField2,
+		),
+		previewMaxLines: nonNegativeIntegerSetting(
+			settings.previewMaxLines,
+			DEFAULT_SETTINGS.previewMaxLines,
+		),
+		previewMaxChars: nonNegativeIntegerSetting(
+			settings.previewMaxChars,
+			DEFAULT_SETTINGS.previewMaxChars,
+		),
+		previewVisualLineSafetyMargin: nonNegativeIntegerSetting(
+			settings.previewVisualLineSafetyMargin,
+			DEFAULT_SETTINGS.previewVisualLineSafetyMargin,
+		),
+		showTwoHopForSelectedCanvasFileNode: booleanSetting(
+			settings.showTwoHopForSelectedCanvasFileNode,
+			DEFAULT_SETTINGS.showTwoHopForSelectedCanvasFileNode,
+		),
+		mobileLongPressAction: enumSetting(
+			settings.mobileLongPressAction,
+			MOBILE_LONG_PRESS_ACTIONS,
+			DEFAULT_SETTINGS.mobileLongPressAction,
+		),
+		excludeAttachments: booleanSetting(
+			settings.excludeAttachments,
+			DEFAULT_SETTINGS.excludeAttachments,
+		),
+		frontmatterKeyCreatedDate: stringSetting(
+			settings.frontmatterKeyCreatedDate,
+			DEFAULT_SETTINGS.frontmatterKeyCreatedDate,
+		),
+		frontmatterKeyModifiedDate: stringSetting(
+			settings.frontmatterKeyModifiedDate,
+			DEFAULT_SETTINGS.frontmatterKeyModifiedDate,
+		),
+		enableGlobalSearchTagModal: booleanSetting(
+			settings.enableGlobalSearchTagModal,
+			DEFAULT_SETTINGS.enableGlobalSearchTagModal,
+		),
+		enableUnresolvedLinkModal: booleanSetting(
+			settings.enableUnresolvedLinkModal,
+			DEFAULT_SETTINGS.enableUnresolvedLinkModal,
+		),
+		enableEmptyViewAllNotesInNewTab: booleanSetting(
+			settings.enableEmptyViewAllNotesInNewTab,
+			DEFAULT_SETTINGS.enableEmptyViewAllNotesInNewTab,
+		),
+		pinBookmarkedToTopInAllNotes: booleanSetting(
+			settings.pinBookmarkedToTopInAllNotes,
+			DEFAULT_SETTINGS.pinBookmarkedToTopInAllNotes,
+		),
+		enableUnresolvedLinkDecoration: booleanSetting(
+			settings.enableUnresolvedLinkDecoration,
+			DEFAULT_SETTINGS.enableUnresolvedLinkDecoration,
+		),
+		enableContentSearch: booleanSetting(
+			settings.enableContentSearch,
+			DEFAULT_SETTINGS.enableContentSearch,
+		),
+		experimentalCosenseTitleEditing: booleanSetting(
+			settings.experimentalCosenseTitleEditing,
+			DEFAULT_SETTINGS.experimentalCosenseTitleEditing,
+		),
+		experimentalShadowDomCss: stringSetting(
+			settings.experimentalShadowDomCss,
+			DEFAULT_SETTINGS.experimentalShadowDomCss,
+		),
+		priorityFrontmatterKeyForPreview: stringSetting(
+			settings.priorityFrontmatterKeyForPreview,
+			DEFAULT_SETTINGS.priorityFrontmatterKeyForPreview,
+		),
+		priorityFrontmatterKeyForTitle: stringSetting(
+			settings.priorityFrontmatterKeyForTitle,
+			DEFAULT_SETTINGS.priorityFrontmatterKeyForTitle,
+		),
+	};
+}
 
-	return result.data;
+function isUnknownSettings(value: unknown): value is UnknownSettings {
+	return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function enumSetting<const Values extends readonly unknown[]>(
+	value: unknown,
+	values: Values,
+	fallback: Values[number],
+): Values[number] {
+	if (values.some((candidate) => Object.is(candidate, value))) {
+		return value as Values[number];
+	}
+	return fallback;
+}
+
+function booleanSetting(value: unknown, fallback: boolean): boolean {
+	return typeof value === "boolean" ? value : fallback;
+}
+
+function stringSetting(value: unknown, fallback: string): string {
+	return typeof value === "string" ? value : fallback;
+}
+
+function positiveIntegerSetting(value: unknown, fallback: number): number {
+	return isFiniteNumber(value) && value > 0 ? Math.floor(value) : fallback;
+}
+
+function nonNegativeIntegerSetting(value: unknown, fallback: number): number {
+	return isFiniteNumber(value) && value >= 0 ? Math.floor(value) : fallback;
+}
+
+function positiveNumberSetting(value: unknown, fallback: number): number {
+	return isFiniteNumber(value) && value > 0 ? value : fallback;
+}
+
+function isFiniteNumber(value: unknown): value is number {
+	return typeof value === "number" && Number.isFinite(value);
 }

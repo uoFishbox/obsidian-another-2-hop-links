@@ -114,11 +114,13 @@ describe("parsePluginSettings", () => {
 		const settings = parsePluginSettings({
 			cardHeightRatio: 0,
 			cardGapPx: Number.NaN,
+			cardMaxColumns: Number.POSITIVE_INFINITY,
 			previewMaxChars: "500",
 		});
 
 		expect(settings.cardHeightRatio).toBe(DEFAULT_SETTINGS.cardHeightRatio);
 		expect(settings.cardGapPx).toBe(DEFAULT_SETTINGS.cardGapPx);
+		expect(settings.cardMaxColumns).toBe(DEFAULT_SETTINGS.cardMaxColumns);
 		expect(settings.previewMaxChars).toBe(DEFAULT_SETTINGS.previewMaxChars);
 	});
 

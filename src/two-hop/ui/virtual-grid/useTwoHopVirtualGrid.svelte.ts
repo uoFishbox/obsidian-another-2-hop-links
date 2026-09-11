@@ -14,7 +14,7 @@ import {
 } from "./rowModel";
 import { buildMountedTwoHopRows, type MountedTwoHopBuild } from "./mountedRows";
 import type { PreviewRuntime } from "card-preview/runtime/previewRuntime";
-import { DISABLED_PREVIEW_SURFACE } from "card-preview/runtime/previewRuntime";
+import { DISABLED_PREVIEW_SURFACE } from "card-preview/runtime/disabledPreviewSurface";
 import type { VirtualFrameCoordinator } from "shared/ui/scheduling/frameCoordinator";
 import { createResolvedCardLayoutSettingsMemo } from "cards/layout/cardLayoutCssVars";
 import { resolveCardGridLayoutBase } from "cards/grid/layout/cardGridLayout";

@@ -7,7 +7,10 @@ import { SettingsManager } from "settings/persistence/SettingsManager";
 import { DEFAULT_SETTINGS } from "settings/model";
 import type { PluginSettings } from "settings/model";
 import type { SortOption } from "cards/sorting";
-import { TwoHopLinksView, TWO_HOP_LINKS_VIEW_TYPE } from "two-hop/ui/TwoHopLinksView";
+import {
+	TWO_HOP_LINKS_VIEW_TYPE,
+	isTwoHopLinksViewApi,
+} from "obsidian-integration/views/viewTypes";
 import type { ResolveProgress, TwoHopLinkResult } from "two-hop/model";
 import type { ResolveOptions } from "two-hop/resolution/TwoHopLinkResolver";
 import type { TwoHopResolveSnapshot } from "two-hop/resolution/ResolverDependencies";
@@ -97,6 +100,7 @@ export default class CosenseCardLinksPlugin extends Plugin implements PluginHost
 		const runtime = this.runtime;
 		this.app.workspace.onLayoutReady(async () => {
 			if (this.isUnloaded) return;
+			runtime.indexUpdateQueue.setupEventListeners();
 
 			installAllPatchers(this, {
 				propertyWidgetStyler: runtime.propertyWidgetStyler,
@@ -146,7 +150,7 @@ export default class CosenseCardLinksPlugin extends Plugin implements PluginHost
 	private updateSidebarView(file: TFile): void {
 		const leaves = this.app.workspace.getLeavesOfType(TWO_HOP_LINKS_VIEW_TYPE);
 		leaves.forEach((leaf) => {
-			if (leaf.view instanceof TwoHopLinksView) {
+			if (isTwoHopLinksViewApi(leaf.view)) {
 				leaf.view.renderForFile(file);
 			}
 		});

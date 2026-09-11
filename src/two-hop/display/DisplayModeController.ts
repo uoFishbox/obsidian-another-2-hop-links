@@ -5,7 +5,10 @@ import type { CanvasNodeData } from "obsidian-integration/hostContracts";
 import type { DisplayMode, PluginSettings } from "settings/model";
 import type { IComponentManager } from "obsidian-integration/lifecycle/ComponentController";
 import { resolveWorkspaceWindow } from "obsidian-integration/workspace/workspaceDocuments";
-import { TwoHopLinksView, TWO_HOP_LINKS_VIEW_TYPE } from "two-hop/ui/TwoHopLinksView";
+import {
+	TWO_HOP_LINKS_VIEW_TYPE,
+	isTwoHopLinksViewApi,
+} from "obsidian-integration/views/viewTypes";
 import {
 	getCanvasFile,
 	getCanvasSelectionData,
@@ -92,7 +95,7 @@ export class DisplayModeController {
 
 	public handleActiveLeafChange(): void {
 		// Do nothing when the active leaf is the sidebar itself
-		if (this.app.workspace.activeLeaf?.view instanceof TwoHopLinksView) {
+		if (isTwoHopLinksViewApi(this.app.workspace.activeLeaf?.view)) {
 			return;
 		}
 
@@ -221,7 +224,7 @@ export class DisplayModeController {
 	private clearSidebarViewContent(): void {
 		const leaves = this.app.workspace.getLeavesOfType(TWO_HOP_LINKS_VIEW_TYPE);
 		leaves.forEach((leaf) => {
-			if (leaf.view instanceof TwoHopLinksView) {
+			if (isTwoHopLinksViewApi(leaf.view)) {
 				leaf.view.clearContent();
 			}
 		});

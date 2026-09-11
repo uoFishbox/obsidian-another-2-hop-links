@@ -12,8 +12,9 @@ import {
 } from "obsidian-integration/views/svelteLifecycle";
 import { mountTwoHopLinksRootView } from "./mountTwoHopLinksRootView";
 import { getMainUiTranslations } from "shared/i18n/mainUiTranslations";
+import { TWO_HOP_LINKS_VIEW_TYPE } from "obsidian-integration/views/viewTypes";
 
-export const TWO_HOP_LINKS_VIEW_TYPE = "cosense-card-links-view";
+export { TWO_HOP_LINKS_VIEW_TYPE } from "obsidian-integration/views/viewTypes";
 
 export interface ExternalListSurfaceLease {
 	readonly element: HTMLElement;

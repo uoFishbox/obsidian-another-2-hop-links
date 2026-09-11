@@ -27,7 +27,7 @@ import { createDisplayDataBuilder } from "two-hop/display/displayDataBuilder";
 import { getRelevanceLinkTargets } from "two-hop/display/relevanceSort";
 import { createLinkContextFactory } from "cards/context/linkContextFactory";
 import type { LinkContext } from "cards/context/linkContext";
-import { CardCollectionState } from "cards/CardCollectionState.svelte";
+import type { CardCollectionState } from "cards/CardCollectionState.svelte";
 import { SortService } from "cards/sorting/SortService";
 import { MetricProvider } from "cards/sorting/MetricProvider";
 import type { SortOption } from "cards/sorting";
@@ -45,14 +45,12 @@ import {
 } from "obsidian-integration/link-decoration/propertyWidgetStyler";
 import { KeyboardCardNavigator } from "obsidian-integration/navigation/KeyboardCardNavigator";
 import { createKeyboardNavigationSurfaceRegistry } from "obsidian-integration/navigation/keyboardNavigationSurface";
+import type { DisposablePreviewService } from "card-preview/pipeline/createPreviewService";
+import type { PreviewRuntime } from "card-preview/runtime/previewRuntime";
 import {
-	createPreviewService,
-	type DisposablePreviewService,
-} from "card-preview/pipeline/createPreviewService";
-import {
-	createPreviewRuntime,
-	type PreviewRuntime,
-} from "card-preview/runtime/previewRuntime";
+	createLazyPreviewRuntime,
+	createLazyPreviewService,
+} from "card-preview/runtime/lazyPreviewRuntime";
 import { createSettingsSideEffectController } from "settings/effects/settingsSideEffectController";
 import type { PluginHost } from "obsidian-integration/pluginHost";
 import type { ViewServices } from "obsidian-integration/views/viewServices";
@@ -113,13 +111,13 @@ export function createPluginRuntime(options: PluginRuntimeOptions): PluginRuntim
 	const frameScheduler = createFrameScheduler(options.isUnloaded, () =>
 		resolveWorkspaceWindow(options.app.workspace),
 	);
-	const previewService = createPreviewService({
+	const previewService = createLazyPreviewService({
 		vault: options.app.vault,
 		metadataCache: options.app.metadataCache,
 		app: options.app,
 		getSettings: options.getSettings,
 	});
-	const previewRuntime = createPreviewRuntime({
+	const previewRuntime = createLazyPreviewRuntime({
 		app: options.app,
 		getPreview: previewService.getPreview,
 		getRawContent: previewService.getRawContent,
@@ -207,12 +205,15 @@ export function createPluginRuntime(options: PluginRuntimeOptions): PluginRuntim
 		options.updateContentSearch,
 	);
 	const viewServices: ViewServices = {
-		createCardCollectionState: (settings) =>
-			new CardCollectionState(
+		createCardCollectionState: (settings) => {
+			const { CardCollectionState } =
+				require("cards/CardCollectionState.svelte") as typeof import("cards/CardCollectionState.svelte");
+			return new CardCollectionState(
 				settings,
 				options.updateSortOption,
 				options.updateContentSearch,
-			),
+			);
+		},
 		createTwoHopState: (settings) =>
 			componentController.createTwoHopState(
 				settings,
@@ -260,7 +261,6 @@ export function createPluginRuntime(options: PluginRuntimeOptions): PluginRuntim
 		allNotesCatalog.invalidateSorting();
 		viewUpdateOrchestrator.updateForContext(context);
 	});
-	indexUpdateQueue.setupEventListeners();
 
 	const applySettingsSideEffects = createSettingsSideEffectController({
 		viewUpdateOrchestrator,

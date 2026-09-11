@@ -1,0 +1,1 @@
+export const RECENT_TWO_HOP_STATE_LIMIT = 6;

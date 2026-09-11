@@ -10,7 +10,7 @@ import {
 } from "obsidian-integration/workspace/fileOpener";
 import { resolveFileByPath } from "obsidian-integration/files/resolveFileByPath";
 
-vi.mock("search/tag-notes/TagNotesView", () => ({
+vi.mock("search/tag-notes/openTagNotesView", () => ({
 	openTagNotesView: vi.fn(),
 }));
 

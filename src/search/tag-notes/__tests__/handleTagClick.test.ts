@@ -6,7 +6,7 @@ const { openTagNotesView } = vi.hoisted(() => ({
 	openTagNotesView: vi.fn(),
 }));
 
-vi.mock("search/tag-notes/TagNotesView", () => ({
+vi.mock("search/tag-notes/openTagNotesView", () => ({
 	openTagNotesView,
 }));
 

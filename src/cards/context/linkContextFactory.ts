@@ -7,7 +7,7 @@ import type { HighlightMode, LinkContext, LinkInteractionOptions } from "./linkC
 import type { PluginSettings } from "settings/model";
 import { triggerHoverPopover } from "hover-popover/mobilePopover";
 import type { PluginHost } from "obsidian-integration/pluginHost";
-import { openTagNotesView } from "search/tag-notes/TagNotesView";
+import { openTagNotesView } from "search/tag-notes/openTagNotesView";
 import {
 	hydrateRuntimeBacklinkHoverLink,
 	hydrateRuntimeBacklinkLink,

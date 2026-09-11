@@ -26,7 +26,7 @@ import {
 	type ConfiguredCardLayout,
 	type FlatGridLayout,
 } from "cards/grid/layout/flatGridMeasurement";
-import { DISABLED_PREVIEW_SURFACE } from "card-preview/runtime/previewRuntime";
+import { DISABLED_PREVIEW_SURFACE } from "card-preview/runtime/disabledPreviewSurface";
 import { useAppContext } from "cards/context/linkContext";
 import type { VirtualFrameCoordinator } from "shared/ui/scheduling/frameCoordinator";
 import { DEFAULT_SETTINGS } from "settings/model";

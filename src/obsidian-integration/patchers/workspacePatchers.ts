@@ -14,8 +14,8 @@ import {
 	hasAnyPreCreationBootstrapState,
 	setPendingPreCreationBootstrapState,
 	setPersistedPreCreationBootstrapState,
-	VIEW_TYPE_PRE_CREATE,
-} from "two-hop/pre-creation/PreCreationView";
+} from "two-hop/pre-creation/preCreationBootstrapState";
+import { VIEW_TYPE_PRE_CREATE } from "obsidian-integration/views/viewTypes";
 import { resolveExpectedPath } from "obsidian-integration/files/resolveExpectedPath";
 import {
 	isLeafHistoryInternal,

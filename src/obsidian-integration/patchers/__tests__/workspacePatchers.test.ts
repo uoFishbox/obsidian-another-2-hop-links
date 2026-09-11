@@ -11,12 +11,15 @@ const {
 	setPersistedPreCreationBootstrapState: vi.fn(),
 }));
 
-vi.mock("two-hop/pre-creation/PreCreationView", () => ({
+vi.mock("two-hop/pre-creation/preCreationBootstrapState", () => ({
 	PRE_CREATION_EPHEMERAL_STATE_KEY: "pre-creation",
-	VIEW_TYPE_PRE_CREATE: "pre-creation-view",
 	hasAnyPreCreationBootstrapState,
 	setPendingPreCreationBootstrapState,
 	setPersistedPreCreationBootstrapState,
+}));
+
+vi.mock("obsidian-integration/views/viewTypes", () => ({
+	VIEW_TYPE_PRE_CREATE: "pre-creation-view",
 }));
 
 vi.mock("obsidian-integration/files/resolveExpectedPath", () => ({
