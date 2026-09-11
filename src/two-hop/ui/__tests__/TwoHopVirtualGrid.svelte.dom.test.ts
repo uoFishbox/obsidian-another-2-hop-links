@@ -118,6 +118,7 @@ interface SurfaceFixture {
 	readonly publishSection: (
 		section: TwoHopSectionModel,
 		cardModelRevision?: unknown,
+		layoutAnchorScope?: string,
 	) => Promise<void>;
 }
 
@@ -128,6 +129,7 @@ async function renderSurface(params: {
 	loadMoreSection?: (sectionId: string) => void;
 	rootTop?: number;
 	cardModelRevision?: unknown;
+	layoutAnchorScope?: string;
 }): Promise<SurfaceFixture> {
 	const applicationStore = {
 		settings: {
@@ -148,6 +150,7 @@ async function renderSurface(params: {
 
 	const baseProps = {
 		sections: [params.section],
+		layoutAnchorScope: params.layoutAnchorScope ?? "default",
 		applicationStore,
 		linkContext:
 			params.linkContext ?? ({ getPreview: vi.fn() } as unknown as LinkContext),
@@ -175,11 +178,16 @@ async function renderSurface(params: {
 		root,
 		scroller,
 		rerender: rendered.rerender,
-		publishSection: (section, cardModelRevision = baseProps.cardModelRevision) =>
+		publishSection: (
+			section,
+			cardModelRevision = baseProps.cardModelRevision,
+			layoutAnchorScope = baseProps.layoutAnchorScope,
+		) =>
 			rendered.rerender({
 				...baseProps,
 				sections: [section],
 				cardModelRevision,
+				layoutAnchorScope,
 			}),
 	};
 }
@@ -468,6 +476,45 @@ describe("TwoHopVirtualGrid component", () => {
 		);
 
 		expect(scroller.scrollTop).toBeGreaterThan(scrollTopBeforePublication);
+	});
+
+	it("does not restore the visible anchor when the result scope changes", async () => {
+		const section = createSection(100);
+		const { publishSection, root, scroller } = await renderSurface({
+			section,
+			resolveItemCardModel: createCardModelResolver(),
+			layoutAnchorScope: "search:filtered",
+		});
+		setNumericProperty(scroller, "scrollTop", 1_000);
+		await fireEvent.scroll(scroller);
+		await vi.waitFor(() => {
+			const rowIndexes = getRows(root).map((row) =>
+				Number(row.dataset.cclRowIndex),
+			);
+			expect(Math.min(...rowIndexes)).toBeGreaterThan(0);
+		});
+		const scrollTopBeforePublication = scroller.scrollTop;
+		const prependedItems = section.items.slice(0, 3).map((item, index) => ({
+			...item,
+			interactionId: `prepended:${index}`,
+			searchKey: `prepended:${index}`,
+			key: `prepended:${index}`,
+		}));
+
+		await publishSection(
+			createTwoHopSectionModel({
+				id: section.id,
+				kind: section.kind,
+				title: section.title,
+				items: [...prependedItems, ...section.items],
+				totalCount: section.totalCount + prependedItems.length,
+			}),
+			undefined,
+			"search:none",
+		);
+		for (let index = 0; index < 4; index += 1) await flushFrames();
+
+		expect(scroller.scrollTop).toBe(scrollTopBeforePublication);
 	});
 
 	it.each(["prepend", "narrow"] as const)(

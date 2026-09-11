@@ -275,6 +275,11 @@
 
 	let appliedSearchQuery = $derived(searchPresentation.result?.query ?? "");
 	let appliedSearchScope = $derived(searchPresentation.result?.scope ?? "title-only");
+	let layoutAnchorScope = $derived(
+		search.normalized
+			? JSON.stringify([search.normalized, searchMatchScope])
+			: "unfiltered",
+	);
 	let paginationScope = $derived(
 		JSON.stringify([
 			file.path,
@@ -399,7 +404,19 @@
 	let previewSurfaceActive = $state(false);
 	let resultsContainerEl = $state<HTMLDivElement | null>(null);
 	let searchInputEl = $state<HTMLInputElement | null>(null);
-	let resultsMinHeight = $derived(search.normalized ? "100vh" : null);
+	let resultsMinHeight = $state<string | null>(search.normalized ? "100vh" : null);
+
+	$effect(() => {
+		if (search.normalized) {
+			resultsMinHeight = "100vh";
+			return;
+		}
+		// Keep the search-era height through the result-set commit. Removing it
+		// earlier can clamp the editor scroller before the full grid grows.
+		void tick().then(() => {
+			if (!search.normalized) resultsMinHeight = null;
+		});
+	});
 
 	$effect(() => {
 		const element = rootEl;
@@ -507,6 +524,7 @@
 		{:else if linkResult}
 			<TwoHopVirtualGrid
 				sections={twoHopVirtualListSections}
+				{layoutAnchorScope}
 				applicationStore={applicationUiState}
 				{loadMoreSection}
 				{cardModelRevision}

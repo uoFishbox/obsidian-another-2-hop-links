@@ -16,6 +16,55 @@ export interface TwoHopLayoutAnchorMeasurement {
 	readonly scrollContainerEl: HTMLElement | null;
 }
 
+export interface TwoHopScrollPosition {
+	readonly scrollTop: number;
+	readonly scrollRoot: HTMLElement | null;
+}
+
+export interface TwoHopScrollPositionRestoration {
+	readonly delta: number;
+	readonly scrollTop: number;
+}
+
+/** Captures the parent scroll offset without tying it to a particular card. */
+export function captureTwoHopScrollPosition(
+	rootEl: HTMLElement | null,
+	measurement: TwoHopLayoutAnchorMeasurement,
+): TwoHopScrollPosition | null {
+	if (!rootEl) return null;
+	const ownerWindow = getOptionalOwnerWindow(rootEl);
+	if (!ownerWindow) return null;
+	const scrollRoot =
+		measurement.scrollContainerEl ?? findNearestScrollContainer(rootEl);
+	return {
+		scrollTop: scrollRoot?.scrollTop ?? ownerWindow.scrollY,
+		scrollRoot,
+	};
+}
+
+/** Restores an absolute parent scroll offset after result-set DOM replacement. */
+export function restoreTwoHopScrollPosition(
+	position: TwoHopScrollPosition | null,
+	rootEl: HTMLElement | null,
+): TwoHopScrollPositionRestoration | null {
+	if (!position || !rootEl) return null;
+	const ownerWindow = getOptionalOwnerWindow(rootEl);
+	if (!ownerWindow) return null;
+	const currentScrollRoot = findNearestScrollContainer(rootEl);
+	if (currentScrollRoot !== position.scrollRoot) return null;
+
+	const currentScrollTop = currentScrollRoot?.scrollTop ?? ownerWindow.scrollY;
+	if (Math.abs(currentScrollTop - position.scrollTop) >= 0.5) {
+		if (currentScrollRoot) currentScrollRoot.scrollTop = position.scrollTop;
+		else ownerWindow.scrollBy({ top: position.scrollTop - currentScrollTop });
+	}
+	const restoredScrollTop = currentScrollRoot?.scrollTop ?? ownerWindow.scrollY;
+	return {
+		delta: restoredScrollTop - currentScrollTop,
+		scrollTop: restoredScrollTop,
+	};
+}
+
 /** Captures the first visible cell so layout changes can preserve its position. */
 export function captureTwoHopLayoutAnchor(
 	rootEl: HTMLElement | null,

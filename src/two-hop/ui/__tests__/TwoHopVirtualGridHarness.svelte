@@ -11,6 +11,7 @@
 
 	interface Props {
 		sections: readonly TwoHopSectionModel[];
+		layoutAnchorScope?: string;
 		applicationStore: CardCollectionState;
 		linkContext: LinkContext;
 		previewDependencies?: TwoHopPreviewDependencies;
@@ -25,6 +26,7 @@
 
 	const {
 		sections,
+		layoutAnchorScope = "default",
 		applicationStore,
 		linkContext,
 		previewDependencies = undefined,
@@ -38,6 +40,7 @@
 
 <TwoHopVirtualGrid
 	{sections}
+	{layoutAnchorScope}
 	{applicationStore}
 	{loadMoreSection}
 	{resolveItemCardModel}

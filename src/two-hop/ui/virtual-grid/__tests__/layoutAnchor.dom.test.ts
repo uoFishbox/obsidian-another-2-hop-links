@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { restoreTwoHopLayoutAnchor, type TwoHopLayoutAnchor } from "../layoutAnchor";
+import {
+	restoreTwoHopLayoutAnchor,
+	restoreTwoHopScrollPosition,
+	type TwoHopLayoutAnchor,
+} from "../layoutAnchor";
 import { createTwoHopRowModel, DEFAULT_TWO_HOP_GRID_LAYOUT } from "../rowModel";
 import { createTwoHopSectionModel } from "two-hop/ui/twoHopSectionModel";
 
@@ -59,5 +63,32 @@ describe("two-hop layout anchor restoration", () => {
 		anchor.scrollRoot!.append(root);
 		vi.spyOn(rowModel, "resolveCellPosition").mockReturnValue(null);
 		expect(restoreTwoHopLayoutAnchor(anchor, root, rowModel)).toBe(0);
+	});
+});
+
+describe("two-hop absolute scroll restoration", () => {
+	it("restores the captured parent scrollTop after an intermediate clamp", () => {
+		const scroller = document.createElement("div");
+		const root = document.createElement("div");
+		scroller.style.overflow = "auto";
+		scroller.append(root);
+		document.body.append(scroller);
+		let scrollTop = 600;
+		Object.defineProperty(scroller, "scrollTop", {
+			configurable: true,
+			get: () => scrollTop,
+			set: (value: number) => {
+				scrollTop = value;
+			},
+		});
+		scrollTop = 250;
+
+		const restoration = restoreTwoHopScrollPosition(
+			{ scrollRoot: scroller, scrollTop: 600 },
+			root,
+		);
+
+		expect(restoration).toEqual({ delta: 350, scrollTop: 600 });
+		expect(scroller.scrollTop).toBe(600);
 	});
 });

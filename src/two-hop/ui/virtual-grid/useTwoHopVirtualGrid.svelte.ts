@@ -33,8 +33,11 @@ import type {
 import type { ProgrammaticScrollSnapshot } from "cards/virtualization/public";
 import {
 	captureTwoHopLayoutAnchor,
+	captureTwoHopScrollPosition,
 	restoreTwoHopLayoutAnchor,
+	restoreTwoHopScrollPosition,
 	type TwoHopLayoutAnchor,
+	type TwoHopScrollPosition,
 } from "./layoutAnchor";
 import { createCardGridVisibilityPolicyResolver } from "cards/grid/model/cardGridVisibilityPolicy";
 import type { InteractionHandle } from "cards/interactions/interactionTypes";
@@ -52,6 +55,11 @@ export interface TwoHopPreviewDependencies {
 
 export interface TwoHopVirtualGridProps {
 	readonly sections: readonly TwoHopSectionModel[];
+	/**
+	 * Identifies the logical result set. Section updates preserve their visible
+	 * anchor only while this scope remains unchanged.
+	 */
+	readonly layoutAnchorScope: string;
 	readonly applicationStore: CardCollectionState;
 	/** Fixed for the lifetime of the virtual surface. */
 	readonly previewDependencies?: TwoHopPreviewDependencies;
@@ -82,10 +90,12 @@ export function useTwoHopVirtualGrid(
 	);
 	let rootEl = $state<HTMLDivElement | null>(null);
 	let lastSections = props.sections;
+	let lastLayoutAnchorScope = props.layoutAnchorScope;
 	let lastCardModelRevision = props.cardModelRevision;
 	let widthWasZero = false;
 	let disposed = false;
 	let pendingLayoutAnchor: TwoHopLayoutAnchor | null = null;
+	let pendingScrollPosition: TwoHopScrollPosition | null = null;
 	let postCommitMeasurementScheduled = false;
 	let interactionBindingRevision = $state(0);
 
@@ -213,6 +223,7 @@ export function useTwoHopVirtualGrid(
 	}
 
 	function capturePendingLayoutAnchor(): void {
+		if (pendingScrollPosition) return;
 		pendingLayoutAnchor ??= captureTwoHopLayoutAnchor(
 			rootEl,
 			rowModel,
@@ -221,7 +232,7 @@ export function useTwoHopVirtualGrid(
 	}
 
 	function scheduleAnchorRestoration(): void {
-		if (!pendingLayoutAnchor) return;
+		if (!pendingLayoutAnchor && !pendingScrollPosition) return;
 		schedulePostCommitMeasurement();
 	}
 
@@ -241,8 +252,15 @@ export function useTwoHopVirtualGrid(
 			return;
 		}
 		const anchor = pendingLayoutAnchor;
+		const scrollPosition = pendingScrollPosition;
 		pendingLayoutAnchor = null;
-		if (anchor) {
+		pendingScrollPosition = null;
+		if (scrollPosition) {
+			const restoration = restoreTwoHopScrollPosition(scrollPosition, rootEl);
+			if (restoration && restoration.delta !== 0) {
+				virtualList.suppressNextNativeScroll(restoration.scrollTop);
+			}
+		} else if (anchor) {
 			const delta = restoreTwoHopLayoutAnchor(anchor, rootEl, rowModel);
 			if (delta !== 0) {
 				virtualList.suppressNextNativeScroll(anchor.scrollTop + delta);
@@ -252,8 +270,16 @@ export function useTwoHopVirtualGrid(
 		virtualList.runScrollMeasurement(undefined, "data-change");
 	}
 
-	function publishSections(nextSections: readonly TwoHopSectionModel[]): void {
-		capturePendingLayoutAnchor();
+	function publishSections(
+		nextSections: readonly TwoHopSectionModel[],
+		preserveLayoutAnchor: boolean,
+	): void {
+		if (preserveLayoutAnchor) {
+			capturePendingLayoutAnchor();
+		} else {
+			pendingLayoutAnchor = null;
+			pendingScrollPosition ??= captureTwoHopScrollPosition(rootEl, measurement);
+		}
 		const nextRowModel = createTwoHopRowModel({
 			sections: nextSections,
 			layout,
@@ -273,9 +299,12 @@ export function useTwoHopVirtualGrid(
 
 	$effect(() => {
 		const nextSections = props.sections;
+		const nextLayoutAnchorScope = props.layoutAnchorScope;
 		if (nextSections === lastSections) return;
+		const preserveLayoutAnchor = nextLayoutAnchorScope === lastLayoutAnchorScope;
 		lastSections = nextSections;
-		untrack(() => publishSections(nextSections));
+		lastLayoutAnchorScope = nextLayoutAnchorScope;
+		untrack(() => publishSections(nextSections, preserveLayoutAnchor));
 	});
 
 	$effect(() => {
@@ -304,6 +333,7 @@ export function useTwoHopVirtualGrid(
 	onDestroy(() => {
 		disposed = true;
 		pendingLayoutAnchor = null;
+		pendingScrollPosition = null;
 		cardSurfaceRuntime.dispose();
 	});
 
