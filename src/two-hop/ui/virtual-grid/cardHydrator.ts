@@ -268,10 +268,8 @@ export function createTwoHopCardHydrator(
 			const current = entries.get(hydration.logicalKey);
 			const model = params.resolveCardModel(hydration.item, revision);
 			const previewRenderKeyChanged =
-				previewActive &&
-				(priority === "foreground" || current !== undefined) &&
 				current?.model.previewRequest?.renderKey !==
-					model.previewRequest?.renderKey;
+				model.previewRequest?.renderKey;
 			entries.set(hydration.logicalKey, {
 				item: hydration.item,
 				revision,
