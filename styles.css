@@ -370,6 +370,19 @@ span[data-twohop-link-state="special-unresolved"] > .is-unresolved,
 	.view-content {
 	margin-top: unset;
 }
+
+/* Baseline animates this header while Obsidian's mobile nav is hidden. On
+   iOS, changing a descendant of a momentum-scrolling custom view can cancel
+   the scroll after touchend. Keep the All Notes header stable instead. */
+body.is-phone
+	.workspace-leaf-content[data-type="cosense-card-links-all-notes-view"]
+	> .view-header {
+	top: 0 !important;
+	transform: none !important;
+	transition: none !important;
+	will-change: auto !important;
+}
+
 .cosense-card-links__box-preview.is-stale {
 	visibility: hidden;
 }
