@@ -43,7 +43,7 @@ export interface FlatCardGridProps<T> {
 	sectionId?: string;
 	applicationStore?: FlatCardGridApplicationStore;
 	className?: string;
-	paginationMode?: "button" | "infinite-scroll";
+	paginationMode?: "button" | "infinite-scroll" | "virtualized-all";
 	infiniteScrollRootMargin?: string;
 	/** Scroll position restored once after the first valid layout measurement. */
 	initialScrollState?: FlatListScrollState;

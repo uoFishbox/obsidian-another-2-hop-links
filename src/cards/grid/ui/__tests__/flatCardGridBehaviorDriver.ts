@@ -18,7 +18,7 @@ export interface RenderFlatCardGridBehaviorOptions {
 	readonly showHeader?: boolean;
 	readonly initialVisibleCount?: number;
 	readonly loadMoreIncrement?: number;
-	readonly paginationMode?: "button" | "infinite-scroll";
+	readonly paginationMode?: "button" | "infinite-scroll" | "virtualized-all";
 	readonly infiniteScrollRootMargin?: string;
 }
 

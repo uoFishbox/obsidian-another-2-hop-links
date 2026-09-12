@@ -125,6 +125,23 @@ describe("FlatCardGrid virtualization contract", () => {
 		).toBeNull();
 	});
 
+	it("reserves the full virtual height when pagination is disabled", async () => {
+		const driver = renderFlatCardGridContract({
+			items: createItems(100),
+			initialVisibleCount: 5,
+			paginationMode: "virtualized-all",
+		});
+
+		await driver.setViewport({ rootHeight: 120, width: 330 });
+		await driver.scrollTo({ scrollTop: 3000, sectionTop: -3000 });
+
+		driver.expectMountedLogicalIndexes({
+			include: [69],
+			exclude: [0],
+			maxCount: 18,
+		});
+	});
+
 	it("mounts only a bounded slice around the initial viewport", async () => {
 		const driver = renderFlatCardGridContract({
 			items: createItems(20),

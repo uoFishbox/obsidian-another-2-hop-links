@@ -10,7 +10,7 @@
 		loadMoreIncrement?: number;
 		sectionId?: string;
 		applicationStore?: CardCollectionState;
-		paginationMode?: "button" | "infinite-scroll";
+		paginationMode?: "button" | "infinite-scroll" | "virtualized-all";
 		infiniteScrollRootMargin?: string;
 		topSpacerHeight?: number;
 		initialScrollState?: FlatListScrollState;

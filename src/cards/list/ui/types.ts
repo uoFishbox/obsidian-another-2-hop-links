@@ -14,7 +14,7 @@ export interface ListProps<T> {
 
 export interface ListConfig<T = CardItem> {
 	title: string;
-	paginationMode?: "button" | "infinite-scroll";
+	paginationMode?: "button" | "infinite-scroll" | "virtualized-all";
 	preserveResultsHeightOnSearch?: boolean;
 	showSectionHeader?: boolean;
 	sectionHeaderTitle?: string;

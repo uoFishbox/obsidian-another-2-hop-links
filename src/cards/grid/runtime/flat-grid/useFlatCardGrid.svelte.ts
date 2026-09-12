@@ -117,7 +117,9 @@ export function useFlatCardGrid<T>(
 		loadMoreIncrement: props.loadMoreIncrement,
 	});
 	const visibleCount = $derived(
-		paginationState.getVisibleCount(flatPaginationSectionId, itemCount),
+		paginationMode === "virtualized-all"
+			? itemCount
+			: paginationState.getVisibleCount(flatPaginationSectionId, itemCount),
 	);
 	const canLoadMore = $derived(visibleCount < itemCount);
 	const shouldUseInfiniteScroll = $derived(
