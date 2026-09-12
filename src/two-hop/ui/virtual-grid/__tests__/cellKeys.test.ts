@@ -3,7 +3,7 @@ import {
 	createTwoHopSectionModel,
 	type TwoHopItemModel,
 } from "two-hop/ui/twoHopSectionModel";
-import { parseTwoHopCellKey, twoHopCellKey } from "../cellKeys";
+import { createTwoHopRowModel } from "../rowModel";
 
 function createItem(key: string): TwoHopItemModel {
 	return {
@@ -21,35 +21,39 @@ const section = createTwoHopSectionModel({
 	totalCount: 4,
 });
 
-describe("twoHopCellKey", () => {
-	it("builds the stable logical key format", () => {
-		expect(twoHopCellKey.header(section)).toBe("header:section");
-		expect(twoHopCellKey.item("section", "alpha")).toBe("item:section:alpha");
-		expect(twoHopCellKey.loadMore("section")).toBe("load-more:section");
+function createModel() {
+	return createTwoHopRowModel({
+		sections: [section],
+		layout: {
+			containerWidth: 220,
+			columns: 2,
+			cellWidth: 100,
+			rowHeight: 100,
+			gap: 10,
+			sectionMarginBottom: 10,
+		},
+	});
+}
+
+describe("two-hop logical cell keys", () => {
+	it("keeps the stable key format on materialized cells", () => {
+		const model = createModel();
+		expect(model.getRow(0)?.getCell(0)?.logicalKey).toBe("header:section");
+		expect(model.getRow(0)?.getCell(1)?.logicalKey).toBe("item:section:alpha");
+		expect(model.getRow(1)?.getCell(1)?.logicalKey).toBe("load-more:section");
 	});
 
-	it("parses every cell kind against its own section", () => {
-		expect(parseTwoHopCellKey(section, "header:section")).toEqual({
-			kind: "header",
-		});
-		expect(parseTwoHopCellKey(section, "item:section:alpha")).toEqual({
-			kind: "item",
-			itemKey: "alpha",
-		});
-		expect(parseTwoHopCellKey(section, "load-more:section")).toEqual({
-			kind: "load-more",
+	it("resolves item keys containing separators without a parser layer", () => {
+		const model = createModel();
+		expect(model.resolveCellPosition("item:section:beta:gamma")).toEqual({
+			rowIndex: 1,
+			columnIndex: 0,
 		});
 	});
 
-	it("keeps item keys that contain the separator intact", () => {
-		expect(parseTwoHopCellKey(section, "item:section:beta:gamma")).toEqual({
-			kind: "item",
-			itemKey: "beta:gamma",
-		});
-	});
-
-	it("rejects keys that belong to another section", () => {
-		expect(parseTwoHopCellKey(section, "item:other:alpha")).toBeNull();
-		expect(parseTwoHopCellKey(section, "load-more:other")).toBeNull();
+	it("rejects keys owned by another section", () => {
+		const model = createModel();
+		expect(model.resolveCellPosition("item:other:alpha")).toBeNull();
+		expect(model.resolveCellPosition("load-more:other")).toBeNull();
 	});
 });

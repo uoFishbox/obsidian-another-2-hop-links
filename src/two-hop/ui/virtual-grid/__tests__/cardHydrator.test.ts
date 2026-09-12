@@ -98,6 +98,55 @@ function collectItemCells(
 }
 
 describe("createTwoHopCardHydrator", () => {
+	it("reads each logical key once while replacing the latest demand window", () => {
+		const section = createTwoHopSectionModel({
+			id: "section",
+			kind: "new-links-section",
+			title: "Section",
+			items: [createItem(0)],
+			totalCount: 1,
+		});
+		const frames = createTestFrameCoordinator();
+		let keyReads = 0;
+		const cells: TwoHopCardHydrationCell[] = Array.from(
+			{ length: 37 },
+			(_, index) => ({
+				kind: "item" as const,
+				section,
+				rowIndex: index,
+				columnIndex: 0,
+				itemIndex: index,
+				item: createItem(index),
+				get logicalKey() {
+					keyReads += 1;
+					return `item:section:item:${index}`;
+				},
+			}),
+		);
+		const hydrator = createTwoHopCardHydrator({
+			frameCoordinator: frames.coordinator,
+			getRevision: () => 0,
+			resolveCardModel,
+			isPreviewActive: () => false,
+			onModelsChanged: vi.fn(),
+			onPreviewModelsChanged: vi.fn(),
+		});
+
+		hydrator.setDemand({
+			foreground: cells.slice(0, 12),
+			background: cells.slice(12, 36),
+		});
+		expect(keyReads).toBe(36);
+
+		keyReads = 0;
+		hydrator.setDemand({
+			foreground: cells.slice(1, 13),
+			background: cells.slice(13, 37),
+		});
+		expect(keyReads).toBe(36);
+		hydrator.dispose();
+	});
+
 	it("does not scan cancelled scroll history when delayed idle work resumes", () => {
 		const section = createTwoHopSectionModel({
 			id: "section",

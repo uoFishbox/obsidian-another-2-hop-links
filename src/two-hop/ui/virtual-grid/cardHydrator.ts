@@ -9,20 +9,10 @@ type HydrationPriority = "foreground" | "background";
 /** Item-cell payload published by the resident two-hop virtual grid. */
 export type TwoHopCardHydrationCell = Extract<TwoHopVirtualCell, { kind: "item" }>;
 
-interface DemandedHydration {
-	readonly cell: TwoHopCardHydrationCell;
-	readonly priority: HydrationPriority;
-}
-
 interface HydratedCardEntry {
 	readonly item: TwoHopItemModel;
 	readonly revision: unknown;
 	readonly model: CardRenderModel;
-}
-
-interface PendingHydration {
-	cell: TwoHopCardHydrationCell;
-	priority: HydrationPriority;
 }
 
 interface HydrationQueue {
@@ -67,20 +57,26 @@ const MAX_HYDRATION_CPU_MS = 1;
 const MAX_RETAINED_CARD_MODELS = 64;
 const HYDRATION_POST_PAINT_TASK_KEY = "two-hop-virtual-hydration-visible";
 const HYDRATION_IDLE_TASK_KEY = "two-hop-virtual-hydration-preload";
+const EMPTY_DEMAND: TwoHopCardDemand = Object.freeze({
+	foreground: Object.freeze([]),
+	background: Object.freeze([]),
+});
 
-/** Owns a key-addressed card cache and derives work from the latest window demand. */
+/**
+ * Owns a key-addressed card cache and schedules only the latest resident demand.
+ * Replacing demand rebuilds two bounded queues instead of retaining scroll history.
+ */
 export function createTwoHopCardHydrator(
 	params: TwoHopCardHydratorParams,
 ): TwoHopCardHydrator {
 	const modelCache = new Map<string, HydratedCardEntry>();
 	const modelConsumers = new Map<string, CardModelConsumer>();
-	const pendingByKey = new Map<string, PendingHydration>();
+	const demandedKeys = new Set<string>();
 	const foregroundQueue = createHydrationQueue();
 	const backgroundQueue = createHydrationQueue();
-	let demandByKey = new Map<string, DemandedHydration>();
+	let demand: TwoHopCardDemand = EMPTY_DEMAND;
 	let cancelDrain: (() => void) | undefined;
 	let scheduledPriority: HydrationPriority | undefined;
-	let generation = 0;
 	let disposed = false;
 
 	function notify(logicalKey: string, model: CardRenderModel | undefined): void {
@@ -100,25 +96,10 @@ export function createTwoHopCardHydrator(
 		};
 	}
 
-	function cancelScheduledDrain(): void {
-		cancelDrain?.();
-		cancelDrain = undefined;
-		scheduledPriority = undefined;
-		generation += 1;
-	}
-
-	function clearPending(): void {
-		cancelScheduledDrain();
-		pendingByKey.clear();
-		clearHydrationQueue(foregroundQueue);
-		clearHydrationQueue(backgroundQueue);
-	}
-
 	function setDemand(nextDemand: TwoHopCardDemand): void {
-		demandByKey = indexDemand(nextDemand);
-		reconcilePendingPriorities();
+		demand = nextDemand;
+		rebuildQueues(false);
 		const modelsEvicted = evictUndemandedModels();
-		enqueueDemand(false);
 		scheduleDrain();
 		if (modelsEvicted) {
 			params.onModelsChanged();
@@ -126,118 +107,94 @@ export function createTwoHopCardHydrator(
 		}
 	}
 
+	function refreshDemand(): void {
+		rebuildQueues(true);
+		scheduleDrain();
+	}
+
+	function rebuildQueues(refreshExisting: boolean): void {
+		clearHydrationQueue(foregroundQueue);
+		clearHydrationQueue(backgroundQueue);
+		demandedKeys.clear();
+		const revision = params.getRevision();
+
+		// Foreground goes first so duplicate logical keys never enter background work.
+		enqueueDemandCells(
+			demand.foreground,
+			foregroundQueue,
+			refreshExisting,
+			revision,
+		);
+		enqueueDemandCells(
+			demand.background,
+			backgroundQueue,
+			refreshExisting,
+			revision,
+		);
+	}
+
+	function enqueueDemandCells(
+		cells: readonly TwoHopCardHydrationCell[],
+		queue: HydrationQueue,
+		refreshExisting: boolean,
+		revision: unknown,
+	): void {
+		for (const cell of cells) {
+			const logicalKey = cell.logicalKey;
+			if (demandedKeys.has(logicalKey)) continue;
+			demandedKeys.add(logicalKey);
+
+			const current = modelCache.get(logicalKey);
+			if (
+				!refreshExisting &&
+				current?.item === cell.item &&
+				current.revision === revision
+			) {
+				continue;
+			}
+			queue.entries.push(cell);
+		}
+	}
+
 	/** Evicts cache entries outside the demand window; reports if any went away. */
 	function evictUndemandedModels(): boolean {
-		let retainedEntryCount = 0;
+		let demandedModelCount = 0;
 		let modelsEvicted = false;
 
-		for (const logicalKey of demandByKey.keys()) {
+		// Touch demanded entries so the undemanded tail is a small LRU cache.
+		for (const logicalKey of demandedKeys) {
 			const entry = modelCache.get(logicalKey);
 			if (!entry) continue;
 			modelCache.delete(logicalKey);
 			modelCache.set(logicalKey, entry);
+			demandedModelCount += 1;
 		}
 
-		for (const logicalKey of modelCache.keys()) {
-			if (demandByKey.has(logicalKey)) {
-				retainedEntryCount += 1;
-				continue;
-			}
-		}
-
-		let retainedCacheSize = modelCache.size - retainedEntryCount;
-		if (retainedCacheSize <= MAX_RETAINED_CARD_MODELS) return false;
+		let retainedUndemanded = modelCache.size - demandedModelCount;
+		if (retainedUndemanded <= MAX_RETAINED_CARD_MODELS) return false;
 
 		for (const logicalKey of modelCache.keys()) {
-			if (demandByKey.has(logicalKey)) continue;
+			if (demandedKeys.has(logicalKey)) continue;
 			notify(logicalKey, undefined);
 			modelCache.delete(logicalKey);
 			modelsEvicted = true;
-			retainedCacheSize -= 1;
-			if (retainedCacheSize <= MAX_RETAINED_CARD_MODELS) break;
+			retainedUndemanded -= 1;
+			if (retainedUndemanded <= MAX_RETAINED_CARD_MODELS) break;
 		}
-
 		return modelsEvicted;
-	}
-
-	function refreshDemand(): void {
-		clearPending();
-		enqueueDemand(true);
-		scheduleDrain();
-	}
-
-	function reconcilePendingPriorities(): void {
-		for (const [logicalKey, pending] of pendingByKey) {
-			const demanded = demandByKey.get(logicalKey);
-			if (!demanded) {
-				pendingByKey.delete(logicalKey);
-				continue;
-			}
-			if (
-				demanded.priority === pending.priority &&
-				demanded.cell === pending.cell
-			) {
-				continue;
-			}
-			pending.cell = demanded.cell;
-			pending.priority = demanded.priority;
-		}
-	}
-
-	function enqueueCell(
-		cell: TwoHopCardHydrationCell,
-		priority: HydrationPriority,
-		refreshExisting: boolean,
-		revision: unknown,
-	): void {
-		const current = modelCache.get(cell.logicalKey);
-		if (
-			current?.item === cell.item &&
-			current.revision === revision &&
-			!refreshExisting
-		) {
-			return;
-		}
-
-		const existing = pendingByKey.get(cell.logicalKey);
-		if (existing) {
-			if (priority === "foreground" && existing.priority !== "foreground") {
-				existing.priority = "foreground";
-			}
-			return;
-		}
-
-		pendingByKey.set(cell.logicalKey, {
-			cell,
-			priority,
-		});
-	}
-
-	function enqueueDemand(refreshExisting: boolean): void {
-		const revision = params.getRevision();
-		for (const demanded of demandByKey.values()) {
-			enqueueCell(demanded.cell, demanded.priority, refreshExisting, revision);
-		}
-		// Idle work may never drain. Rebuild in reused storage so cancelled cells
-		// and obsolete priority entries cannot accumulate across scroll windows.
-		clearHydrationQueue(foregroundQueue);
-		clearHydrationQueue(backgroundQueue);
-		for (const pending of pendingByKey.values()) {
-			queueFor(pending.priority).entries.push(pending.cell);
-		}
 	}
 
 	function scheduleDrain(): void {
 		if (disposed) return;
 		const priority = resolveNextPriority();
 		if (!priority) {
-			if (cancelDrain) cancelScheduledDrain();
+			cancelScheduledDrain();
 			return;
 		}
 		if (cancelDrain && scheduledPriority === priority) return;
-		cancelDrain?.();
+
+		cancelScheduledDrain();
 		scheduledPriority = priority;
-		const expectedGeneration = generation;
 		const lane = priority === "foreground" ? "post-paint" : "idle";
 		const taskKey =
 			priority === "foreground"
@@ -246,10 +203,15 @@ export function createTwoHopCardHydrator(
 		params.frameCoordinator.schedule(lane, taskKey, () => {
 			cancelDrain = undefined;
 			scheduledPriority = undefined;
-			if (disposed || expectedGeneration !== generation) return;
-			drain(priority);
+			if (!disposed) drain(priority);
 		});
 		cancelDrain = () => params.frameCoordinator.cancel(lane, taskKey);
+	}
+
+	function cancelScheduledDrain(): void {
+		cancelDrain?.();
+		cancelDrain = undefined;
+		scheduledPriority = undefined;
 	}
 
 	function drain(priority: HydrationPriority): void {
@@ -263,70 +225,38 @@ export function createTwoHopCardHydrator(
 			processed < MAX_MODELS_PER_DRAIN &&
 			(processed === 0 || performance.now() - startedAt < MAX_HYDRATION_CPU_MS)
 		) {
-			const hydration = takeNextPending(queue, priority);
-			if (!hydration) break;
+			const cell = takeNext(queue);
+			if (!cell) break;
 			processed += 1;
-			const current = modelCache.get(hydration.logicalKey);
-			const model = params.resolveCardModel(hydration.item, revision);
+			const logicalKey = cell.logicalKey;
+			const current = modelCache.get(logicalKey);
+			const model = params.resolveCardModel(cell.item, revision);
 			const previewRenderKeyChanged =
 				current?.model.previewRequest?.renderKey !==
 				model.previewRequest?.renderKey;
-			modelCache.set(hydration.logicalKey, {
-				item: hydration.item,
+			modelCache.set(logicalKey, {
+				item: cell.item,
 				revision,
 				model,
 			});
-			notify(hydration.logicalKey, model);
+			notify(logicalKey, model);
 			if (previewActive && previewRenderKeyChanged) previewChanged = true;
 		}
-		compactHydrationQueue(queue);
+
 		const modelsEvicted = evictUndemandedModels();
-		if (processed > 0 || modelsEvicted) {
-			params.onModelsChanged();
-		}
-		if (previewChanged || modelsEvicted) {
-			params.onPreviewModelsChanged();
-		}
-		if (hasPendingPriority("foreground") || hasPendingPriority("background")) {
-			scheduleDrain();
-		}
+		if (processed > 0 || modelsEvicted) params.onModelsChanged();
+		if (previewChanged || modelsEvicted) params.onPreviewModelsChanged();
+		scheduleDrain();
 	}
 
-	function takeNextPending(
-		queue: HydrationQueue,
-		priority: HydrationPriority,
-	): TwoHopCardHydrationCell | undefined {
-		while (queue.head < queue.entries.length) {
-			const cell = queue.entries[queue.head];
-			queue.head += 1;
-			if (!cell) continue;
-			const pending = pendingByKey.get(cell.logicalKey);
-			if (!pending || pending.priority !== priority || pending.cell !== cell) {
-				continue;
-			}
-			const demanded = demandByKey.get(cell.logicalKey);
-			if (!demanded || demanded.priority !== priority || demanded.cell !== cell) {
-				pendingByKey.delete(cell.logicalKey);
-				continue;
-			}
-			pendingByKey.delete(cell.logicalKey);
-			return cell;
-		}
-		return undefined;
-	}
-
-	function hasPendingPriority(priority: HydrationPriority): boolean {
-		for (const pending of pendingByKey.values()) {
-			if (pending.priority === priority) return true;
-		}
-		return false;
-	}
-
-	/** Foreground work preempts background work; undefined means idle. */
 	function resolveNextPriority(): HydrationPriority | undefined {
-		if (hasPendingPriority("foreground")) return "foreground";
-		if (hasPendingPriority("background")) return "background";
+		if (hasQueuedCells(foregroundQueue)) return "foreground";
+		if (hasQueuedCells(backgroundQueue)) return "background";
 		return undefined;
+	}
+
+	function queueFor(priority: HydrationPriority): HydrationQueue {
+		return priority === "foreground" ? foregroundQueue : backgroundQueue;
 	}
 
 	function getModel(logicalKey: string): CardRenderModel | undefined {
@@ -334,13 +264,13 @@ export function createTwoHopCardHydrator(
 	}
 
 	function dispose(): void {
+		if (disposed) return;
 		disposed = true;
-		clearPending();
+		cancelScheduledDrain();
+		clearHydrationQueue(foregroundQueue);
+		clearHydrationQueue(backgroundQueue);
+		demandedKeys.clear();
 		modelConsumers.clear();
-	}
-
-	function queueFor(priority: HydrationPriority): HydrationQueue {
-		return priority === "foreground" ? foregroundQueue : backgroundQueue;
 	}
 
 	return {
@@ -352,17 +282,6 @@ export function createTwoHopCardHydrator(
 	};
 }
 
-function indexDemand(demand: TwoHopCardDemand): Map<string, DemandedHydration> {
-	const demandByKey = new Map<string, DemandedHydration>();
-	for (const cell of demand.background) {
-		demandByKey.set(cell.logicalKey, { cell, priority: "background" });
-	}
-	for (const cell of demand.foreground) {
-		demandByKey.set(cell.logicalKey, { cell, priority: "foreground" });
-	}
-	return demandByKey;
-}
-
 function createHydrationQueue(): HydrationQueue {
 	return { entries: [], head: 0 };
 }
@@ -372,14 +291,12 @@ function clearHydrationQueue(queue: HydrationQueue): void {
 	queue.head = 0;
 }
 
-function compactHydrationQueue(queue: HydrationQueue): void {
-	if (queue.head === 0) return;
-	const remaining = queue.entries.length - queue.head;
-	if (remaining === 0) {
-		clearHydrationQueue(queue);
-		return;
-	}
-	if (queue.head < remaining) return;
-	queue.entries.splice(0, queue.head);
-	queue.head = 0;
+function hasQueuedCells(queue: HydrationQueue): boolean {
+	return queue.head < queue.entries.length;
+}
+
+function takeNext(queue: HydrationQueue): TwoHopCardHydrationCell | undefined {
+	const cell = queue.entries[queue.head];
+	if (cell) queue.head += 1;
+	return cell;
 }

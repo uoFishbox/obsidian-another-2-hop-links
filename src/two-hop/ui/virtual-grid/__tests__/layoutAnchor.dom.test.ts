@@ -3,7 +3,7 @@ import {
 	restoreTwoHopLayoutAnchor,
 	restoreTwoHopScrollPosition,
 	type TwoHopLayoutAnchor,
-} from "../layoutAnchor";
+} from "../anchorRestoration";
 import { DEFAULT_TWO_HOP_GRID_LAYOUT } from "../layout";
 import { createTwoHopRowModel } from "../rowModel";
 import { createTwoHopSectionModel } from "two-hop/ui/twoHopSectionModel";

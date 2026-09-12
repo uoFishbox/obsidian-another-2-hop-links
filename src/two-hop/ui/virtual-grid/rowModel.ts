@@ -10,7 +10,6 @@ import {
 	resolveVirtualRangesInto,
 } from "cards/virtualization/public";
 import type { TwoHopSectionModel } from "two-hop/ui/twoHopSectionModel";
-import { parseTwoHopCellKey, twoHopCellKey } from "./cellKeys";
 import type { TwoHopGridLayout } from "./layout";
 import {
 	resolveTwoHopNavigationTarget,
@@ -238,20 +237,14 @@ function resolveSectionCellIndexForKey(
 	section: TwoHopSectionModel,
 	logicalKey: string,
 ): number {
-	const parsed = parseTwoHopCellKey(section, logicalKey);
-	if (!parsed) return -1;
-	switch (parsed.kind) {
-		case "header":
-			return 0;
-		case "load-more":
-			return section.items.length + 1;
-		case "item": {
-			const itemIndex = section.items.findIndex(
-				(item) => item.key === parsed.itemKey,
-			);
-			return itemIndex >= 0 ? itemIndex + 1 : -1;
-		}
-	}
+	if (logicalKey === section.header.logicalKey) return 0;
+	if (logicalKey === `load-more:${section.id}`) return section.items.length + 1;
+
+	const itemPrefix = `item:${section.id}:`;
+	if (!logicalKey.startsWith(itemPrefix)) return -1;
+	const itemKey = logicalKey.slice(itemPrefix.length);
+	const itemIndex = section.items.findIndex((item) => item.key === itemKey);
+	return itemIndex >= 0 ? itemIndex + 1 : -1;
 }
 
 function resolveTwoHopCell(
@@ -266,7 +259,7 @@ function resolveTwoHopCell(
 			rowIndex,
 			columnIndex,
 			kind: "header",
-			logicalKey: twoHopCellKey.header(section),
+			logicalKey: section.header.logicalKey,
 		};
 	}
 	const itemIndex = cellIndex - 1;
@@ -277,7 +270,7 @@ function resolveTwoHopCell(
 			rowIndex,
 			columnIndex,
 			kind: "item",
-			logicalKey: twoHopCellKey.item(section.id, item.key),
+			logicalKey: `item:${section.id}:${item.key}`,
 			itemIndex,
 			item,
 		};
@@ -291,7 +284,7 @@ function resolveTwoHopCell(
 			rowIndex,
 			columnIndex,
 			kind: "load-more",
-			logicalKey: twoHopCellKey.loadMore(section.id),
+			logicalKey: `load-more:${section.id}`,
 		};
 	}
 	return null;

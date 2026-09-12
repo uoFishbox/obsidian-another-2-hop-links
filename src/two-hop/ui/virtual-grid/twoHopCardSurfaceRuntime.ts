@@ -32,6 +32,7 @@ export interface TwoHopCardSurfaceRuntimeOptions {
 	onInteractionHandlesChanged(): void;
 }
 
+/** Runtime surface consumed by the two-hop virtual grid controller. */
 export interface TwoHopCardSurfaceRuntime {
 	readonly previewSurface: VirtualPreviewSurface;
 	readonly interactionDescriptorResolverProvider: InteractionDescriptorResolverProvider;
@@ -39,7 +40,10 @@ export interface TwoHopCardSurfaceRuntime {
 	onSnapshotUpdated(mountedBuild: MountedTwoHopBuild | null): void;
 	scheduleRangeEffects(): void;
 	refreshDemand(): void;
-	registerCardModelConsumer: TwoHopCardHydrator["registerConsumer"];
+	registerCardModelConsumer(
+		logicalKey: string,
+		consumer: (model: CardRenderModel | undefined) => void,
+	): () => void;
 	getInteractionHandle(physicalCellSlot: number): InteractionHandle;
 	dispose(): void;
 }
