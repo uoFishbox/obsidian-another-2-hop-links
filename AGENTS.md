@@ -19,10 +19,11 @@ Compact guide for agents working in this repo.
 | Test (coverage)      | `bun run test:coverage`                                                                                                           |
 | Type/Svelte check    | `bun run check`                                                                                                                   |
 | Check circular deps  | `bun run check:circular`                                                                                                          |
+| Verify release data  | `bun run verify:release`                                                                                                          |
 | Run single test file | `bun run test -- src/cards/sorting/__tests__/sortService.test.ts`                                                                 |
 | Version bump         | `npm version patch` (or `minor` / `major`) — updates `manifest.json`, `package.json`, `versions.json`, and git-adds the first two |
 
-- Package scripts use `bun`, but CI (`release.yml`) uses `npm install` + `npm run build`.
+- CI and release jobs install the pinned Bun version and use `bun install --frozen-lockfile` with the committed lockfile.
 - Built artifact is `main.js`. It is **gitignored** but uploaded to GitHub releases.
 - `data.json` (plugin settings at runtime) is gitignored.
 - `bks/` contains backup zip files — do not delete or modify.
@@ -101,9 +102,9 @@ src/
 1. Update `minAppVersion` in `manifest.json` if needed.
 2. Run `npm version patch/minor/major`. This reads `npm_package_version` env var and runs `version-bump.mjs` to sync `manifest.json` and `versions.json`.
 3. Push the resulting tag.
-4. CI (`.github/workflows/release.yml`) builds on Node 20 and creates a **draft** release attaching `main.js` + `manifest.json`.
+4. CI (`.github/workflows/release.yml`) validates metadata, runs checks and tests, builds with Bun, attests the assets, and creates a **draft** release attaching `main.js` + `styles.css` + `manifest.json`.
 
-> **Note**: `version-bump.mjs` reads `minAppVersion` from `manifest.json` to populate `versions.json`. If `minAppVersion` is missing, `versions.json` entries will be `undefined`.
+> **Note**: `version-bump.mjs` reads `minAppVersion` from `manifest.json` to populate `versions.json` and fails before writing when the metadata is invalid.
 
 ## Common gotchas
 

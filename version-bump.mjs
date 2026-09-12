@@ -1,14 +1,61 @@
-import { readFileSync, writeFileSync } from "fs";
+import { readFileSync, writeFileSync } from "node:fs";
 
-const targetVersion = process.env.npm_package_version;
+const VERSION_PATTERN = /^\d+\.\d+\.\d+$/;
 
-// read minAppVersion from manifest.json and bump version to target version
-let manifest = JSON.parse(readFileSync("manifest.json", "utf8"));
-const { minAppVersion } = manifest;
-manifest.version = targetVersion;
-writeFileSync("manifest.json", JSON.stringify(manifest, null, "\t"));
+function formatError(error) {
+	return error instanceof Error ? error.message : String(error);
+}
 
-// update versions.json with target version and minAppVersion from manifest.json
-let versions = JSON.parse(readFileSync("versions.json", "utf8"));
-versions[targetVersion] = minAppVersion;
-writeFileSync("versions.json", JSON.stringify(versions, null, "\t"));
+function readJsonObject(path) {
+	try {
+		const value = JSON.parse(readFileSync(path, "utf8"));
+		if (typeof value !== "object" || value === null || Array.isArray(value)) {
+			return { ok: false, message: `${path} must contain a JSON object.` };
+		}
+		return { ok: true, value };
+	} catch (error) {
+		return {
+			ok: false,
+			message: `Failed to read ${path}: ${formatError(error)}`,
+		};
+	}
+}
+
+function prepareVersionUpdate() {
+	const targetVersion = process.env.npm_package_version;
+	if (typeof targetVersion !== "string" || !VERSION_PATTERN.test(targetVersion)) {
+		return {
+			ok: false,
+			message: "npm_package_version must use the x.y.z format.",
+		};
+	}
+
+	const manifestResult = readJsonObject("manifest.json");
+	if (!manifestResult.ok) return manifestResult;
+
+	const versionsResult = readJsonObject("versions.json");
+	if (!versionsResult.ok) return versionsResult;
+
+	const minAppVersion = manifestResult.value.minAppVersion;
+	if (typeof minAppVersion !== "string" || !VERSION_PATTERN.test(minAppVersion)) {
+		return {
+			ok: false,
+			message: "manifest.json minAppVersion must use the x.y.z format.",
+		};
+	}
+
+	return {
+		ok: true,
+		manifest: { ...manifestResult.value, version: targetVersion },
+		versions: { ...versionsResult.value, [targetVersion]: minAppVersion },
+	};
+}
+
+const result = prepareVersionUpdate();
+if (!result.ok) {
+	console.error(result.message);
+	process.exitCode = 1;
+} else {
+	writeFileSync("manifest.json", `${JSON.stringify(result.manifest, null, "\t")}\n`);
+	writeFileSync("versions.json", `${JSON.stringify(result.versions, null, "\t")}\n`);
+}

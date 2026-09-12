@@ -39,14 +39,25 @@ Run tests:
 bun run test
 ```
 
-Build and publish the version from `manifest.json` as a GitHub release:
+Before creating a release, run the same checks used by CI:
 
 ```bash
-bun run release
+bun install --frozen-lockfile
+bun run check
+bun run test
+bun run build
 ```
 
-The command requires an authenticated GitHub CLI (`gh auth login`) and uploads
-`main.js`, `styles.css`, and `manifest.json`.
+Bump the version and push the generated commit and tag:
+
+```bash
+npm version patch
+git push origin main --follow-tags
+```
+
+Use `minor` or `major` instead of `patch` when appropriate. GitHub Actions
+validates the tag and metadata, rebuilds the plugin from `bun.lock`, and creates
+a draft release containing `main.js`, `styles.css`, and `manifest.json`.
 
 ## License
 

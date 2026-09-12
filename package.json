@@ -1,12 +1,13 @@
 {
-	"name": "obsidian-sample-plugin",
+	"name": "cosense-style-card-links",
 	"version": "1.2.0",
+	"packageManager": "bun@1.2.15",
 	"description": "Obsidian plugin for Cosense-style link preview cards and two-hop navigation.",
 	"main": "main.js",
 	"scripts": {
 		"dev": "bun run esbuild.config.mjs",
 		"build": "bun run esbuild.config.mjs production",
-		"release": "bun run build && node release.mjs",
+		"verify:release": "node verify-release.mjs",
 		"test": "vitest run --project node --project dom-unit --project dom-svelte --project jsdom --project perf",
 		"test:unit": "vitest run --project node",
 		"test:dom-all": "vitest run --project dom-unit --project dom-svelte --project jsdom",

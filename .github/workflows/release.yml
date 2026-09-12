@@ -6,38 +6,69 @@ on:
             - "*"
 
 permissions:
-    contents: write
+    contents: read
+
+concurrency:
+    group: release-${{ github.ref }}
+    cancel-in-progress: false
 
 jobs:
     release:
         runs-on: ubuntu-latest
+        timeout-minutes: 15
+        permissions:
+            attestations: write
+            contents: write
+            id-token: write
         steps:
             - name: Checkout repository
-              uses: actions/checkout@v2
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-            - name: Set up Node.js
-              uses: actions/setup-node@v3
-              with:
-                  node-version: "20.x"
+            - name: Set up Bun
+              uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
 
-            - name: Install dependencies and build
-              run: |
-                  npm install
-                  npm run build
+            - name: Install dependencies
+              run: bun install --frozen-lockfile
 
-            - name: Install GitHub CLI
-              run: |
-                  sudo apt-get install -y gh
+            - name: Verify release metadata
+              env:
+                  RELEASE_TAG: ${{ github.ref_name }}
+              run: bun run verify:release
+
+            - name: Check types and Svelte
+              run: bun run check
+
+            - name: Check circular dependencies
+              run: bun run check:circular
+
+            - name: Run tests
+              run: bun run test
+
+            - name: Build production bundle
+              run: bun run build
 
             - name: Verify release assets
               run: |
-                  test -f main.js
-                  test -f styles.css
-                  test -f manifest.json
+                  test -s main.js
+                  test -s styles.css
+                  test -s manifest.json
+
+            - name: Generate artifact attestation
+              uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+              with:
+                  subject-path: |
+                      main.js
+                      styles.css
+                      manifest.json
 
             - name: Create GitHub release
               env:
                   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  RELEASE_TAG: ${{ github.ref_name }}
               run: |
-                  tag="${GITHUB_REF#refs/tags/}"
-                  gh release create "$tag" --title="$tag" --draft main.js styles.css manifest.json
+                  gh release create "$RELEASE_TAG" \
+                      --verify-tag \
+                      --title="$RELEASE_TAG" \
+                      --generate-notes \
+                      --draft \
+                      main.js styles.css manifest.json
