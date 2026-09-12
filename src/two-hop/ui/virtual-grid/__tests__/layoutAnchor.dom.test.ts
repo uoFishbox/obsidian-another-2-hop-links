@@ -4,7 +4,8 @@ import {
 	restoreTwoHopScrollPosition,
 	type TwoHopLayoutAnchor,
 } from "../layoutAnchor";
-import { createTwoHopRowModel, DEFAULT_TWO_HOP_GRID_LAYOUT } from "../rowModel";
+import { DEFAULT_TWO_HOP_GRID_LAYOUT } from "../layout";
+import { createTwoHopRowModel } from "../rowModel";
 import { createTwoHopSectionModel } from "two-hop/ui/twoHopSectionModel";
 
 function createFixture() {

@@ -4,7 +4,7 @@ import type {
 	VirtualFrameCoordinator,
 	VirtualFrameLane,
 } from "shared/ui/scheduling/frameCoordinator";
-import { DEFAULT_TWO_HOP_GRID_LAYOUT } from "../rowModel";
+import { DEFAULT_TWO_HOP_GRID_LAYOUT } from "../layout";
 import {
 	createTwoHopCardHydrator,
 	type TwoHopCardHydrationCell,

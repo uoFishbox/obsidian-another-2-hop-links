@@ -72,8 +72,8 @@ const HYDRATION_IDLE_TASK_KEY = "two-hop-virtual-hydration-preload";
 export function createTwoHopCardHydrator(
 	params: TwoHopCardHydratorParams,
 ): TwoHopCardHydrator {
-	const entries = new Map<string, HydratedCardEntry>();
-	const consumers = new Map<string, CardModelConsumer>();
+	const modelCache = new Map<string, HydratedCardEntry>();
+	const modelConsumers = new Map<string, CardModelConsumer>();
 	const pendingByKey = new Map<string, PendingHydration>();
 	const foregroundQueue = createHydrationQueue();
 	const backgroundQueue = createHydrationQueue();
@@ -84,17 +84,19 @@ export function createTwoHopCardHydrator(
 	let disposed = false;
 
 	function notify(logicalKey: string, model: CardRenderModel | undefined): void {
-		consumers.get(logicalKey)?.(model);
+		modelConsumers.get(logicalKey)?.(model);
 	}
 
 	function registerConsumer(
 		logicalKey: string,
 		consumer: CardModelConsumer,
 	): () => void {
-		consumers.set(logicalKey, consumer);
-		consumer(entries.get(logicalKey)?.model);
+		modelConsumers.set(logicalKey, consumer);
+		consumer(modelCache.get(logicalKey)?.model);
 		return () => {
-			if (consumers.get(logicalKey) === consumer) consumers.delete(logicalKey);
+			if (modelConsumers.get(logicalKey) === consumer) {
+				modelConsumers.delete(logicalKey);
+			}
 		};
 	}
 
@@ -115,44 +117,47 @@ export function createTwoHopCardHydrator(
 	function setDemand(nextDemand: TwoHopCardDemand): void {
 		demandByKey = indexDemand(nextDemand);
 		reconcilePendingPriorities();
-		const previewChanged = reconcileModelRetention();
+		const modelsEvicted = evictUndemandedModels();
 		enqueueDemand(false);
 		scheduleDrain();
-		if (previewChanged) params.onModelsChanged();
-		if (previewChanged) params.onPreviewModelsChanged();
+		if (modelsEvicted) {
+			params.onModelsChanged();
+			params.onPreviewModelsChanged();
+		}
 	}
 
-	function reconcileModelRetention(): boolean {
+	/** Evicts cache entries outside the demand window; reports if any went away. */
+	function evictUndemandedModels(): boolean {
 		let retainedEntryCount = 0;
-		let previewChanged = false;
+		let modelsEvicted = false;
 
 		for (const logicalKey of demandByKey.keys()) {
-			const entry = entries.get(logicalKey);
+			const entry = modelCache.get(logicalKey);
 			if (!entry) continue;
-			entries.delete(logicalKey);
-			entries.set(logicalKey, entry);
+			modelCache.delete(logicalKey);
+			modelCache.set(logicalKey, entry);
 		}
 
-		for (const logicalKey of entries.keys()) {
+		for (const logicalKey of modelCache.keys()) {
 			if (demandByKey.has(logicalKey)) {
 				retainedEntryCount += 1;
 				continue;
 			}
 		}
 
-		let retainedCacheSize = entries.size - retainedEntryCount;
+		let retainedCacheSize = modelCache.size - retainedEntryCount;
 		if (retainedCacheSize <= MAX_RETAINED_CARD_MODELS) return false;
 
-		for (const logicalKey of entries.keys()) {
+		for (const logicalKey of modelCache.keys()) {
 			if (demandByKey.has(logicalKey)) continue;
 			notify(logicalKey, undefined);
-			entries.delete(logicalKey);
-			previewChanged = true;
+			modelCache.delete(logicalKey);
+			modelsEvicted = true;
 			retainedCacheSize -= 1;
 			if (retainedCacheSize <= MAX_RETAINED_CARD_MODELS) break;
 		}
 
-		return previewChanged;
+		return modelsEvicted;
 	}
 
 	function refreshDemand(): void {
@@ -185,7 +190,7 @@ export function createTwoHopCardHydrator(
 		refreshExisting: boolean,
 		revision: unknown,
 	): void {
-		const current = entries.get(cell.logicalKey);
+		const current = modelCache.get(cell.logicalKey);
 		if (
 			current?.item === cell.item &&
 			current.revision === revision &&
@@ -224,11 +229,7 @@ export function createTwoHopCardHydrator(
 
 	function scheduleDrain(): void {
 		if (disposed) return;
-		const priority = hasPendingPriority("foreground")
-			? "foreground"
-			: hasPendingPriority("background")
-				? "background"
-				: undefined;
+		const priority = resolveNextPriority();
 		if (!priority) {
 			if (cancelDrain) cancelScheduledDrain();
 			return;
@@ -265,12 +266,12 @@ export function createTwoHopCardHydrator(
 			const hydration = takeNextPending(queue, priority);
 			if (!hydration) break;
 			processed += 1;
-			const current = entries.get(hydration.logicalKey);
+			const current = modelCache.get(hydration.logicalKey);
 			const model = params.resolveCardModel(hydration.item, revision);
 			const previewRenderKeyChanged =
 				current?.model.previewRequest?.renderKey !==
 				model.previewRequest?.renderKey;
-			entries.set(hydration.logicalKey, {
+			modelCache.set(hydration.logicalKey, {
 				item: hydration.item,
 				revision,
 				model,
@@ -279,11 +280,11 @@ export function createTwoHopCardHydrator(
 			if (previewActive && previewRenderKeyChanged) previewChanged = true;
 		}
 		compactHydrationQueue(queue);
-		const retainedModelsEvicted = reconcileModelRetention();
-		if (processed > 0 || retainedModelsEvicted) {
+		const modelsEvicted = evictUndemandedModels();
+		if (processed > 0 || modelsEvicted) {
 			params.onModelsChanged();
 		}
-		if (previewChanged || retainedModelsEvicted) {
+		if (previewChanged || modelsEvicted) {
 			params.onPreviewModelsChanged();
 		}
 		if (hasPendingPriority("foreground") || hasPendingPriority("background")) {
@@ -321,14 +322,21 @@ export function createTwoHopCardHydrator(
 		return false;
 	}
 
+	/** Foreground work preempts background work; undefined means idle. */
+	function resolveNextPriority(): HydrationPriority | undefined {
+		if (hasPendingPriority("foreground")) return "foreground";
+		if (hasPendingPriority("background")) return "background";
+		return undefined;
+	}
+
 	function getModel(logicalKey: string): CardRenderModel | undefined {
-		return entries.get(logicalKey)?.model;
+		return modelCache.get(logicalKey)?.model;
 	}
 
 	function dispose(): void {
 		disposed = true;
 		clearPending();
-		consumers.clear();
+		modelConsumers.clear();
 	}
 
 	function queueFor(priority: HydrationPriority): HydrationQueue {
