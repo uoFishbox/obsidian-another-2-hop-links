@@ -97,7 +97,7 @@
 
 	let listConfig = $derived.by((): ListConfig<CardItem> => ({
 		title: text.allNotes,
-		paginationMode: "virtualized-all",
+		paginationMode: "infinite-scroll",
 		preserveResultsHeightOnSearch: false,
 		searchEnabled: true,
 		allowContentSearch: true,
