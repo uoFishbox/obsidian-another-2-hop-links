@@ -42,13 +42,21 @@ afterEach(() => {
 });
 
 describe("createPreviewRenderQueue", () => {
-	test("schedules preview rendering on the next animation frame", async () => {
+	test("schedules preview rendering in a task after the next animation frame", async () => {
 		const requestIdleCallback = vi.spyOn(window, "requestIdleCallback");
+		let frameCallback: FrameRequestCallback | undefined;
+		vi.mocked(requestAnimationFrame).mockImplementation((callback) => {
+			frameCallback = callback;
+			return 1;
+		});
 		const { createPreviewRenderQueue } = await loadQueueModule();
 		const queue = createPreviewRenderQueue();
+		const run = vi.fn(async () => "rendered");
 
-		const result = queue.enqueue(async () => "rendered");
-		await vi.runAllTimersAsync();
+		const result = queue.enqueue(run);
+		frameCallback?.(0);
+		expect(run).not.toHaveBeenCalled();
+		await vi.advanceTimersByTimeAsync(0);
 
 		await expect(result).resolves.toBe("rendered");
 		expect(requestIdleCallback).not.toHaveBeenCalled();
@@ -73,7 +81,7 @@ describe("createPreviewRenderQueue", () => {
 			return "second";
 		});
 
-		await vi.advanceTimersByTimeAsync(0);
+		await vi.runAllTimersAsync();
 		expect(events).toEqual(["first:start"]);
 
 		releaseFirst.resolve();
@@ -106,6 +114,30 @@ describe("createPreviewRenderQueue", () => {
 		queue.dispose();
 	});
 
+	test("aborts a task waiting to run after its animation frame", async () => {
+		let frameCallback: FrameRequestCallback | undefined;
+		const ownerWindow = createSchedulingWindow({
+			requestAnimationFrame: (callback) => {
+				frameCallback = callback;
+				return 42;
+			},
+		});
+		const { createPreviewRenderQueue } = await loadQueueModule();
+		const queue = createPreviewRenderQueue();
+		const controller = new AbortController();
+		const run = vi.fn(async () => "unexpected");
+		const result = queue.enqueue(run, controller.signal, ownerWindow);
+		const rejection = expect(result).rejects.toMatchObject({ name: "AbortError" });
+
+		frameCallback?.(0);
+		controller.abort();
+		await vi.runAllTimersAsync();
+
+		await rejection;
+		expect(run).not.toHaveBeenCalled();
+		queue.dispose();
+	});
+
 	test("aborted pending tasks reject before the running task finishes", async () => {
 		const { createPreviewRenderQueue } = await loadQueueModule();
 		const queue = createPreviewRenderQueue();
@@ -123,7 +155,7 @@ describe("createPreviewRenderQueue", () => {
 		}, controller.signal);
 		const rejection = expect(aborted).rejects.toMatchObject({ name: "AbortError" });
 
-		await vi.advanceTimersByTimeAsync(0);
+		await vi.runAllTimersAsync();
 		expect(events).toEqual(["first:start"]);
 
 		controller.abort();
@@ -138,10 +170,11 @@ describe("createPreviewRenderQueue", () => {
 
 	test("a stalled owner window does not block another window partition", async () => {
 		const stalledRequestFrame = vi.fn(() => 10);
-		const activeRequestFrame = vi.fn(
-			(callback: FrameRequestCallback) =>
-				setTimeout(() => callback(0), 0) as unknown as number,
-		);
+		let activeFrameCallback: FrameRequestCallback | undefined;
+		const activeRequestFrame = vi.fn((callback: FrameRequestCallback) => {
+			activeFrameCallback = callback;
+			return 11;
+		});
 		const stalledWindow = createSchedulingWindow({
 			requestAnimationFrame: stalledRequestFrame,
 		});
@@ -162,6 +195,7 @@ describe("createPreviewRenderQueue", () => {
 		});
 
 		const active = queue.enqueue(async () => "active", undefined, activeWindow);
+		activeFrameCallback?.(0);
 		await vi.advanceTimersByTimeAsync(0);
 
 		await expect(active).resolves.toBe("active");
@@ -190,6 +224,7 @@ describe("createPreviewRenderQueue", () => {
 		await vi.advanceTimersByTimeAsync(99);
 		expect(run).not.toHaveBeenCalled();
 		await vi.advanceTimersByTimeAsync(1);
+		await vi.runOnlyPendingTimersAsync();
 
 		await expect(result).resolves.toBe("watchdog");
 		frameCallback?.(100);
@@ -223,6 +258,8 @@ describe("createPreviewRenderQueue", () => {
 
 		expect(frameCallbacks).toHaveLength(1);
 		frameCallbacks[0]?.(0);
+		expect(events).toEqual([]);
+		await vi.advanceTimersByTimeAsync(0);
 
 		await expect(Promise.all(results)).resolves.toEqual([0, 1, 2, 3]);
 		expect(events).toEqual([0, 1, 2, 3]);

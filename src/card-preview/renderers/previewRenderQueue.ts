@@ -57,7 +57,8 @@ function readSchedulingTime(): number {
  *
  * Work is partitioned by DOM owner window so a stalled popout cannot hold the
  * render capacity of another realm. A drain starts at most four serialized
- * tasks per frame, avoiding the former one-preview-per-frame throughput cap.
+ * tasks after each frame, avoiding the former one-preview-per-frame throughput cap
+ * without running preview generation inside the frame callback.
  */
 export function createPreviewRenderQueue(
 	options: CreatePreviewRenderQueueOptions = {},
@@ -109,7 +110,7 @@ export function createPreviewRenderQueue(
 		removePartitionIfIdle(partition);
 	}
 
-	function scheduleOnAnimationFrame(
+	function scheduleAfterAnimationFrame(
 		partition: RenderQueuePartition,
 		callback: () => void,
 	): () => void {
@@ -122,21 +123,26 @@ export function createPreviewRenderQueue(
 		}
 		let completed = false;
 		const cancellations: Array<() => void> = [];
+		const cancelScheduledWork = (): void => {
+			while (cancellations.length > 0) cancellations.pop()?.();
+		};
 
 		const cancel = (): void => {
 			if (completed) return;
 			completed = true;
-			for (const cancelScheduledWork of cancellations) {
-				cancelScheduledWork();
-			}
+			cancelScheduledWork();
 		};
 		const runOnce = (): void => {
 			if (completed) return;
 			completed = true;
-			for (const cancelScheduledWork of cancellations) {
-				cancelScheduledWork();
-			}
+			cancelScheduledWork();
 			callback();
+		};
+		const scheduleAfterFrame = (): void => {
+			if (completed) return;
+			cancelScheduledWork();
+			const timeoutHandle = globalThis.setTimeout(runOnce, 0);
+			cancellations.push(() => globalThis.clearTimeout(timeoutHandle));
 		};
 
 		if (
@@ -144,7 +150,8 @@ export function createPreviewRenderQueue(
 			typeof schedulingWindow.requestAnimationFrame === "function"
 		) {
 			try {
-				const frameHandle = schedulingWindow.requestAnimationFrame(runOnce);
+				const frameHandle =
+					schedulingWindow.requestAnimationFrame(scheduleAfterFrame);
 				const cancelFrame = (): void => {
 					if (typeof schedulingWindow.cancelAnimationFrame === "function") {
 						schedulingWindow.cancelAnimationFrame(frameHandle);
@@ -159,7 +166,7 @@ export function createPreviewRenderQueue(
 				// Keep the watchdog outside the target window. A closed or throttled
 				// popout must not retain the queue merely because its rAF never fires.
 				const watchdogHandle = globalThis.setTimeout(
-					runOnce,
+					scheduleAfterFrame,
 					ANIMATION_FRAME_WATCHDOG_MS,
 				);
 				cancellations.push(() => globalThis.clearTimeout(watchdogHandle));
@@ -183,7 +190,7 @@ export function createPreviewRenderQueue(
 		}
 
 		let ranSynchronously = false;
-		const cancelScheduledDrain = scheduleOnAnimationFrame(partition, () => {
+		const cancelScheduledDrain = scheduleAfterAnimationFrame(partition, () => {
 			ranSynchronously = true;
 			partition.cancelScheduledDrain = null;
 			void drainPartition(partition);
