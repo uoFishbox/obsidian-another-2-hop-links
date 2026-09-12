@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, render } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { Platform } from "obsidian";
 import ClickableHeaderHarness from "./ClickableHeaderHarness.svelte";
 
 describe("ClickableHeader", () => {
@@ -18,5 +19,21 @@ describe("ClickableHeader", () => {
 		await fireEvent.keyDown(header, { key: " " });
 
 		expect(onclick).toHaveBeenCalledTimes(3);
+	});
+
+	it("only makes the header draggable on desktop", () => {
+		const desktopView = render(ClickableHeaderHarness, {
+			props: { draggable: true },
+		});
+		expect(desktopView.getByRole("button")).toHaveAttribute("draggable", "true");
+		desktopView.unmount();
+
+		Platform.isMobile = true;
+		const mobileView = render(ClickableHeaderHarness, {
+			props: { draggable: true },
+		});
+		Platform.isMobile = false;
+
+		expect(mobileView.getByRole("button")).not.toHaveAttribute("draggable");
 	});
 });

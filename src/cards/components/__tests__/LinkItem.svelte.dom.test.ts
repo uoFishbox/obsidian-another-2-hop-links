@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/svelte";
 import { describe, expect, it, vi } from "vitest";
+import { Platform } from "obsidian";
 import LinkItem from "../LinkItem.svelte";
 import type { InteractionHandle } from "cards/interactions/interactionTypes";
 
@@ -91,6 +92,22 @@ describe("LinkItem", () => {
 				draggable: false,
 			},
 		});
+
+		expect(container.querySelector(".cosense-card-links__box")).not.toHaveAttribute(
+			"draggable",
+		);
+	});
+
+	it("does not make card body draggable on mobile", () => {
+		Platform.isMobile = true;
+		const { container } = render(LinkItem, {
+			props: {
+				title: "Mobile Target",
+				ariaLabel: "mobile-target-card",
+				interactionHandle: handle("token-mobile-card"),
+			},
+		});
+		Platform.isMobile = false;
 
 		expect(container.querySelector(".cosense-card-links__box")).not.toHaveAttribute(
 			"draggable",

@@ -671,6 +671,36 @@ describe("delegated interaction dispatcher", () => {
 		);
 	});
 
+	it("prevents dragstart without resolving drag data on mobile", () => {
+		Platform.isMobile = true;
+		const linkContext = createLinkContext();
+		const registry = createInteractionRegistry();
+		const file = createMockTFile(TARGET_FILE_PATH);
+		const interactionHandle = createInteractionHandle();
+		registry.register(interactionHandle, createSectionDescriptor(file));
+		const dispatcher = createDelegatedInteractionDispatcher({
+			registry,
+			linkContext,
+			appContext: createAppContext(linkContext),
+		});
+		const element = document.createElement("div");
+		element.dataset.cclInteractionHandle = interactionHandle;
+		root.append(element);
+		attachDispatcher(root, dispatcher);
+		const dataTransfer = { setData: vi.fn() };
+		const event = new Event("dragstart", {
+			bubbles: true,
+			cancelable: true,
+		}) as DragEvent;
+		Object.defineProperty(event, "dataTransfer", { value: dataTransfer });
+
+		element.dispatchEvent(event);
+
+		expect(event.defaultPrevented).toBe(true);
+		expect(linkContext.buildWikiLink).not.toHaveBeenCalled();
+		expect(dataTransfer.setData).not.toHaveBeenCalled();
+	});
+
 	it("resolves interaction targets from composed paths inside a shadow root", () => {
 		const linkContext = createLinkContext();
 		const appContext = createAppContext(linkContext);

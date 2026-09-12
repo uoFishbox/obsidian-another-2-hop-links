@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Snippet } from "svelte";
+	import { Platform } from "obsidian";
 
 	export interface Props {
 		title: string;
@@ -30,7 +31,7 @@
 	role="button"
 	tabindex="0"
 	aria-label={ariaLabel}
-	{draggable}
+	draggable={draggable && !Platform.isMobile ? true : undefined}
 	onclick={() => onclick?.()}
 	onkeydown={(event) => {
 		if (event.key === "Enter" || event.key === " ") {

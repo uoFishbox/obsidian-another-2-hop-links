@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { type TFile } from "obsidian";
+	import { Platform, type TFile } from "obsidian";
 	import Icon from "shared/ui/primitives/Icon.svelte";
 	import { type IconName } from "shared/ui/icons/iconRegistry";
 	import { isAttachment } from "obsidian-integration/files/fileRules";
@@ -99,7 +99,7 @@
 	aria-label={interactive ? ariaLabel : undefined}
 	aria-hidden={interactive ? undefined : "true"}
 	data-ccl-interaction-handle={interactive ? interactionHandle : undefined}
-	draggable={interactive && draggable ? true : undefined}
+	draggable={interactive && draggable && !Platform.isMobile ? true : undefined}
 >
 	<div class="cosense-card-links__box-title-wrapper">
 		<div

@@ -478,6 +478,11 @@ export function createDelegatedInteractionDispatcher({
 		},
 
 		handleDragStart(event: DragEvent): void {
+			if (Platform.isMobile) {
+				event.preventDefault();
+				return;
+			}
+
 			const element = getInteractionElement(event);
 			if (!element || !event.dataTransfer) {
 				return;
