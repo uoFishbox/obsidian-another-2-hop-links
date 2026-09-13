@@ -1,11 +1,15 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
 	installResizeObserverMock,
 	setNumericProperty,
 	teardownResizeObserverMock,
 	triggerResize,
 } from "testing/helpers/DOMObserverMock";
-import { createInlineSurfaceLayoutController } from "../inlineSurfaceLayoutController";
+import {
+	createInlineSurfaceLayoutController,
+	refreshInlineSurfacePosition,
+	INLINE_SURFACE_POSITION_CHANGED,
+} from "../inlineSurfaceLayoutController";
 
 describe("createInlineSurfaceLayoutController", () => {
 	beforeEach(() => {
@@ -67,6 +71,30 @@ describe("createInlineSurfaceLayoutController", () => {
 
 		expect(container.dataset.inlineSurfaceTop).toBeUndefined();
 		controller.dispose();
+	});
+
+	it("notifies after placement changes and silently refreshes missed changes before measurement", () => {
+		const { container, sizer } = createSourceSurface();
+		const scroller = container.parentElement!;
+		const controller = createInlineSurfaceLayoutController({
+			surface: "source",
+			container,
+		});
+		const onPositionChanged = vi.fn(() => {
+			expect(container.dataset.inlineSurfaceTop).toBe("240");
+		});
+		scroller.addEventListener(INLINE_SURFACE_POSITION_CHANGED, onPositionChanged);
+		setNumericProperty(sizer, "offsetHeight", 240);
+		triggerResize(sizer, 300, 200);
+		triggerResize(sizer, 300, 200);
+		expect(onPositionChanged).toHaveBeenCalledOnce();
+		setNumericProperty(sizer, "offsetTop", 80);
+		refreshInlineSurfacePosition(scroller);
+		expect(container.dataset.inlineSurfaceTop).toBe("320");
+		expect(onPositionChanged).toHaveBeenCalledOnce();
+		controller.dispose();
+		refreshInlineSurfacePosition(scroller);
+		expect(container.dataset.inlineSurfaceTop).toBeUndefined();
 	});
 });
 

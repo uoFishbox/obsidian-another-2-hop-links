@@ -54,12 +54,13 @@ export function observeSharedResizeTarget<TSubscriber>(
 	registry: SharedResizeObserverRegistry<TSubscriber>,
 	target: HTMLElement,
 	subscriber: TSubscriber,
+	options?: ResizeObserverOptions,
 ): void {
 	let subscribers = registry.subscribersByTarget.get(target);
 	if (!subscribers) {
 		subscribers = new Set<TSubscriber>();
 		registry.subscribersByTarget.set(target, subscribers);
-		registry.observer.observe(target);
+		registry.observer.observe(target, options);
 	}
 
 	subscribers.add(subscriber);

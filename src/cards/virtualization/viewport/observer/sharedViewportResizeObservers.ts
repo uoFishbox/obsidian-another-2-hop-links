@@ -129,6 +129,7 @@ export function createVirtualViewportResizeObservers(
 			getLayoutDependencyObserver(entry.ownerWindow),
 			target,
 			entry,
+			{ box: "border-box" },
 		);
 	}
 

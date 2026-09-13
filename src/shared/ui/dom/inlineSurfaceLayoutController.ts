@@ -3,6 +3,15 @@ import { isHTMLElementLike } from "./realmSafeDom";
 
 const INLINE_SURFACE_TOP_PROPERTY = "--ccl-inline-surface-top";
 
+/** Dispatched on the scroller after its inline surface position changes. */
+export const INLINE_SURFACE_POSITION_CHANGED = "ccl-inline-surface-position-changed";
+const positionRefreshers = new WeakMap<HTMLElement, () => void>();
+
+/** Refreshes placement before measuring, without scheduling another measurement. */
+export function refreshInlineSurfacePosition(scroller: HTMLElement | null): void {
+	if (scroller) positionRefreshers.get(scroller)?.();
+}
+
 export interface InlineSurfaceLayoutController {
 	/** Stops observing the sizer and removes controller-owned inline styles. */
 	dispose: () => void;
@@ -31,6 +40,10 @@ export function createInlineSurfaceLayoutController(
 
 	let observer: ResizeObserver | null = null;
 	let disposed = false;
+	const refreshPosition = (): void => {
+		updateInlineSurfacePosition(sizer, target.container);
+	};
+	positionRefreshers.set(scroller, refreshPosition);
 
 	const bindObserverToCurrentWindow = (): void => {
 		observer?.disconnect();
@@ -43,9 +56,11 @@ export function createInlineSurfaceLayoutController(
 		if (!ResizeObserverConstructor) return;
 
 		observer = new ResizeObserverConstructor(() => {
-			updateInlineSurfacePosition(sizer, target.container);
+			if (disposed || !updateInlineSurfacePosition(sizer, target.container))
+				return;
+			scroller.dispatchEvent(new Event(INLINE_SURFACE_POSITION_CHANGED));
 		});
-		observer.observe(sizer);
+		observer.observe(sizer, { box: "border-box" });
 	};
 
 	bindObserverToCurrentWindow();
@@ -58,6 +73,9 @@ export function createInlineSurfaceLayoutController(
 		dispose: () => {
 			if (disposed) return;
 			disposed = true;
+			if (positionRefreshers.get(scroller) === refreshPosition) {
+				positionRefreshers.delete(scroller);
+			}
 			unregisterWindowMigration();
 			observer?.disconnect();
 			observer = null;
@@ -76,15 +94,19 @@ function findDirectSizer(scroller: HTMLElement): HTMLElement | null {
 	return null;
 }
 
-function updateInlineSurfacePosition(sizer: HTMLElement, container: HTMLElement): void {
+function updateInlineSurfacePosition(
+	sizer: HTMLElement,
+	container: HTMLElement,
+): boolean {
 	const top = Math.ceil(sizer.offsetTop + sizer.offsetHeight);
 	const serializedTop = String(top);
 	if (container.dataset.inlineSurfaceTop === serializedTop) {
-		return;
+		return false;
 	}
 
 	container.dataset.inlineSurfaceTop = serializedTop;
 	container.style.setProperty(INLINE_SURFACE_TOP_PROPERTY, `${top}px`);
+	return true;
 }
 
 function clearInlineSurfacePosition(container: HTMLElement): void {

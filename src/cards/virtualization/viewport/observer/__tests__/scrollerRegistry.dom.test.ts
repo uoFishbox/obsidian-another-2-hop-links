@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { observeVirtualViewport as observeVirtualListViewport } from "../scrollerRegistry";
+import { createInlineSurfaceLayoutController } from "shared/ui/dom/inlineSurfaceLayoutController";
+import { setNumericProperty } from "testing/helpers/DOMObserverMock";
 import {
 	isScrollActivityActive,
 	resetScrollActivityForTests,
@@ -37,6 +39,51 @@ const scheduleScrollMeasurement = (task?: () => void): void => {
 };
 
 describe("observeVirtualListViewport", () => {
+	it("defers inline position notifications until idle and removes the listener on cleanup", async () => {
+		vi.useFakeTimers();
+		const scroller = document.createElement("div");
+		scroller.className = "cm-scroller ccl-inline-card-host";
+		scroller.style.overflow = "auto";
+		const sizer = document.createElement("div");
+		sizer.className = "cm-sizer";
+		const rootEl = document.createElement("div");
+		scroller.append(sizer, rootEl);
+		document.body.append(scroller);
+		const controller = createInlineSurfaceLayoutController({
+			surface: "source",
+			container: rootEl,
+		});
+		const scheduleLayoutMeasurement = vi.fn();
+		const stop = observeVirtualListViewport({
+			rootEl,
+			frameCoordinator: createObserverFrameCoordinator(),
+			onWidthChange: vi.fn(),
+			onScrollContainerChange: vi.fn(),
+			scheduleLayoutMeasurement,
+			scheduleScrollMeasurement,
+			runScrollMeasurement: vi.fn(),
+			runInitialLayoutMeasurement: vi.fn(),
+		});
+		try {
+			scroller.dispatchEvent(new Event("scroll"));
+			setNumericProperty(sizer, "offsetHeight", 900);
+			triggerResize(sizer, 320, 800);
+			setNumericProperty(sizer, "offsetHeight", 950);
+			triggerResize(sizer, 320, 800);
+			expect(scheduleLayoutMeasurement).not.toHaveBeenCalled();
+			await vi.advanceTimersByTimeAsync(140);
+			expect(scheduleLayoutMeasurement).toHaveBeenCalledOnce();
+			expect(rootEl.dataset.inlineSurfaceTop).toBe("950");
+			stop();
+			setNumericProperty(sizer, "offsetHeight", 1000);
+			triggerResize(sizer, 320, 800);
+			expect(scheduleLayoutMeasurement).toHaveBeenCalledOnce();
+		} finally {
+			stop();
+			controller.dispose();
+		}
+	});
+
 	beforeEach(() => {
 		resetRecords();
 		installResizeObserverMock();
@@ -1158,7 +1205,7 @@ describe("observeVirtualListViewport", () => {
 		}
 	});
 
-	it("keeps the coverage-miss reason when idle fires before the task runs", async () => {
+	it("upgrades a queued coverage miss to idle recovery without adding another task", async () => {
 		vi.useFakeTimers();
 		const rafQueue: FrameRequestCallback[] = [];
 		const rafSpy = vi
@@ -1205,8 +1252,7 @@ describe("observeVirtualListViewport", () => {
 			scrollContainer.dispatchEvent(new Event("scroll"));
 			expect(rafQueue).toHaveLength(1);
 
-			// Idle fires before the scheduled rAF task executes; it must not
-			// reclassify the pending task as "scroll-idle".
+			// Idle recovery must survive a delayed frame without adding a task.
 			await vi.advanceTimersByTimeAsync(140);
 			expect(runScrollMeasurement).not.toHaveBeenCalled();
 
@@ -1216,8 +1262,8 @@ describe("observeVirtualListViewport", () => {
 
 			expect(runScrollMeasurement).toHaveBeenCalledTimes(1);
 			expect(runScrollMeasurement).toHaveBeenCalledWith(
-				expect.anything(),
-				"scroll-coverage-miss",
+				expect.objectContaining({ isScrollActive: false }),
+				"scroll-idle",
 			);
 		} finally {
 			stopObserving();

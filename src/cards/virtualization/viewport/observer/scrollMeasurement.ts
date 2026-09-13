@@ -120,6 +120,7 @@ export interface ScrollerViewportEntry {
 	lastScrollEventAt: number;
 	suppressedNativeScrollTop: number | null;
 	onNativeScroll: () => void;
+	onInlinePositionChange: () => void;
 	onScrollIdleTimeout: () => void;
 	unsubscribeWindowResize: (() => void) | null;
 	runDependencyObserverRefresh: () => void;
@@ -218,7 +219,12 @@ export function scheduleScrollMeasurement(
 	reason: VirtualScrollMeasurementReason = "scroll-coverage-miss",
 ): void {
 	const subscriber = getActiveSubscriber(entry);
-	if (!subscriber || entry.hasPendingScrollMeasurement) return;
+	if (!subscriber) return;
+	if (entry.hasPendingScrollMeasurement) {
+		// Preserve idle recovery when a scroll frame has not executed yet.
+		if (reason === "scroll-idle") entry.scrollMeasurementReason = reason;
+		return;
+	}
 
 	entry.hasPendingScrollMeasurement = true;
 	entry.scrollMeasurementReason = reason;

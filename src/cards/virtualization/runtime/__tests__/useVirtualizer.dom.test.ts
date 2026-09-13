@@ -19,6 +19,8 @@ import {
 	type UseVirtualizerOptions,
 } from "cards/virtualization/runtime/useVirtualizer.svelte";
 import UseVirtualizerHarness from "./UseVirtualizerHarness.svelte";
+import { setNumericProperty } from "testing/helpers/DOMObserverMock";
+import { createInlineSurfaceLayoutController } from "shared/ui/dom/inlineSurfaceLayoutController";
 
 const viewportObservationHarness = vi.hoisted(() => ({
 	options: undefined as unknown,
@@ -373,6 +375,7 @@ describe("useVirtualizer", () => {
 		const onRangePublished = vi.fn();
 		const {
 			runtime,
+			rootEl,
 			findVisibleRangeInto,
 			findVisibleRangesInto,
 			onSnapshotUpdated,
@@ -384,6 +387,13 @@ describe("useVirtualizer", () => {
 				previewCoverageBand: { min: 30, max: 70 },
 			},
 			{ onRangePublished },
+		);
+		const scroller = document.createElement("div");
+		setNumericProperty(scroller, "clientHeight", 100);
+		scroller.scrollTop = 60;
+		runtime.measurement.scrollContainerEl = scroller;
+		vi.spyOn(rootEl, "getBoundingClientRect").mockReturnValue(
+			new DOMRect(0, -60, 320, 400),
 		);
 		runtime.runScrollMeasurement(ACTIVE_SCROLL_METRICS);
 		const mountedResolutionCount = findVisibleRangeInto.mock.calls.length;
@@ -414,6 +424,81 @@ describe("useVirtualizer", () => {
 				isScrollActive: false,
 			}),
 		);
+	});
+
+	it("repairs a position-only shift at idle even inside the old coverage without rebuilding layout", () => {
+		const resolveLayoutMeasurement = vi.fn();
+		const { runtime, rootEl, findVisibleRangesInto } = createRuntimeHarness(
+			{
+				mounted: { start: 0, end: 10 },
+				previewVisible: { start: 2, end: 8 },
+				mountedCoverageBand: { min: 20, max: 80 },
+				previewCoverageBand: { min: 30, max: 70 },
+			},
+			{ resolveLayoutMeasurement },
+		);
+		const scroller = document.createElement("div");
+		setNumericProperty(scroller, "clientHeight", 100);
+		scroller.scrollTop = 60;
+		runtime.measurement.scrollContainerEl = scroller;
+		const readRect = vi
+			.spyOn(rootEl, "getBoundingClientRect")
+			.mockReturnValue(new DOMRect(0, 140, 320, 400));
+		runtime.runScrollMeasurement(ACTIVE_SCROLL_METRICS);
+		expect(readRect).not.toHaveBeenCalled();
+		const resolutions = findVisibleRangesInto.mock.calls.length;
+		runtime.runScrollMeasurement(
+			{ ...ACTIVE_SCROLL_METRICS, isScrollActive: false },
+			"scroll-idle",
+		);
+		expect(runtime.measurement.sectionTop).toBe(200);
+		expect(readRect).toHaveBeenCalledOnce();
+		expect(findVisibleRangesInto.mock.calls.length).toBeGreaterThan(resolutions);
+		expect(resolveLayoutMeasurement).not.toHaveBeenCalled();
+	});
+
+	it("refreshes missed editor placement before reading the idle section position", () => {
+		const { runtime, rootEl } = createRuntimeHarness();
+		const scroller = document.createElement("div");
+		scroller.className = "cm-scroller";
+		setNumericProperty(scroller, "clientHeight", 100);
+		scroller.scrollTop = 600;
+		const sizer = document.createElement("div");
+		sizer.className = "cm-sizer";
+		setNumericProperty(sizer, "offsetHeight", 1000);
+		scroller.append(sizer, rootEl);
+		document.body.append(scroller);
+		runtime.measurement.scrollContainerEl = scroller;
+		const controller = createInlineSurfaceLayoutController({
+			surface: "source",
+			container: rootEl,
+		});
+		const readRect = vi
+			.spyOn(rootEl, "getBoundingClientRect")
+			.mockImplementation(
+				() =>
+					new DOMRect(
+						0,
+						Number(rootEl.dataset.inlineSurfaceTop) - scroller.scrollTop,
+						320,
+						400,
+					),
+			);
+		try {
+			setNumericProperty(sizer, "offsetHeight", 1400);
+			runtime.runScrollMeasurement({ ...ACTIVE_SCROLL_METRICS, scrollTop: 600 });
+			expect(rootEl.dataset.inlineSurfaceTop).toBe("1000");
+			expect(readRect).not.toHaveBeenCalled();
+			runtime.runScrollMeasurement(
+				{ ...ACTIVE_SCROLL_METRICS, scrollTop: 600, isScrollActive: false },
+				"scroll-idle",
+			);
+			expect(rootEl.dataset.inlineSurfaceTop).toBe("1400");
+			expect(runtime.measurement.sectionTop).toBe(1400);
+			expect(readRect).toHaveBeenCalledOnce();
+		} finally {
+			controller.dispose();
+		}
 	});
 
 	it.each([29, 30, 70, 71])(

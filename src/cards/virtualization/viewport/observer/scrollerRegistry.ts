@@ -1,4 +1,5 @@
 import { findNearestScrollContainer } from "shared/ui/scroll/scrollContainer";
+import { INLINE_SURFACE_POSITION_CHANGED } from "shared/ui/dom/inlineSurfaceLayoutController";
 import { markScrollActivityIdle } from "shared/ui/scroll/scrollActivity";
 import { subscribeWindowResize } from "shared/ui/scroll/windowResize";
 import { getOptionalOwnerWindow } from "shared/ui/dom/realmSafeDom";
@@ -193,6 +194,7 @@ const getScrollerViewportEntry = (
 		lastScrollEventAt: 0,
 		suppressedNativeScrollTop: null,
 		onNativeScroll: () => handleVirtualScrollEvent(entry, scrollSessionActions),
+		onInlinePositionChange: () => scheduleLayoutMeasurementWhenIdle(entry),
 		onScrollIdleTimeout: () => checkVirtualScrollIdle(entry, scrollSessionActions),
 		unsubscribeWindowResize: null,
 		runDependencyObserverRefresh: () => dependencyObservers.refresh(entry),
@@ -201,6 +203,10 @@ const getScrollerViewportEntry = (
 	entry.scrollTarget.addEventListener("scroll", entry.onNativeScroll, {
 		passive: true,
 	});
+	entry.scrollTarget.addEventListener(
+		INLINE_SURFACE_POSITION_CHANGED,
+		entry.onInlinePositionChange,
+	);
 	entry.unsubscribeWindowResize = subscribeWindowResize(() => {
 		scheduleLayoutMeasurementWhenIdle(entry);
 	}, ownerWindow);
@@ -259,6 +265,10 @@ const unregisterSubscriber = (subscriber: VirtualListViewportSubscriber): void =
 	entry.suppressedNativeScrollTop = null;
 	entry.scrollCoverageGate.valid = false;
 	entry.scrollTarget.removeEventListener("scroll", entry.onNativeScroll);
+	entry.scrollTarget.removeEventListener(
+		INLINE_SURFACE_POSITION_CHANGED,
+		entry.onInlinePositionChange,
+	);
 	entry.unsubscribeWindowResize?.();
 	entry.unsubscribeWindowResize = null;
 	scrollerViewportEntries.delete(entry.registryKey);

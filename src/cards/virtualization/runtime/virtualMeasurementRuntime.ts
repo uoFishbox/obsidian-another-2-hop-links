@@ -1,4 +1,5 @@
 import { getOptionalOwnerWindow } from "shared/ui/dom/realmSafeDom";
+import { refreshInlineSurfacePosition } from "shared/ui/dom/inlineSurfaceLayoutController";
 import {
 	createVirtualScrollWindowRangeResolver,
 	type ScrollWindowMeasurement,
@@ -301,6 +302,7 @@ export function createVirtualMeasurementRuntime<
 		if (!rootEl) return SKIPPED_NO_ROOT;
 		if (!getOptionalOwnerWindow(rootEl)) return SKIPPED_NO_WINDOW;
 
+		refreshInlineSurfacePosition(measurement.scrollContainerEl);
 		const sectionRect = rootEl.getBoundingClientRect();
 		const scrollMetrics = getScrollMetrics(
 			rootEl,
@@ -345,7 +347,40 @@ export function createVirtualMeasurementRuntime<
 		if (!getOptionalOwnerWindow(rootEl ?? measurement.scrollContainerEl)) {
 			return SKIPPED_NO_WINDOW;
 		}
+		// Idle is the recovery boundary for position changes missed by observers.
+		// Ordinary scroll measurements must continue to use cached geometry.
+		let idleMetrics: VirtualListScrollSnapshot | undefined;
+		if (
+			reason === "scroll-idle" &&
+			!sharedScrollMetrics?.isScrollActive &&
+			rootEl
+		) {
+			refreshInlineSurfacePosition(measurement.scrollContainerEl);
+			const metrics = getScrollMetrics(rootEl, measurement.scrollContainerEl);
+			const valid = hasValidVirtualListScrollMetrics({
+				hasRenderableContent: hasRenderableContent(),
+				rootRect: metrics.sectionRect,
+				...metrics,
+			});
+			if (
+				metrics.sectionTop !== measurement.sectionTop ||
+				metrics.viewportHeight !== measurement.viewportHeight ||
+				valid !== measurement.hasValidScrollMetrics
+			) {
+				scrollCoverage.reset();
+			}
+			updateLiveMeasurementState(metrics, valid);
+			idleMetrics = metrics;
+			if (sharedScrollMetrics) {
+				sharedScrollMetrics = {
+					...sharedScrollMetrics,
+					scrollTop: metrics.scrollTop,
+					viewportHeight: metrics.viewportHeight,
+				};
+			}
+		}
 		const snapshot =
+			idleMetrics ??
 			sharedScrollMetrics ??
 			readScrollSnapshot(
 				measurement.scrollContainerEl,
