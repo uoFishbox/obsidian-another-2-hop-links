@@ -94,8 +94,8 @@ vi.mock("cards/context/linkContext", async () => {
 
 	return {
 		...actual,
-		setAppContext: vi.fn(),
-		setLinkContext: vi.fn(),
+		// The page provides the real contexts so the virtual grid can consume the
+		// same app context as production instead of a two-hop-specific prop path.
 		setLazyLoaderCache: vi.fn(),
 	};
 });

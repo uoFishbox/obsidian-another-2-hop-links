@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import type { TFile } from "obsidian";
 import { createPrimarySectionDescriptor } from "two-hop/ui/section-descriptors/descriptors";
 import type { IndexedLink } from "indexing/model";
@@ -19,19 +19,13 @@ describe("section descriptor prefix materialization", () => {
 			{ length: 2_000 },
 			(_, index) => ({ hop1: createLink(`${index}.md`), hop2: [] }),
 		);
-		const resolveItemInteractionId = vi.fn(
-			(_semanticKey: string) => `i${resolveItemInteractionId.mock.calls.length}`,
-		);
-
 		const section = createPrimarySectionDescriptor({
 			input: { kind: "outgoing", items: branches },
 			itemLimit: 20,
 			previousItems: [],
-			resolveItemInteractionId,
 			language: "en",
 		});
 
-		expect(resolveItemInteractionId).toHaveBeenCalledTimes(20);
 		expect(section.totalCount).toBe(2_000);
 		expect(section.items).toHaveLength(20);
 		const rows = section.items;
@@ -39,11 +33,9 @@ describe("section descriptor prefix materialization", () => {
 			input: { kind: "outgoing", items: branches },
 			itemLimit: 40,
 			previousItems: rows,
-			resolveItemInteractionId,
 			language: "en",
 		});
 
-		expect(resolveItemInteractionId).toHaveBeenCalledTimes(40);
 		expect(expanded.items).toHaveLength(40);
 		expect(expanded.items[0]).toBe(rows[0]);
 		expect(expanded.items[19]).toBe(rows[19]);

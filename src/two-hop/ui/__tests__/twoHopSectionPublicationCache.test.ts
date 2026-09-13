@@ -5,7 +5,6 @@ import { DEFAULT_SETTINGS } from "settings/model";
 import type { TaggedNote, IndexedLink } from "indexing/model";
 import type { TwoHopLinkBranch } from "two-hop/model";
 import { createTwoHopSectionPublicationMemo } from "two-hop/ui/section-descriptors/cache";
-import { createTwoHopInteractionIdentity } from "two-hop/ui/section-descriptors/descriptors";
 import { buildScopedSectionId } from "cards/components/listPagination";
 
 const sourceFile = { path: "source.md" } as TFile;
@@ -102,7 +101,6 @@ function createHarness(defaultVisibleLimit = 20, loadMoreIncrement = 20) {
 		getSortedTagGroupItems: (items: readonly TaggedNote[]) =>
 			applicationStore.getSortedTagGroupItems(items),
 		getVisibleCount: createVisibleCountResolver(),
-		interactionIdentity: createTwoHopInteractionIdentity(),
 		onTagClick: vi.fn(),
 	};
 	return {
@@ -251,5 +249,20 @@ describe("createTwoHopSectionPublicationMemo", () => {
 		second[0]?.header.props.onClick?.();
 		expect(firstCallback).not.toHaveBeenCalled();
 		expect(secondCallback).toHaveBeenCalledWith("alpha");
+	});
+
+	it("publishes the new-links section under the same id used for lookups", () => {
+		const cache = createTwoHopSectionPublicationMemo();
+		const { params } = createHarness();
+		const input = {
+			...params,
+			displayData: { ...createDisplayData(), newLinks: [createLink("new.md")] },
+		};
+
+		const first = cache.resolve(input);
+		const second = cache.resolve(input);
+
+		expect(first.map((section) => section.id)).toEqual(["newlinks"]);
+		expect(second).toBe(first);
 	});
 });

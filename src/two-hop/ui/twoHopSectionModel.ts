@@ -1,6 +1,14 @@
 import type { CardItem } from "cards/CardItem";
 import { generateLinkKey } from "card-preview/text/textUtils";
-import type { ClickableHeaderExtraProps } from "two-hop/ui/section-descriptors/types";
+import type { SectionHeaderInteractionDescriptor } from "cards/interactions/interactionTypes";
+
+/** Optional interactive header payload shared by all two-hop section kinds. */
+export interface ClickableHeaderExtraProps {
+	className?: string;
+	draggable?: boolean;
+	interactionDescriptor?: SectionHeaderInteractionDescriptor;
+	onClick?: () => void;
+}
 
 /** Immutable section data consumed by two-hop layout and rendering. */
 export interface TwoHopSectionModel {

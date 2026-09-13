@@ -16,11 +16,11 @@ import type {
 import {
 	createBranchSectionDescriptor,
 	createNewLinksSectionDescriptor,
+	NEW_LINKS_SECTION_ID,
 	resolveBranchHeader,
 	createPrimarySectionDescriptor,
 	createTagSectionDescriptor,
 	type PrimarySectionBuildInput,
-	type TwoHopInteractionIdentity,
 } from "./descriptors";
 
 export interface ResolveTwoHopSectionsParams {
@@ -48,7 +48,6 @@ export interface ResolveTwoHopSectionsParams {
 	 * function when pagination inputs change so exact-hit memoization stays valid.
 	 */
 	readonly getVisibleCount: (sectionId: string, totalCount: number) => number;
-	readonly interactionIdentity: TwoHopInteractionIdentity;
 	readonly onTagClick: (tag: string) => void;
 }
 
@@ -81,7 +80,6 @@ interface ResolveSnapshot {
 	readonly getSortedTwoHopItems: ResolveTwoHopSectionsParams["getSortedTwoHopItems"];
 	readonly getSortedTagGroupItems: ResolveTwoHopSectionsParams["getSortedTagGroupItems"];
 	readonly getVisibleCount: ResolveTwoHopSectionsParams["getVisibleCount"];
-	readonly interactionIdentity: TwoHopInteractionIdentity;
 	readonly onTagClick: ResolveTwoHopSectionsParams["onTagClick"];
 	readonly mobileLongPressAction: PluginSettings["mobileLongPressAction"];
 	readonly highlightInPreviewOnHover: boolean;
@@ -188,8 +186,6 @@ function appendPrimarySections(
 	params: ResolveTwoHopSectionsParams,
 	append: AppendSection,
 ): void {
-	const resolveItemInteractionId =
-		params.interactionIdentity.resolveItemInteractionId;
 	const inputs: PrimarySectionBuildInput[] = params.useMergedLinks
 		? params.displayData.mergedItems.length > 0
 			? [{ kind: "merged", items: params.displayData.mergedItems }]
@@ -210,14 +206,13 @@ function appendPrimarySections(
 	for (const input of inputs) {
 		append(
 			input.kind,
-			[input.items, params.interactionIdentity, params.currentSettings.language],
+			[input.items, params.currentSettings.language],
 			input.items.length,
 			(itemLimit, previousItems) =>
 				createPrimarySectionDescriptor({
 					input,
 					itemLimit,
 					previousItems,
-					resolveItemInteractionId,
 					language: params.currentSettings.language,
 				}),
 		);
@@ -256,25 +251,21 @@ function appendBranchSections(
 				params.currentSort,
 				params.sortContextVersion,
 				params.getSortedTwoHopItems,
-				params.interactionIdentity,
 				interactionSettings.mobileLongPressAction,
 				interactionSettings.highlightInPreviewOnHover,
 			],
 			branch.hop2.length,
 			(itemLimit, previousItems) =>
-				createBranchSectionDescriptor(
-					{
-						branch,
-						rawSectionId: id,
-						sourceFile: params.sourceFile,
-						...header,
-						interactionSettings,
-						sortedItems: getSortedItems(),
-						itemLimit,
-						previousItems,
-					},
-					params.interactionIdentity,
-				),
+				createBranchSectionDescriptor({
+					branch,
+					rawSectionId: id,
+					sourceFile: params.sourceFile,
+					...header,
+					interactionSettings,
+					sortedItems: getSortedItems(),
+					itemLimit,
+					previousItems,
+				}),
 		);
 	}
 }
@@ -296,22 +287,18 @@ function appendTagSections(
 				params.currentSort,
 				params.sortContextVersion,
 				params.getSortedTagGroupItems,
-				params.interactionIdentity,
 				params.onTagClick,
 			],
 			source.notes.length,
 			(itemLimit, previousItems) =>
-				createTagSectionDescriptor(
-					{
-						source,
-						rawSectionId: id,
-						sortedItems: getSortedItems(),
-						itemLimit,
-						previousItems,
-						onTagClick: params.onTagClick,
-					},
-					params.interactionIdentity,
-				),
+				createTagSectionDescriptor({
+					source,
+					rawSectionId: id,
+					sortedItems: getSortedItems(),
+					itemLimit,
+					previousItems,
+					onTagClick: params.onTagClick,
+				}),
 		);
 	}
 }
@@ -323,16 +310,14 @@ function appendNewLinksSection(
 	const items = params.displayData.newLinks;
 	if (items.length === 0) return;
 	append(
-		"new-links",
-		[items, params.interactionIdentity, params.currentSettings.language],
+		NEW_LINKS_SECTION_ID,
+		[items, params.currentSettings.language],
 		items.length,
 		(itemLimit, previousItems) =>
 			createNewLinksSectionDescriptor({
 				items,
 				itemLimit,
 				previousItems,
-				resolveItemInteractionId:
-					params.interactionIdentity.resolveItemInteractionId,
 				language: params.currentSettings.language,
 			}),
 	);
@@ -351,7 +336,6 @@ function createResolveSnapshot(params: ResolveTwoHopSectionsParams): ResolveSnap
 		getSortedTwoHopItems: params.getSortedTwoHopItems,
 		getSortedTagGroupItems: params.getSortedTagGroupItems,
 		getVisibleCount: params.getVisibleCount,
-		interactionIdentity: params.interactionIdentity,
 		onTagClick: params.onTagClick,
 		mobileLongPressAction: params.currentSettings.mobileLongPressAction,
 		highlightInPreviewOnHover: params.currentSettings.highlightInPreviewOnHover,

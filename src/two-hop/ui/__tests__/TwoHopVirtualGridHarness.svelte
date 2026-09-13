@@ -3,7 +3,6 @@
 	import { setLinkContext, type LinkContext } from "cards/context/linkContext";
 	import type { CardCollectionState } from "cards/CardCollectionState.svelte";
 	import type { CardRenderModel } from "cards/rendering/cardRenderModel";
-	import type { TwoHopPreviewDependencies } from "two-hop/ui/virtual-grid/useTwoHopVirtualGrid.svelte";
 	import type {
 		TwoHopItemModel,
 		TwoHopSectionModel,
@@ -14,7 +13,6 @@
 		layoutAnchorScope?: string;
 		applicationStore: CardCollectionState;
 		linkContext: LinkContext;
-		previewDependencies?: TwoHopPreviewDependencies;
 		previewActive?: boolean;
 		cardModelRevision?: unknown;
 		loadMoreSection?: (sectionId: string) => void;
@@ -29,7 +27,6 @@
 		layoutAnchorScope = "default",
 		applicationStore,
 		linkContext,
-		previewDependencies = undefined,
 		previewActive = true,
 		cardModelRevision = 0,
 		loadMoreSection = undefined,
@@ -44,7 +41,6 @@
 	{applicationStore}
 	{loadMoreSection}
 	{resolveItemCardModel}
-	{previewDependencies}
 	{previewActive}
 	{cardModelRevision}
 />

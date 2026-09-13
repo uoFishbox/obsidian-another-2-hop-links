@@ -4,6 +4,8 @@ import type { DisplayData, MergedLinkItem } from "two-hop/display/displayDataBui
 import {
 	formatLinkText,
 	generateBacklinkKey,
+	generateBranchCardKey,
+	generateIndexedLinkKey,
 	generateLinkKey,
 } from "card-preview/text/textUtils";
 import {
@@ -17,19 +19,10 @@ import {
 import {
 	createTaggedNoteSectionItemKey,
 	createTwoHopSectionModel,
+	type ClickableHeaderExtraProps,
 	type TwoHopItemModel,
 	type TwoHopSectionModel,
 } from "two-hop/ui/twoHopSectionModel";
-import {
-	backlinksSectionConfig,
-	mergedLinksSectionConfig,
-	newLinksSectionConfig,
-	outgoingLinksSectionConfig,
-} from "two-hop/ui/section-descriptors/sectionConfigs";
-import type {
-	ClickableHeaderExtraProps,
-	SectionConfig,
-} from "two-hop/ui/section-descriptors/types";
 import {
 	createItemInteractionKey,
 	createSectionHeaderInteractionKey,
@@ -41,8 +34,11 @@ import type { TagGroup, TwoHopLinkBranch } from "two-hop/model";
 import type { Language } from "settings/model";
 import { getMainUiTranslations } from "shared/i18n/mainUiTranslations";
 
+/** Stable publication and section identity for the new-links section. */
+export const NEW_LINKS_SECTION_ID = "newlinks";
+
 /** Materializes only the requested prefix while preserving existing item identities. */
-export function materializeItemPrefix<T>(
+function materializeItemPrefix<T>(
 	sources: readonly T[],
 	itemLimit: number,
 	previousItems: readonly TwoHopItemModel[],
@@ -58,19 +54,6 @@ export function materializeItemPrefix<T>(
 		items.push(createItem(source, index));
 	}
 	return items;
-}
-
-export interface TwoHopInteractionIdentity {
-	readonly resolveItemInteractionId: (semanticKey: string) => string;
-	readonly resolveHeaderInteractionId: (sectionId: string) => string;
-}
-
-export function createTwoHopInteractionIdentity(): TwoHopInteractionIdentity {
-	return {
-		resolveItemInteractionId: (semanticKey) => semanticKey,
-		resolveHeaderInteractionId: (sectionId) =>
-			createSectionHeaderInteractionKey(sectionId),
-	};
 }
 
 export type PrimarySectionBuildInput =
@@ -91,7 +74,6 @@ export interface CreatePrimarySectionDescriptorParams {
 	readonly input: PrimarySectionBuildInput;
 	readonly itemLimit: number;
 	readonly previousItems: readonly TwoHopItemModel[];
-	readonly resolveItemInteractionId: (semanticKey: string) => string;
 	readonly language: Language;
 }
 
@@ -110,10 +92,10 @@ export function createPrimarySectionDescriptor(
 				items: params.input.items,
 				itemLimit: params.itemLimit,
 				previousItems: params.previousItems,
-				config: outgoingLinksSectionConfig,
+				sectionId: "outgoing",
 				toCardItem: (item) => ({ type: "branch", data: item }),
 				getSearchKey: getOutgoingSearchKey,
-				resolveItemInteractionId: params.resolveItemInteractionId,
+				getVirtualKey: (item) => generateBranchCardKey(item),
 				title: getMainUiTranslations(params.language).outgoingLinks,
 			});
 		case "backlinks":
@@ -121,10 +103,10 @@ export function createPrimarySectionDescriptor(
 				items: params.input.items,
 				itemLimit: params.itemLimit,
 				previousItems: params.previousItems,
-				config: backlinksSectionConfig,
+				sectionId: "backlinks",
 				toCardItem: (item) => ({ type: "backlink", data: item }),
 				getSearchKey: getBacklinkSearchKey,
-				resolveItemInteractionId: params.resolveItemInteractionId,
+				getVirtualKey: (item) => generateBacklinkKey(item, "backlink"),
 				title: getMainUiTranslations(params.language).backlinks,
 			});
 		case "merged":
@@ -132,10 +114,10 @@ export function createPrimarySectionDescriptor(
 				items: params.input.items,
 				itemLimit: params.itemLimit,
 				previousItems: params.previousItems,
-				config: mergedLinksSectionConfig,
+				sectionId: "merged",
 				toCardItem: toMergedViewItem,
 				getSearchKey: getMergedSearchKey,
-				resolveItemInteractionId: params.resolveItemInteractionId,
+				getVirtualKey: resolveMergedVirtualKey,
 				title: getMainUiTranslations(params.language).links,
 			});
 	}
@@ -145,10 +127,10 @@ interface CreatePrimaryDescriptorParams<T> {
 	readonly items: readonly T[];
 	readonly itemLimit: number;
 	readonly previousItems: readonly TwoHopItemModel[];
-	readonly config: SectionConfig<T>;
+	readonly sectionId: string;
 	readonly toCardItem: (item: T) => CardItem;
 	readonly getSearchKey: (item: T) => string;
-	readonly resolveItemInteractionId: (semanticKey: string) => string;
+	readonly getVirtualKey: (item: T, index: number) => string;
 	readonly title: string;
 }
 
@@ -161,11 +143,10 @@ function createPrimaryDescriptor<T>(
 		params.previousItems,
 		(source, index): TwoHopItemModel => {
 			const item = params.toCardItem(source);
-			const virtualKey = params.config.getKey(source, index);
-			const semanticKey = createItemInteractionKey(item, virtualKey);
+			const virtualKey = params.getVirtualKey(source, index);
 			return {
 				item,
-				interactionId: params.resolveItemInteractionId(semanticKey),
+				interactionId: createItemInteractionKey(item, virtualKey),
 				searchKey: params.getSearchKey(source),
 				key: virtualKey,
 			};
@@ -173,11 +154,17 @@ function createPrimaryDescriptor<T>(
 	);
 	return createTwoHopSectionModel({
 		kind: "primary-section",
-		id: params.config.sectionId,
+		id: params.sectionId,
 		title: params.title,
 		items: rows,
 		totalCount: params.items.length,
 	});
+}
+
+function resolveMergedVirtualKey(item: MergedLinkItem): string {
+	return "hop1" in item && "hop2" in item
+		? generateBranchCardKey(item, "outgoing")
+		: generateBacklinkKey(item, "backlink");
 }
 
 function toMergedViewItem(item: MergedLinkItem): CardItem {
@@ -232,7 +219,6 @@ export function resolveBranchHeader(params: {
 /** Builds one immutable branch publication from a sorted, bounded prefix. */
 export function createBranchSectionDescriptor(
 	input: BranchSectionBuildInput,
-	tokens: TwoHopInteractionIdentity,
 ): TwoHopSectionModel {
 	const branchBaseKey = getTwohopBranchSearchBaseKey(input.branch);
 	const rows = materializeItemPrefix(
@@ -242,10 +228,9 @@ export function createBranchSectionDescriptor(
 		(source): TwoHopItemModel => {
 			const item: CardItem = { type: "backlink", data: source };
 			const virtualKey = generateBacklinkKey(source);
-			const semanticKey = createItemInteractionKey(item, virtualKey);
 			return {
 				item,
-				interactionId: tokens.resolveItemInteractionId(semanticKey),
+				interactionId: createItemInteractionKey(item, virtualKey),
 				searchKey: createTwohopChildSearchKeyFromBaseKeys(
 					branchBaseKey,
 					virtualKey,
@@ -254,9 +239,8 @@ export function createBranchSectionDescriptor(
 			};
 		},
 	);
-	const headerInteractionId = tokens.resolveHeaderInteractionId(input.rawSectionId);
 	const headerInteractionDescriptor: SectionHeaderInteractionDescriptor = {
-		interactionId: headerInteractionId,
+		interactionId: createSectionHeaderInteractionKey(input.rawSectionId),
 		kind: "sectionHeader",
 		link: input.branch.hop1,
 		isOutgoingLink: true,
@@ -294,7 +278,6 @@ export interface TagSectionBuildInput {
 /** Builds one immutable tag publication from a sorted, bounded prefix. */
 export function createTagSectionDescriptor(
 	input: TagSectionBuildInput,
-	tokens: TwoHopInteractionIdentity,
 ): TwoHopSectionModel {
 	const headerProps: ClickableHeaderExtraProps = {
 		className: "cosense-card-links__box--tag",
@@ -316,10 +299,9 @@ export function createTagSectionDescriptor(
 				input.source.tag,
 				index,
 			);
-			const semanticKey = createItemInteractionKey(item, virtualKey);
 			return {
 				item,
-				interactionId: tokens.resolveItemInteractionId(semanticKey),
+				interactionId: createItemInteractionKey(item, virtualKey),
 				searchKey: getTagNoteSearchKeyFromBaseKey(input.source.tag, baseKey),
 				key: virtualKey,
 			};
@@ -339,7 +321,6 @@ export interface CreateNewLinksSectionDescriptorParams {
 	readonly items: readonly IndexedLink[];
 	readonly itemLimit: number;
 	readonly previousItems: readonly TwoHopItemModel[];
-	readonly resolveItemInteractionId: (semanticKey: string) => string;
 	readonly language: Language;
 }
 
@@ -351,13 +332,12 @@ export function createNewLinksSectionDescriptor(
 		params.items,
 		params.itemLimit,
 		params.previousItems,
-		(source, index): TwoHopItemModel => {
+		(source): TwoHopItemModel => {
 			const item: CardItem = { type: "newLink", data: source };
-			const virtualKey = newLinksSectionConfig.getKey(source, index);
-			const semanticKey = createItemInteractionKey(item, virtualKey);
+			const virtualKey = generateIndexedLinkKey(source, "new");
 			return {
 				item,
-				interactionId: params.resolveItemInteractionId(semanticKey),
+				interactionId: createItemInteractionKey(item, virtualKey),
 				searchKey: virtualKey,
 				key: virtualKey,
 			};
@@ -365,7 +345,7 @@ export function createNewLinksSectionDescriptor(
 	);
 	return createTwoHopSectionModel({
 		kind: "new-links-section",
-		id: newLinksSectionConfig.sectionId,
+		id: NEW_LINKS_SECTION_ID,
 		title: getMainUiTranslations(params.language).newLinks,
 		items: rows,
 		totalCount: params.items.length,

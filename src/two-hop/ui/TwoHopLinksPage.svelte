@@ -30,14 +30,12 @@
 	import type { DisplayData } from "two-hop/display/displayDataBuilder";
 	import { tick, untrack } from "svelte";
 	import { createTwoHopSectionPublicationMemo } from "two-hop/ui/section-descriptors/cache";
-	import { createTwoHopInteractionIdentity } from "two-hop/ui/section-descriptors/descriptors";
 	import {
 		buildScopedSectionId,
 		normalizeIncrement,
 	} from "cards/components/listPagination";
 	import type { TwoHopLinksRootUiState } from "two-hop/ui/twoHopLinksRootUiState";
 	import { observePreviewSurfaceVisibility } from "card-preview/scheduling/previewSurfaceVisibility";
-	import type { TwoHopPreviewDependencies } from "two-hop/ui/virtual-grid/useTwoHopVirtualGrid.svelte";
 	import type { PreviewRuntime } from "card-preview/runtime/previewRuntime";
 	import type { LinkUtilitiesContext } from "cards/context/linkUtilities";
 	import {
@@ -292,7 +290,6 @@
 	const sourceFile = linkContext.sourceFile;
 	const fileToLinktext = linkContext.fileToLinktext;
 	const onTagClick = linkContext.onTagClick;
-	const interactionIdentity = createTwoHopInteractionIdentity();
 	const sectionPublicationMemo = createTwoHopSectionPublicationMemo();
 	let getSectionVisibleCount = $derived.by(() => {
 		const expandedLimits = applicationUiState.sectionExpandedLimits ?? {};
@@ -327,7 +324,6 @@
 			getSortedTwoHopItems,
 			getSortedTagGroupItems,
 			getVisibleCount: getSectionVisibleCount,
-			interactionIdentity,
 			onTagClick,
 		}),
 	);
@@ -371,14 +367,6 @@
 	setLinkContext(linkContext);
 	setContext<CardCollectionState>("applicationStore", applicationUiState);
 	setLazyLoaderCache(lazyLoaderCache);
-
-	const previewDependencies: TwoHopPreviewDependencies | undefined = previewRuntime
-		? {
-				previewRuntime,
-				resolveSearchMatchOffset: (query, targetFile) =>
-					searchSession.getFirstMatchOffset(query, targetFile),
-			}
-		: undefined;
 
 	function getPreviewRenderVersion(path: string): string {
 		return applicationUiState.previewState.getRenderVersion(path);
@@ -529,7 +517,6 @@
 				{loadMoreSection}
 				{cardModelRevision}
 				{resolveItemCardModel}
-				{previewDependencies}
 				previewActive={previewSurfaceActive}
 				language={currentSettings.language}
 				onMoveFocusAboveGrid={moveFocusToSearchInput}

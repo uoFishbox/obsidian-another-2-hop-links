@@ -20,26 +20,48 @@ import {
 	teardownResizeObserverMock,
 	triggerResize,
 } from "testing/helpers/DOMObserverMock";
+import type { VirtualFrameLane } from "shared/ui/scheduling/frameCoordinator";
 import TwoHopVirtualGridHarness from "./TwoHopVirtualGridHarness.svelte";
 
-const cardDemandProbe = vi.hoisted(() => ({ setDemand: vi.fn() }));
+const cardDemandProbe = vi.hoisted(() => ({
+	getPreviewVisibleRangeCalls: 0,
+	rangeEffectRuns: 0,
+}));
 
-vi.mock("two-hop/ui/virtual-grid/cardHydrator", async (importOriginal) => {
+vi.mock("two-hop/ui/virtual-grid/twoHopCardRuntime", async (importOriginal) => {
 	const actual =
-		await importOriginal<typeof import("two-hop/ui/virtual-grid/cardHydrator")>();
+		await importOriginal<
+			typeof import("two-hop/ui/virtual-grid/twoHopCardRuntime")
+		>();
 	return {
 		...actual,
-		createTwoHopCardHydrator: (
-			params: Parameters<typeof actual.createTwoHopCardHydrator>[0],
+		createTwoHopCardRuntime: (
+			options: Parameters<typeof actual.createTwoHopCardRuntime>[0],
 		) => {
-			const hydrator = actual.createTwoHopCardHydrator(params);
-			return {
-				...hydrator,
-				setDemand(demand: Parameters<typeof hydrator.setDemand>[0]): void {
-					cardDemandProbe.setDemand(demand);
-					hydrator.setDemand(demand);
+			const frameCoordinator = {
+				...options.frameCoordinator,
+				schedule(
+					lane: VirtualFrameLane,
+					key: string,
+					task: () => void,
+				): boolean {
+					return options.frameCoordinator.schedule(lane, key, () => {
+						const callsBefore = cardDemandProbe.getPreviewVisibleRangeCalls;
+						task();
+						if (cardDemandProbe.getPreviewVisibleRangeCalls > callsBefore) {
+							cardDemandProbe.rangeEffectRuns += 1;
+						}
+					});
 				},
 			};
+			return actual.createTwoHopCardRuntime({
+				...options,
+				frameCoordinator,
+				getPreviewVisibleRange: () => {
+					cardDemandProbe.getPreviewVisibleRangeCalls += 1;
+					return options.getPreviewVisibleRange();
+				},
+			});
 		},
 	};
 });
@@ -167,7 +189,8 @@ async function waitForStableRowCount(root: HTMLElement): Promise<number> {
 
 beforeEach(() => {
 	resetRecords();
-	cardDemandProbe.setDemand.mockClear();
+	cardDemandProbe.getPreviewVisibleRangeCalls = 0;
+	cardDemandProbe.rangeEffectRuns = 0;
 	installResizeObserverMock();
 	installAnimationFrameMock();
 	setNumericProperty(window, "scrollY", 0);
@@ -187,7 +210,8 @@ describe("TwoHopVirtualGrid performance contract", () => {
 			section,
 			resolveItemCardModel: resolver,
 		});
-		cardDemandProbe.setDemand.mockClear();
+		cardDemandProbe.getPreviewVisibleRangeCalls = 0;
+		cardDemandProbe.rangeEffectRuns = 0;
 
 		const replacement = { ...section.items[0]! };
 		await publishSection(
@@ -199,10 +223,10 @@ describe("TwoHopVirtualGrid performance contract", () => {
 				totalCount: section.totalCount,
 			}),
 		);
-		const demandAfterRerender = cardDemandProbe.setDemand.mock.calls.length;
+		const demandAfterRerender = cardDemandProbe.rangeEffectRuns;
 		for (let index = 0; index < 4; index += 1) await flushFrames();
 
 		expect(demandAfterRerender).toBe(0);
-		expect(cardDemandProbe.setDemand).toHaveBeenCalledTimes(1);
+		expect(cardDemandProbe.rangeEffectRuns).toBe(1);
 	});
 });

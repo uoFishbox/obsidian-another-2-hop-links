@@ -1,8 +1,7 @@
 import { onDestroy, untrack } from "svelte";
-import type { TFile } from "obsidian";
-import type { SearchContentMatch } from "search/searchTypes";
 import type { CardCollectionState } from "cards/CardCollectionState.svelte";
 import type { CardRenderModel } from "cards/rendering/cardRenderModel";
+import { useAppContext } from "cards/context/linkContext";
 import type {
 	TwoHopItemModel,
 	TwoHopSectionModel,
@@ -17,7 +16,6 @@ import {
 	type MountedTwoHopBuild,
 	type MountedTwoHopRow,
 } from "./mountedRows";
-import type { PreviewRuntime } from "card-preview/runtime/previewRuntime";
 import { DISABLED_PREVIEW_SURFACE } from "card-preview/runtime/disabledPreviewSurface";
 import type { VirtualFrameCoordinator } from "shared/ui/scheduling/frameCoordinator";
 import { createResolvedCardLayoutSettingsMemo } from "cards/layout/cardLayoutCssVars";
@@ -42,19 +40,9 @@ import type { InteractionDescriptorResolverProvider } from "cards/interactions/i
 import type { InteractionHandle } from "cards/interactions/interactionTypes";
 import type { VirtualPreviewSurface } from "card-preview/scheduling/virtualPreviewSurface";
 import { createTwoHopAnchorRestorationController } from "./anchorRestoration";
-import { shouldMoveFocusAboveTwoHopGrid } from "./navigation";
 import { createCardGridVisibilityPolicyResolver } from "cards/grid/model/cardGridVisibilityPolicy";
-import { createTwoHopCardSurfaceRuntime } from "./twoHopCardSurfaceRuntime";
+import { createTwoHopCardRuntime } from "./twoHopCardRuntime";
 import type { Language } from "settings/model";
-
-/** Dependencies required to enable previews on the two-hop virtual surface. */
-export interface TwoHopPreviewDependencies {
-	readonly previewRuntime: PreviewRuntime;
-	readonly resolveSearchMatchOffset: (
-		query: string,
-		file: TFile | null | undefined,
-	) => SearchContentMatch | undefined;
-}
 
 export interface TwoHopVirtualGridProps {
 	readonly sections: readonly TwoHopSectionModel[];
@@ -64,8 +52,6 @@ export interface TwoHopVirtualGridProps {
 	 */
 	readonly layoutAnchorScope: string;
 	readonly applicationStore: CardCollectionState;
-	/** Fixed for the lifetime of the virtual surface. */
-	readonly previewDependencies?: TwoHopPreviewDependencies;
 	readonly loadMoreSection?: (sectionId: string) => void;
 	readonly previewActive?: boolean;
 	readonly cardModelRevision: unknown;
@@ -133,22 +119,29 @@ export function useTwoHopVirtualGrid(
 	const configuredLayout = $derived(
 		resolveConfiguredLayout(applicationStore.settings),
 	);
-	const previewDependencies = props.previewDependencies;
-	const previewSurface = previewDependencies
-		? previewDependencies.previewRuntime.createSurface({
+	const appContext = (() => {
+		try {
+			return useAppContext();
+		} catch {
+			return undefined;
+		}
+	})();
+	const previewRuntime = appContext?.previewRuntime;
+	const previewSurface = previewRuntime
+		? previewRuntime.createSurface({
 				frameCoordinator,
-				resolveSearchMatchOffset: previewDependencies.resolveSearchMatchOffset,
+				resolveSearchMatchOffset: appContext?.resolveSearchMatchOffset,
 			})
 		: DISABLED_PREVIEW_SURFACE;
 
 	function isPreviewSurfaceActive(): boolean {
-		return previewDependencies !== undefined && props.previewActive !== false;
+		return previewRuntime !== undefined && props.previewActive !== false;
 	}
 
 	const resolveCardGridVisibilityPolicy = createCardGridVisibilityPolicyResolver();
 	const resolveVisibilityPolicy = (model: TwoHopRowModel) =>
 		resolveCardGridVisibilityPolicy(model.layout.rowStride);
-	const cardSurfaceRuntime = createTwoHopCardSurfaceRuntime({
+	const cardSurfaceRuntime = createTwoHopCardRuntime({
 		frameCoordinator,
 		previewSurface,
 		getMountedBuild: () => virtualizer.getMountedBuild(),
@@ -370,7 +363,7 @@ export function useTwoHopVirtualGrid(
 		currentKey: string,
 		currentPosition: { rowIndex: number; columnIndex: number },
 	): boolean {
-		return shouldMoveFocusAboveTwoHopGrid(rowModel, currentKey, currentPosition);
+		return rowModel.shouldMoveFocusAboveGrid(currentKey, currentPosition);
 	}
 
 	return {

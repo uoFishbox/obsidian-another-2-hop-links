@@ -21,7 +21,7 @@ import {
 	type TwoHopVirtualCell,
 } from "../rowModel";
 import { buildMountedTwoHopRows, type MountedTwoHopBuild } from "../mountedRows";
-import { createTwoHopCardSurfaceRuntime } from "../twoHopCardSurfaceRuntime";
+import { createTwoHopCardRuntime } from "../twoHopCardRuntime";
 
 function createFrames() {
 	const tasks = new Map<string, () => void>();
@@ -122,7 +122,7 @@ function createFixture() {
 			}),
 		};
 	});
-	const runtime = createTwoHopCardSurfaceRuntime({
+	const runtime = createTwoHopCardRuntime({
 		frameCoordinator: frames.coordinator,
 		previewSurface,
 		getMountedBuild: () => engine.getSnapshot()?.mountedBuild ?? null,

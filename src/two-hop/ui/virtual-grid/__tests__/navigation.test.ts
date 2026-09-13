@@ -1,151 +1,188 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { createTwoHopRowModel } from "../rowModel";
 import {
 	createTwoHopSectionModel,
+	type TwoHopItemModel,
 	type TwoHopSectionModel,
 } from "two-hop/ui/twoHopSectionModel";
-import {
-	resolveTwoHopNavigationTarget,
-	resolveTwoHopSequentialNavigationTarget,
-	shouldMoveFocusAboveTwoHopGrid,
-	type TwoHopNavigationCell,
-	type TwoHopNavigationGrid,
-} from "../navigation";
 
-const plainSection = createTwoHopSectionModel({
-	id: "section",
-	kind: "new-links-section",
-	title: "Section",
-	items: [],
-	totalCount: 0,
-});
+const layout = {
+	containerWidth: 220,
+	columns: 2,
+	cellWidth: 100,
+	rowHeight: 100,
+	gap: 10,
+	sectionMarginBottom: 10,
+};
 
-const clickableSection = createTwoHopSectionModel({
-	id: "clickable",
-	kind: "new-links-section",
-	title: "Clickable",
-	headerProps: { onClick: () => {} },
-	items: [],
-	totalCount: 0,
-});
-
-function createCell(
-	section: TwoHopSectionModel,
-	kind: TwoHopNavigationCell["kind"],
-	rowIndex: number,
-	columnIndex: number,
-	logicalKey: string,
-): TwoHopNavigationCell {
-	return { section, kind, rowIndex, columnIndex, logicalKey };
+function createItem(sectionId: string, index: number): TwoHopItemModel {
+	return {
+		item: { type: "newLink" } as TwoHopItemModel["item"],
+		searchKey: `${sectionId}-${index}`,
+		key: `${sectionId}-${index}`,
+	};
 }
 
-function createGrid(
-	rows: readonly (readonly TwoHopNavigationCell[])[],
-): TwoHopNavigationGrid<TwoHopNavigationCell> {
-	return {
-		rowCount: rows.length,
-		getRow(rowIndex) {
-			const cells = rows[rowIndex];
-			if (!cells) return null;
-			return {
-				top: rowIndex * 100,
-				cellCount: cells.length,
-				getCell: (columnIndex) => cells[columnIndex] ?? null,
-			};
-		},
-	};
+function createSection(
+	id: string,
+	count: number,
+	headerProps?: TwoHopSectionModel["header"]["props"],
+): TwoHopSectionModel {
+	return createTwoHopSectionModel({
+		id,
+		kind: "new-links-section",
+		title: id,
+		headerProps,
+		items: Array.from({ length: count }, (_, index) => createItem(id, index)),
+		totalCount: count,
+	});
+}
+
+function createModel(
+	sections: readonly TwoHopSectionModel[],
+	columns = layout.columns,
+) {
+	return createTwoHopRowModel({
+		sections,
+		layout: { ...layout, columns },
+	});
+}
+
+function requirePosition(model: ReturnType<typeof createTwoHopRowModel>, key: string) {
+	const position = model.resolveCellPosition(key);
+	if (!position) throw new Error(`Missing cell position for ${key}`);
+	return position;
 }
 
 describe("two-hop navigation policy", () => {
 	it("skips non-focusable headers when navigating sequentially", () => {
-		const grid = createGrid([
-			[
-				createCell(plainSection, "header", 0, 0, "header"),
-				createCell(plainSection, "item", 0, 1, "a"),
-			],
-			[createCell(plainSection, "item", 1, 0, "b")],
+		const model = createModel([
+			createSection("first", 2),
+			createSection("second", 2),
 		]);
+		const lastOfFirst = "item:first:first-1";
+		const firstOfSecond = "item:second:second-0";
+		const expectedPosition = requirePosition(model, firstOfSecond);
 
 		expect(
-			resolveTwoHopSequentialNavigationTarget(grid, "a", "forward", {
-				rowIndex: 0,
-				columnIndex: 1,
-			})?.cell.logicalKey,
-		).toBe("b");
-		expect(
-			resolveTwoHopSequentialNavigationTarget(grid, "b", "backward", {
-				rowIndex: 1,
-				columnIndex: 0,
-			})?.cell.logicalKey,
-		).toBe("a");
+			model.resolveSequentialNavigationTarget?.(
+				lastOfFirst,
+				"forward",
+				requirePosition(model, lastOfFirst),
+			),
+		).toEqual({
+			key: firstOfSecond,
+			rowTop: model.getRow(expectedPosition.rowIndex)?.top,
+			...expectedPosition,
+		});
 	});
 
 	it("treats a clickable header as sequentially focusable", () => {
-		const grid = createGrid([
-			[
-				createCell(plainSection, "item", 0, 0, "a"),
-				createCell(clickableSection, "header", 0, 1, "clickable-header"),
-			],
+		const model = createModel([
+			createSection("first", 2),
+			createSection("second", 2, { onClick: vi.fn() }),
 		]);
+		const lastOfFirst = "item:first:first-1";
+		const headerOfSecond = "header:second";
+		const headerPosition = requirePosition(model, headerOfSecond);
 
 		expect(
-			resolveTwoHopSequentialNavigationTarget(grid, "a", "forward", {
-				rowIndex: 0,
-				columnIndex: 0,
-			})?.cell.logicalKey,
-		).toBe("clickable-header");
+			model.resolveSequentialNavigationTarget?.(
+				lastOfFirst,
+				"forward",
+				requirePosition(model, lastOfFirst),
+			),
+		).toEqual({
+			key: headerOfSecond,
+			rowTop: model.getRow(headerPosition.rowIndex)?.top,
+			...headerPosition,
+		});
 	});
 
 	it("wraps horizontal navigation across rows", () => {
-		const grid = createGrid([
-			[
-				createCell(plainSection, "item", 0, 0, "a"),
-				createCell(plainSection, "item", 0, 1, "b"),
-			],
-			[createCell(plainSection, "item", 1, 0, "c")],
-		]);
+		const model = createModel([createSection("section", 4)]);
+		const item0 = "item:section:section-0";
+		const item1 = "item:section:section-1";
+		const item2 = "item:section:section-2";
+		const item3 = "item:section:section-3";
 
 		expect(
-			resolveTwoHopNavigationTarget(grid, "b", "right", {
-				rowIndex: 0,
-				columnIndex: 1,
-			}),
+			model.resolveNavigationTarget?.(
+				item0,
+				"right",
+				requirePosition(model, item0),
+			),
 		).toEqual({
-			cell: expect.objectContaining({ logicalKey: "c" }),
-			rowTop: 100,
+			key: item1,
+			rowTop: model.getRow(requirePosition(model, item1).rowIndex)?.top,
 		});
 		expect(
-			resolveTwoHopNavigationTarget(grid, "c", "left", {
-				rowIndex: 1,
-				columnIndex: 0,
-			})?.cell.logicalKey,
-		).toBe("b");
+			model.resolveNavigationTarget?.(
+				item3,
+				"left",
+				requirePosition(model, item3),
+			),
+		).toEqual({
+			key: item2,
+			rowTop: model.getRow(requirePosition(model, item2).rowIndex)?.top,
+		});
+	});
+
+	it("keeps the nearest column when navigating vertically", () => {
+		const model = createModel([createSection("section", 4)]);
+		const item0 = "item:section:section-0";
+		const item1 = "item:section:section-1";
+		const item2 = "item:section:section-2";
+		const item3 = "item:section:section-3";
+
+		expect(
+			model.resolveNavigationTarget?.(
+				item0,
+				"down",
+				requirePosition(model, item0),
+			),
+		).toEqual({
+			key: item2,
+			rowTop: model.getRow(requirePosition(model, item2).rowIndex)?.top,
+		});
+		expect(
+			model.resolveNavigationTarget?.(item3, "up", requirePosition(model, item3)),
+		).toEqual({
+			key: item1,
+			rowTop: model.getRow(requirePosition(model, item1).rowIndex)?.top,
+		});
+		// Falls back to the nearest focusable cell when the column is empty.
+		expect(
+			model.resolveNavigationTarget?.(
+				item2,
+				"down",
+				requirePosition(model, item2),
+			),
+		).toEqual({
+			key: item3,
+			rowTop: model.getRow(requirePosition(model, item3).rowIndex)?.top,
+		});
 	});
 
 	it("moves focus above the grid only from its first item row", () => {
-		const grid = createGrid([
-			[
-				createCell(plainSection, "header", 0, 0, "header"),
-				createCell(plainSection, "item", 0, 1, "first"),
-			],
-			[createCell(plainSection, "item", 1, 0, "second")],
-		]);
-		const firstPosition = { rowIndex: 0, columnIndex: 1 };
+		const model = createModel([createSection("section", 3)], 1);
+		const first = "item:section:section-0";
+		const second = "item:section:section-1";
 
-		expect(shouldMoveFocusAboveTwoHopGrid(grid, "first", firstPosition)).toBe(true);
 		expect(
-			shouldMoveFocusAboveTwoHopGrid(grid, "second", {
-				rowIndex: 1,
-				columnIndex: 0,
-			}),
+			model.shouldMoveFocusAboveGrid(first, requirePosition(model, first)),
+		).toBe(true);
+		expect(
+			model.shouldMoveFocusAboveGrid(second, requirePosition(model, second)),
 		).toBe(false);
 		expect(
-			shouldMoveFocusAboveTwoHopGrid(grid, "header", {
+			model.shouldMoveFocusAboveGrid("header:section", {
 				rowIndex: 0,
 				columnIndex: 0,
 			}),
 		).toBe(false);
-		expect(shouldMoveFocusAboveTwoHopGrid(grid, "stale", firstPosition)).toBe(
-			false,
-		);
+		expect(
+			model.shouldMoveFocusAboveGrid("stale", requirePosition(model, first)),
+		).toBe(false);
 	});
 });

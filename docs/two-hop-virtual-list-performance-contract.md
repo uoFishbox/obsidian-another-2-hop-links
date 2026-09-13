@@ -18,8 +18,10 @@ to physical slots supplied by the shared allocator. `CardGridSurface` publishes
 those immutable bindings into stable row and cell signals.
 
 Preview and hydration work runs after the mounted snapshot is published.
-`mountedCardBindings.ts` derives foreground/background demand and preview bindings;
-`TwoHopCardHydrator` owns the bounded off-window model cache and async queues.
+`twoHopCardRuntime.ts` rebuilds foreground/background queues in one pass over
+the mounted rows and owns the bounded off-window model cache, preview binding
+invalidation, and physical-slot interaction bindings. There is no intermediate
+demand object between mounted rows and the hydration queues.
 
 Demand publication rebuilds the foreground/background queues in reused storage
 from current pending keys. Cancelled cells and obsolete priority entries must
@@ -39,8 +41,8 @@ and scroller changes, and republishes ranges from the resulting scroll position.
 | Mounted ranges and immutable snapshots | shared virtualizer engine      | range or row-model change                 |
 | Logical-row to physical-slot mapping   | shared resident row allocator  | range or column topology change           |
 | Reactive row/cell shells               | shared physical grid slot pool | capacity growth or column topology change |
-| Hydrated card models                   | `TwoHopCardHydrator`           | item/revision change or bounded eviction  |
-| Preview bindings and demand priorities | `mountedCardBindings.ts`       | coalesced post-paint range effect         |
+| Hydrated card models                   | `twoHopCardRuntime.ts`         | item/revision change or bounded eviction  |
+| Preview bindings and demand queues     | `twoHopCardRuntime.ts`         | coalesced post-paint range effect         |
 
 ## Required hot-path properties
 
@@ -52,6 +54,10 @@ and scroller changes, and republishes ranges from the resulting scroll position.
 - Scrolling does not rebuild section geometry or enumerate all section items.
 - Range scans use direct loops over `rowsInMountedRange`; they do not create a
   flattened mounted-cell array, iterators, or chained `map`/`filter` results.
+- A range update rebuilds hydration queues in a single pass over the mounted
+  rows; it neither materializes a demand object nor rescans for queue setup.
+- Preview bindings are reused while their inputs are unchanged, so a
+  visible-range-only change does not rescan mounted cards for previews.
 - Visibility-policy objects are memoized by row stride.
 - Scratch storage owned by allocators, schedulers, and slot pools is reused
   across scroll frames.
