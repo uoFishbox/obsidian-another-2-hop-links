@@ -62,20 +62,19 @@ Compact guide for agents working in this repo.
 ```
 src/
   main.ts                    # Plugin entry (Obsidian Plugin class)
-  appConstants.ts           # Shared constants
   cards/                    # Card models, lists, grids, interactions, and virtualization
   indexing/                 # Vault indexing and query state
   two-hop/                  # Two-hop resolution, display state, and UI
   card-preview/             # Card preview pipeline, rendering, and scheduling
-  hover-preview/            # Obsidian hover-preview integration and Shadow DOM bridging
+  hover-popover/            # Obsidian hover-preview integration and Shadow DOM bridging
   search/                   # Search filtering and worker boundary
   settings/                 # Settings model, persistence, effects, and UI
-  obsidian/                 # Obsidian integration, lifecycle, workspace, and custom-view hosts
+  obsidian-integration/     # Obsidian integration, lifecycle, workspace, and custom-view hosts
   shared/                   # Feature-independent utilities and UI foundations
-  types/                    # Cross-feature host and domain contracts
   testing/                  # Test setup, mocks, and architecture checks
 ```
 
+- `src/testing/architecture/__tests__/featureOwnership.test.ts` enforces this layout: it fails if `application/`, `core/`, `features/`, `infrastructure/`, `presentation/`, `types/`, or `ui/` reappear, if shared constants land in `src/appConstants.ts`, or if a local `src/obsidian/` shadows the external `obsidian` package. Add new concepts to the owning feature directory instead of recreating a generic layer.
 - Custom views: `TwoHopLinksPage`, `PreCreationView`, `TagNotesView`.
 - Full-text search runs on demand on the main thread with cooperative time slicing.
 
