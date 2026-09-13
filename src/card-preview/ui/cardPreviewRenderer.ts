@@ -164,14 +164,15 @@ export function createCardPreviewRenderer(
 
 			if (!shouldDelayMathCardRendering) {
 				if (previewForRender.type === "text") {
-					const renderedFragment = await renderDetachedTextPreviewFragment({
-						document: container.ownerDocument,
-						content: previewForRender.content,
-						enableMathRendering,
-						analysis: previewAnalysis,
-						enqueuePreviewRender: options.enqueuePreviewRender,
-						signal,
-					});
+					const { fragment: renderedFragment } =
+						await renderDetachedTextPreviewFragment({
+							document: container.ownerDocument,
+							content: previewForRender.content,
+							enableMathRendering,
+							analysis: previewAnalysis,
+							enqueuePreviewRender: options.enqueuePreviewRender,
+							signal,
+						});
 					if (isRenderStale(signal)) return false;
 					return commitDetachedTextPreview(
 						container,
@@ -227,22 +228,31 @@ export function createCardPreviewRenderer(
 				return didReplace;
 			}
 
+			let renderedFragment: DocumentFragment | undefined;
 			await enqueueMathRender(
-				async () => {
-					if (isRenderStale(signal)) return;
+				{
+					render: async () => {
+						if (isRenderStale(signal)) return false;
 
-					if (previewForRender.type === "text") {
-						const renderedFragment =
-							await renderDetachedTextPreviewFragment({
-								document: container.ownerDocument,
-								content: previewForRender.content,
-								enableMathRendering: true,
-								analysis: previewAnalysis,
-								enqueuePreviewRender: options.enqueuePreviewRender,
-								signal,
-							});
+						if (previewForRender.type === "text") {
+							const renderedPreview =
+								await renderDetachedTextPreviewFragment({
+									document: container.ownerDocument,
+									content: previewForRender.content,
+									enableMathRendering: true,
+									analysis: previewAnalysis,
+									enqueuePreviewRender: options.enqueuePreviewRender,
+									signal,
+								});
 
-						if (isRenderStale(signal)) return;
+							renderedFragment = renderedPreview.fragment;
+							return renderedPreview.renderedMath;
+						}
+
+						return false;
+					},
+					commit: async () => {
+						if (isRenderStale(signal) || !renderedFragment) return;
 						await commitDetachedTextPreview(
 							container,
 							callbacks,
@@ -250,8 +260,7 @@ export function createCardPreviewRenderer(
 							renderedFragment,
 							shouldSyncMathStyles,
 						);
-						return;
-					}
+					},
 				},
 				{
 					key: `${file.path}:${file.stat.mtime}:${searchQuery}`,
@@ -370,7 +379,7 @@ function renderDetachedTextPreviewFragment(params: {
 	enqueuePreviewRender: EnqueuePreviewRender;
 	analysis?: PreviewContentAnalysis;
 	signal?: AbortSignal;
-}): Promise<DocumentFragment> {
+}): Promise<{ fragment: DocumentFragment; renderedMath: boolean }> {
 	const {
 		document: ownerDocument,
 		content,
@@ -384,14 +393,16 @@ function renderDetachedTextPreviewFragment(params: {
 		async () => {
 			const tempContainer = ownerDocument.createElement("div");
 			throwIfAborted(signal, "Preview render aborted");
-			await processPreviewContent(tempContainer, content, {
+			const renderedMath = processPreviewContent(tempContainer, content, {
 				enableMathRendering,
 				analysis,
 				syncShadowRootMathStyles: false,
 				signal,
 			});
-			throwIfAborted(signal, "Preview render aborted");
-			return moveChildrenToFragment(tempContainer);
+			return {
+				fragment: moveChildrenToFragment(tempContainer),
+				renderedMath,
+			};
 		},
 		signal,
 		ownerDocument.defaultView,

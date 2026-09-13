@@ -1,10 +1,18 @@
-type QueueTask = {
+import { finishRenderMath } from "obsidian";
+
+export interface MathRenderTask {
+	/** Renders into a detached surface and reports whether math was submitted. */
+	render: () => Promise<boolean>;
+	/** Publishes the detached result after the batch math render is finalized. */
+	commit: () => Promise<void>;
+}
+
+type QueueTask = MathRenderTask & {
 	cancelled: boolean;
 	cleanup: () => void;
 	key?: string;
 	reject: (error: unknown) => void;
 	resolve: () => void;
-	run: () => Promise<void>;
 	signal?: AbortSignal;
 	ownerWindow?: Window | null;
 };
@@ -16,12 +24,11 @@ interface EnqueueMathRenderOptions {
 	ownerWindow?: Window | null;
 }
 
-const MAX_CONCURRENT_MATH_RENDERS = 1;
 const IDLE_TIMEOUT_MS = 120;
 const IDLE_FALLBACK_BUFFER_MS = 50;
-let activeMathRenders = 0;
+let isBatchActive = false;
+let isBatchScheduled = false;
 const pendingTasks: QueueTask[] = [];
-const scheduledTasks = new Set<QueueTask>();
 const queuedTaskByKey = new Map<string, QueueTask>();
 
 function scheduleTask(task: () => void, ownerWindow?: Window | null): void {
@@ -75,54 +82,86 @@ function cleanupKeyMapping(task: QueueTask): void {
 	}
 }
 
-function processQueue(): void {
-	while (
-		activeMathRenders + scheduledTasks.size < MAX_CONCURRENT_MATH_RENDERS &&
-		pendingTasks.length > 0
-	) {
-		const nextTask = pendingTasks.shift();
-		if (!nextTask) {
-			return;
-		}
+function takePendingMathTasks(): QueueTask[] {
+	return pendingTasks.splice(0).filter((task) => {
+		if (!task.cancelled && !task.signal?.aborted) return true;
+		cleanupKeyMapping(task);
+		task.resolve();
+		return false;
+	});
+}
 
-		if (nextTask.cancelled || nextTask.signal?.aborted) {
-			cleanupKeyMapping(nextTask);
-			nextTask.resolve();
+async function renderBatch(batch: QueueTask[]): Promise<void> {
+	const renderedTasks: QueueTask[] = [];
+	let renderedMath = false;
+
+	for (const task of batch) {
+		if (task.cancelled || task.signal?.aborted) {
+			task.resolve();
 			continue;
 		}
 
-		scheduledTasks.add(nextTask);
-		scheduleTask(() => {
-			scheduledTasks.delete(nextTask);
-			if (nextTask.cancelled || nextTask.signal?.aborted) {
-				cleanupKeyMapping(nextTask);
-				nextTask.resolve();
-				processQueue();
-				return;
+		try {
+			renderedMath = (await task.render()) || renderedMath;
+			renderedTasks.push(task);
+		} catch (error) {
+			task.reject(error);
+		}
+	}
+
+	if (renderedMath) {
+		try {
+			await finishRenderMath();
+		} catch (error) {
+			for (const task of renderedTasks) {
+				task.reject(error);
 			}
+			return;
+		}
+	}
 
-			activeMathRenders++;
-			void nextTask
-				.run()
-				.then(() => {
-					nextTask.resolve();
-				})
-				.catch((error) => {
-					nextTask.reject(error);
-				})
-				.finally(() => {
-					activeMathRenders = Math.max(activeMathRenders - 1, 0);
-					cleanupKeyMapping(nextTask);
-					processQueue();
-				});
-		}, nextTask.ownerWindow);
+	for (const task of renderedTasks) {
+		if (task.cancelled || task.signal?.aborted) {
+			task.resolve();
+			continue;
+		}
 
-		break;
+		try {
+			await task.commit();
+			task.resolve();
+		} catch (error) {
+			task.reject(error);
+		}
 	}
 }
 
+function processQueue(): void {
+	if (isBatchActive || isBatchScheduled || pendingTasks.length === 0) return;
+
+	isBatchScheduled = true;
+	const ownerWindow = pendingTasks[0]?.ownerWindow;
+	scheduleTask(() => {
+		isBatchScheduled = false;
+		const batch = takePendingMathTasks();
+		if (batch.length === 0) {
+			processQueue();
+			return;
+		}
+
+		isBatchActive = true;
+		void renderBatch(batch).finally(() => {
+			for (const task of batch) {
+				cleanupKeyMapping(task);
+			}
+			isBatchActive = false;
+			processQueue();
+		});
+	}, ownerWindow);
+}
+
+/** Enqueues detached math rendering and its post-finalization DOM commit. */
 export function enqueueMathRender(
-	task: () => Promise<void>,
+	task: MathRenderTask,
 	options: EnqueueMathRenderOptions = {},
 ): Promise<void> {
 	const { signal, key, priority = "normal", ownerWindow } = options;
@@ -140,12 +179,12 @@ export function enqueueMathRender(
 		};
 
 		const queueTask: QueueTask = {
+			...task,
 			cancelled: false,
 			cleanup: () => {},
 			key,
 			reject: (error) => settle(() => reject(error)),
 			resolve: () => settle(() => resolve()),
-			run: task,
 			signal,
 			ownerWindow,
 		};
@@ -192,12 +231,5 @@ export function clearMathRenderQueue(): void {
 		cleanupKeyMapping(task);
 		task.resolve();
 	}
-	for (const task of scheduledTasks) {
-		task.cancelled = true;
-		cleanupKeyMapping(task);
-		task.resolve();
-	}
-	scheduledTasks.clear();
 	queuedTaskByKey.clear();
-	activeMathRenders = 0;
 }

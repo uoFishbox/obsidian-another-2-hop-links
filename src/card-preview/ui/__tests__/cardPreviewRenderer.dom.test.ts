@@ -138,11 +138,15 @@ function callbacks() {
 describe("card preview renderer contract", () => {
 	beforeEach(() => {
 		state.processPreviewContent.mockReset();
-		state.processPreviewContent.mockImplementation(async (element, content) => {
+		state.processPreviewContent.mockImplementation((element, content) => {
 			element.innerHTML = `<p>rendered:${content}</p>`;
+			return content.includes("$");
 		});
 		state.enqueueMathRender.mockReset();
-		state.enqueueMathRender.mockImplementation(async (task) => task());
+		state.enqueueMathRender.mockImplementation(async (task) => {
+			await task.render();
+			await task.commit();
+		});
 		state.highlightSearchMatchesInHtml.mockReset();
 		state.highlightSearchMatchesInHtml.mockImplementation(
 			(content: string) => `<mark>${content}</mark>`,

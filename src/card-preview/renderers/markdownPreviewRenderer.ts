@@ -1,4 +1,4 @@
-import { finishRenderMath, renderMath, sanitizeHTMLToDom } from "obsidian";
+import { renderMath, sanitizeHTMLToDom } from "obsidian";
 import { createProtectedSegmentRestorer } from "../text/protectedHtml";
 import {
 	analyzePreviewContent,
@@ -30,14 +30,18 @@ function appendSanitizedHtml(containerEl: HTMLElement, html: string): void {
 	containerEl.append(sanitizeHTMLToDom(html));
 }
 
-export async function processPreviewContent(
+/**
+ * Renders preview content and reports whether math was submitted to Obsidian.
+ * Math finalization is owned by the batch render queue.
+ */
+export function processPreviewContent(
 	containerEl: HTMLElement,
 	content: string,
 	options?: ProcessPreviewContentOptions,
-) {
+): boolean {
 	const signal = options?.signal;
 	if (signal?.aborted) {
-		return;
+		return false;
 	}
 
 	const enableMathRendering = options?.enableMathRendering ?? true;
@@ -46,8 +50,10 @@ export async function processPreviewContent(
 	let analysis: PreviewContentAnalysis | undefined;
 
 	if (signal?.aborted) {
-		return;
+		return false;
 	}
+
+	let renderedMath = false;
 
 	if (!enableMathRendering || !hasDollar) {
 		replaceWithSanitizedHtml(containerEl, content);
@@ -72,7 +78,7 @@ export async function processPreviewContent(
 
 			while (true) {
 				if (signal?.aborted) {
-					return;
+					return renderedMath;
 				}
 
 				const match = MATH_SPLIT_REGEX.exec(contentForMathParsing);
@@ -94,6 +100,7 @@ export async function processPreviewContent(
 						matchedString.length - 2,
 					);
 					containerEl.appendChild(renderMath(mathContent, true));
+					renderedMath = true;
 				} else if (
 					matchedString.startsWith("$") &&
 					matchedString.endsWith("$")
@@ -103,6 +110,7 @@ export async function processPreviewContent(
 						matchedString.length - 1,
 					);
 					containerEl.appendChild(renderMath(mathContent, false));
+					renderedMath = true;
 				} else if (matchedString === "\\$") {
 					containerEl.appendChild(
 						containerEl.ownerDocument.createTextNode("$"),
@@ -117,25 +125,17 @@ export async function processPreviewContent(
 				const span = containerEl.createSpan();
 				appendSanitizedHtml(span, restoreProtectedSegments(textPart));
 			}
-
-			if (signal?.aborted) {
-				return;
-			}
-
-			await finishRenderMath();
-
-			if (signal?.aborted) {
-				return;
-			}
 		}
 	}
 
 	if (signal?.aborted) {
-		return;
+		return renderedMath;
 	}
 
 	if (analysis?.hasMathExpression && syncShadowRootMathStyles) {
 		syncMathStylesForNode(containerEl);
 		queueMathShadowStylesSync();
 	}
+
+	return renderedMath;
 }
