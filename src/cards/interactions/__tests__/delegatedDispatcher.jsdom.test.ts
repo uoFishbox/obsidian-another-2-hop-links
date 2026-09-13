@@ -573,6 +573,113 @@ describe("delegated interaction dispatcher", () => {
 		Platform.isMobile = false;
 	});
 
+	it("opens one menu for each mobile long press and suppresses its follow-up events", () => {
+		vi.useFakeTimers();
+		Platform.isMobile = true;
+		const linkContext = createLinkContext();
+		const appContext = createAppContext(linkContext);
+		const registry = createInteractionRegistry();
+		const file = createMockTFile(TARGET_FILE_PATH);
+		const descriptor = createItemDescriptor(
+			{ type: "file", data: file } as CardItem,
+			file,
+		);
+		descriptor.settings = {
+			highlightInPreviewOnHover: false,
+			mobileLongPressAction: "menu",
+		};
+		const interactionHandle = createInteractionHandle();
+		registry.register(interactionHandle, descriptor);
+		const dispatcher = createDelegatedInteractionDispatcher({
+			registry,
+			linkContext,
+			appContext,
+		});
+		attachDispatcher(root, dispatcher);
+
+		const observedContextMenus = vi.fn();
+		root.addEventListener("contextmenu", observedContextMenus);
+		const element = document.createElement("div");
+		element.dataset.cclInteractionHandle = interactionHandle;
+		root.append(element);
+
+		for (const [index, holdDuration] of [500, 900, 1_500].entries()) {
+			element.dispatchEvent(
+				createTouchEvent("touchstart", [
+					{ clientX: 20, clientY: 30, screenX: 120, screenY: 130 },
+				]),
+			);
+			vi.advanceTimersByTime(holdDuration);
+
+			expect(linkContext.onShowFileMenu).toHaveBeenCalledTimes(index + 1);
+			expect(observedContextMenus).toHaveBeenCalledTimes(index * 2);
+			expect(linkContext.onLinkHover).not.toHaveBeenCalled();
+
+			const contextMenuWhilePressed = new MouseEvent("contextmenu", {
+				bubbles: true,
+				cancelable: true,
+				composed: true,
+			});
+			element.dispatchEvent(contextMenuWhilePressed);
+			expect(contextMenuWhilePressed.defaultPrevented).toBe(true);
+			expect(linkContext.onShowFileMenu).toHaveBeenCalledTimes(index + 1);
+
+			element.dispatchEvent(createTouchEvent("touchend", []));
+			element.dispatchEvent(
+				new MouseEvent("click", { bubbles: true, composed: true }),
+			);
+			const delayedContextMenu = new MouseEvent("contextmenu", {
+				bubbles: true,
+				cancelable: true,
+				composed: true,
+			});
+			element.dispatchEvent(delayedContextMenu);
+
+			expect(delayedContextMenu.defaultPrevented).toBe(true);
+			expect(linkContext.onShowFileMenu).toHaveBeenCalledTimes(index + 1);
+			expect(linkContext.onOpenFile).not.toHaveBeenCalled();
+		}
+
+		const menuEvent = vi.mocked(linkContext.onShowFileMenu).mock.calls[0]?.[0];
+		expect(menuEvent).toBeInstanceOf(MouseEvent);
+		expect(menuEvent?.clientX).toBe(20);
+		expect(menuEvent?.clientY).toBe(30);
+		expect(observedContextMenus).toHaveBeenCalledTimes(6);
+	});
+
+	it("keeps a mobile mouse or trackpad context menu when there was no recent touch", () => {
+		Platform.isMobile = true;
+		const linkContext = createLinkContext();
+		const appContext = createAppContext(linkContext);
+		const registry = createInteractionRegistry();
+		const file = createMockTFile(TARGET_FILE_PATH);
+		const descriptor = createItemDescriptor(
+			{ type: "file", data: file } as CardItem,
+			file,
+		);
+		const interactionHandle = createInteractionHandle();
+		registry.register(interactionHandle, descriptor);
+		const dispatcher = createDelegatedInteractionDispatcher({
+			registry,
+			linkContext,
+			appContext,
+		});
+		attachDispatcher(root, dispatcher);
+
+		const element = document.createElement("div");
+		element.dataset.cclInteractionHandle = interactionHandle;
+		root.append(element);
+		const contextMenuEvent = new MouseEvent("contextmenu", {
+			bubbles: true,
+			cancelable: true,
+		});
+		element.dispatchEvent(contextMenuEvent);
+
+		expect(contextMenuEvent.defaultPrevented).toBe(true);
+		expect(linkContext.onShowFileMenu).toHaveBeenCalledOnce();
+		expect(linkContext.onShowFileMenu).toHaveBeenCalledWith(contextMenuEvent, file);
+	});
+
 	it("dispatches context menu and drag data without drag-only DOM", () => {
 		const linkContext = createLinkContext();
 		const appContext = createAppContext(linkContext);

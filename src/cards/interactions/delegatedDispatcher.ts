@@ -34,6 +34,7 @@ interface DelegatedDispatcherDeps {
 }
 
 const MOBILE_TOUCH_MOUSEOVER_SUPPRESSION_MS = 900;
+const MOBILE_TOUCH_CONTEXTMENU_SUPPRESSION_MS = 900;
 const LONG_PRESS_DURATION = 500;
 const TOUCH_SLOP = 10;
 const VIBRATION_DURATION = 50;
@@ -168,10 +169,11 @@ export function createDelegatedInteractionDispatcher({
 	appContext,
 }: DelegatedDispatcherDeps) {
 	const resolvedLinkContext = linkContext ?? appContext?.linkContext;
+	const onShowFileMenu = resolvedLinkContext?.onShowFileMenu;
 	let activeHoverInteractionId: string | null = null;
 	let longPressTimer: number | undefined = undefined;
 	let longPressTimerWindow: Window | null = null;
-	let longPressElement: HTMLElement | null = null;
+	let activeTouchElement: HTMLElement | null = null;
 	let longPressStartX = 0;
 	let longPressStartY = 0;
 
@@ -185,7 +187,7 @@ export function createDelegatedInteractionDispatcher({
 
 	function resetLongPressState(): void {
 		clearLongPressTimer();
-		longPressElement = null;
+		activeTouchElement = null;
 	}
 
 	function resetTransientState(): void {
@@ -246,17 +248,20 @@ export function createDelegatedInteractionDispatcher({
 				return;
 			}
 
-			const descriptor = resolveInteractionDescriptor(registry, element);
-			const onShowFileMenu = appContext?.linkContext.onShowFileMenu;
-			const isMobile = Platform?.isMobile ?? false;
-
-			if (!descriptor?.targetFile || !onShowFileMenu) {
+			const lastTouchAt = getInteractionLastTouchAt(element);
+			const isTouchOriginated =
+				activeTouchElement === element ||
+				(lastTouchAt !== null &&
+					Date.now() - lastTouchAt < MOBILE_TOUCH_CONTEXTMENU_SUPPRESSION_MS);
+			if (isTouchOriginated) {
+				event.preventDefault();
+				event.stopPropagation();
 				return;
 			}
 
-			if (isMobile && descriptor.settings?.mobileLongPressAction === "preview") {
-				event.preventDefault();
-				event.stopPropagation();
+			const descriptor = resolveInteractionDescriptor(registry, element);
+
+			if (!descriptor?.targetFile || !onShowFileMenu) {
 				return;
 			}
 
@@ -385,7 +390,7 @@ export function createDelegatedInteractionDispatcher({
 			}
 
 			const descriptor = resolveInteractionDescriptor(registry, element);
-			if (!descriptor || descriptor.settings?.mobileLongPressAction === "menu") {
+			if (!descriptor) {
 				return;
 			}
 
@@ -394,18 +399,24 @@ export function createDelegatedInteractionDispatcher({
 				return;
 			}
 
-			longPressElement = element;
+			activeTouchElement = element;
 			longPressStartX = touch.clientX;
 			longPressStartY = touch.clientY;
 			markInteractionTouched(element);
 			clearInteractionLongPressed(element);
+			const touchCoordinates: MouseEventInit = {
+				clientX: touch.clientX,
+				clientY: touch.clientY,
+				screenX: touch.screenX,
+				screenY: touch.screenY,
+			};
 
 			const ownerWindow = getOwnerWindow(element);
 			longPressTimerWindow = ownerWindow;
 			longPressTimer = ownerWindow.setTimeout(() => {
 				longPressTimer = undefined;
 				longPressTimerWindow = null;
-				const targetElement = longPressElement;
+				const targetElement = activeTouchElement;
 				if (!targetElement?.isConnected) {
 					return;
 				}
@@ -419,25 +430,37 @@ export function createDelegatedInteractionDispatcher({
 				}
 
 				markInteractionLongPressed(targetElement);
-				const hoverEvent = createOwnerMouseEvent(targetElement, "mouseover", {
-					bubbles: true,
-					cancelable: true,
-					composed: true,
-					clientX: touch.clientX,
-					clientY: touch.clientY,
-					screenX: touch.screenX,
-					screenY: touch.screenY,
-				});
-				if (
-					dispatchHover(
+				if (currentDescriptor.settings?.mobileLongPressAction === "menu") {
+					if (currentDescriptor.targetFile && onShowFileMenu) {
+						const menuEvent = createOwnerMouseEvent(
+							targetElement,
+							"contextmenu",
+							touchCoordinates,
+						);
+						onShowFileMenu(menuEvent, currentDescriptor.targetFile);
+					}
+				} else {
+					const hoverEvent = createOwnerMouseEvent(
 						targetElement,
-						currentDescriptor,
-						resolvedLinkContext,
-						appContext,
-						hoverEvent,
-					)
-				) {
-					activeHoverInteractionId = currentDescriptor.interactionId;
+						"mouseover",
+						{
+							bubbles: true,
+							cancelable: true,
+							composed: true,
+							...touchCoordinates,
+						},
+					);
+					if (
+						dispatchHover(
+							targetElement,
+							currentDescriptor,
+							resolvedLinkContext,
+							appContext,
+							hoverEvent,
+						)
+					) {
+						activeHoverInteractionId = currentDescriptor.interactionId;
+					}
 				}
 
 				if (ownerWindow.navigator.vibrate) {
@@ -466,13 +489,16 @@ export function createDelegatedInteractionDispatcher({
 		handleTouchEnd(event: TouchEvent): void {
 			clearLongPressTimer();
 
-			const targetElement = longPressElement ?? getInteractionElement(event);
-			longPressElement = null;
-			if (!targetElement || targetElement.dataset.cclLongPressed !== "1") {
+			const targetElement = activeTouchElement ?? getInteractionElement(event);
+			activeTouchElement = null;
+			if (!targetElement) {
 				return;
 			}
 
 			markInteractionTouched(targetElement);
+			if (targetElement.dataset.cclLongPressed !== "1") {
+				return;
+			}
 			event.preventDefault();
 			event.stopPropagation();
 		},
