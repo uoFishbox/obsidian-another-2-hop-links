@@ -9,6 +9,11 @@ import { buildMountedFlatGridRows, type MountedFlatGridBuild } from "../mountedR
 import { flattenMountedRowBindings } from "./mountedRowsTestHelpers";
 import { createFlatGridRowModel, type FlatGridRowModel } from "../rowModel";
 import {
+	computeHarnessSnapshot,
+	createHarnessRowModel,
+	getHarnessMountedCells,
+} from "./snapshotComputationTestHarness";
+import {
 	createVirtualizerEngine,
 	type VirtualListSnapshot,
 } from "cards/virtualization/engine/virtualizer";
@@ -180,5 +185,104 @@ describe("VirtualListEngine performance contracts", () => {
 
 		expect(mounted.rowsInMountedRange).toHaveLength(mountedRows);
 		expect(getRow).toHaveBeenCalledTimes(mountedRows + NO_OP_MEASUREMENTS);
+	});
+});
+
+// The remaining contracts cover the engine's reuse fast paths. They assert
+// object identity and builder call counts on purpose: PERFORMANCE.md lists
+// snapshot/build reuse, physical slot stability, and the canonical mounted
+// build shape as Required Invariants, so a failure here means the performance
+// implementation changed rather than that user-visible behaviour broke.
+describe("VirtualListEngine reuse contracts", () => {
+	it("keeps render slots unique and reuses physical slots while scrolling", () => {
+		const rowModel = createHarnessRowModel(12);
+		const initial = computeHarnessSnapshot({ rowModel }).snapshot;
+		const shifted = computeHarnessSnapshot({
+			rowModel,
+			previous: initial,
+			scrollTop: 110,
+		}).snapshot;
+		const initialCells = getHarnessMountedCells(initial.mountedBuild!);
+		const shiftedCells = getHarnessMountedCells(shifted.mountedBuild!);
+
+		// Slots are claimed from a resident pool, so the same slot numbers stay in
+		// use and each is assigned at most once.
+		expect(shiftedCells.map((cell) => cell.physicalCellSlot)).toEqual(
+			initialCells.map((cell) => cell.physicalCellSlot),
+		);
+		expect(new Set(shiftedCells.map((cell) => cell.physicalCellSlot)).size).toBe(
+			shiftedCells.length,
+		);
+	});
+
+	it("publishes no visibility metadata or mounted-cell key index", () => {
+		const snapshot = computeHarnessSnapshot({
+			rowModel: createHarnessRowModel(12),
+			mountedOverscanPx: 220,
+		}).snapshot;
+
+		// The mounted build is the canonical representation; adding a flat key
+		// index or per-cell visibility flag would duplicate it.
+		expect("mountedCellsByKey" in snapshot).toBe(false);
+		expect(
+			getHarnessMountedCells(snapshot.mountedBuild!).every(
+				(cell) => !Object.prototype.hasOwnProperty.call(cell, "visibility"),
+			),
+		).toBe(true);
+	});
+
+	it("reuses the mounted build when only previewVisible changes", () => {
+		const rowModel = createHarnessRowModel(30);
+		const buildMountedRows = vi.fn(buildMountedFlatGridRows<TestItem>);
+		const initialResult = computeHarnessSnapshot({
+			rowModel,
+			ranges: {
+				mounted: { start: 0, end: 7 },
+				previewVisible: { start: 0, end: 1 },
+			},
+			buildMountedRows,
+		});
+		const nextResult = computeHarnessSnapshot({
+			rowModel,
+			previous: initialResult.snapshot,
+			ranges: {
+				mounted: { start: 0, end: 7 },
+				previewVisible: { start: 1, end: 2 },
+			},
+			buildMountedRows,
+		});
+
+		expect(buildMountedRows).toHaveBeenCalledTimes(1);
+		expect(nextResult.snapshot.mountedBuild).toBe(
+			initialResult.snapshot.mountedBuild,
+		);
+	});
+
+	it("reuses the entire snapshot for a no-op measurement", () => {
+		const rowModel = createHarnessRowModel(30);
+		const ranges = {
+			mounted: { start: 0, end: 4 },
+			previewVisible: { start: 0, end: 1 },
+		};
+		const initial = computeHarnessSnapshot({ rowModel, ranges }).snapshot;
+		const repeated = computeHarnessSnapshot({
+			rowModel,
+			previous: initial,
+			ranges,
+		}).snapshot;
+
+		expect(repeated).toBe(initial);
+	});
+
+	it("recomputes into the same mounted build when dependencies are unchanged", () => {
+		const rowModel = createHarnessRowModel(12);
+		const buildMountedRows = vi.fn(buildMountedFlatGridRows<TestItem>);
+		const initialResult = computeHarnessSnapshot({ rowModel, buildMountedRows });
+		buildMountedRows.mockClear();
+		initialResult.engine.recompute({ rowModel });
+		const recomputed = initialResult.engine.getSnapshot();
+
+		expect(buildMountedRows).not.toHaveBeenCalled();
+		expect(recomputed?.mountedBuild).toBe(initialResult.snapshot.mountedBuild);
 	});
 });
