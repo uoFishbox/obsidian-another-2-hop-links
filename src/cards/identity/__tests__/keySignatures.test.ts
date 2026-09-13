@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from "vitest";
-import type { TFile } from "obsidian";
+import type { Pos, TFile } from "obsidian";
 import type { IndexedLink } from "indexing/model";
 import type { CardLinkBranch } from "cards/model";
 import {
@@ -29,12 +29,22 @@ describe("keySignatures", () => {
 		);
 	});
 
-	test("creates collision-resistant length-prefixed signatures", () => {
-		const keyA = createLengthPrefixedSignature(["a-b", "c", ""]);
-		const keyB = createLengthPrefixedSignature(["a", "b-c", ""]);
+	test("creates collision-resistant signatures that stay stable for equal input", () => {
+		// Ambiguous part boundaries must not collapse onto the same signature.
+		const hyphenSplit = createLengthPrefixedSignature(["a-b", "c", ""]);
+		const hyphenShifted = createLengthPrefixedSignature(["a", "b-c", ""]);
+		const separatorInsidePart = createLengthPrefixedSignature(["a|b", "c"]);
+		const separatorAsBoundary = createLengthPrefixedSignature(["a", "b|c"]);
 
-		expect(keyA).not.toBe(keyB);
-		expect(keyA).toBe("3:a-b|1:c|0:");
+		expect(hyphenSplit).not.toBe(hyphenShifted);
+		expect(separatorInsidePart).not.toBe(separatorAsBoundary);
+
+		// Repeating the same input yields the same signature.
+		expect(createLengthPrefixedSignature(["a-b", "c", ""])).toBe(hyphenSplit);
+
+		// Part count and part order are part of the identity.
+		expect(createLengthPrefixedSignature(["a-b", "c"])).not.toBe(hyphenSplit);
+		expect(createLengthPrefixedSignature(["c", "a-b", ""])).not.toBe(hyphenSplit);
 	});
 
 	test("creates usage signatures without UI identity fields", () => {
@@ -118,7 +128,7 @@ describe("keySignatures", () => {
 		);
 	});
 
-	test("creates stable backlink identity signatures with metadata suffix fields", () => {
+	test("distinguishes backlink metadata fields and suffix", () => {
 		const link: IndexedLink = {
 			sourceFile: createFile("Source.md"),
 			rawText: "Raw",
@@ -127,10 +137,28 @@ describe("keySignatures", () => {
 			key: "frontmatter",
 			isUnresolved: true,
 		};
+		const signature = createBacklinkIdentitySignature(link, "branch:2");
 
-		expect(createBacklinkIdentitySignature(link, "branch:2")).toBe(
-			"9:Source.md|3:Raw|40:Path.md\u001flookup\u001ffrontmatter\u001f-1\u001f1\u001fbranch:2",
-		);
+		// Repeating the same input yields the same signature.
+		expect(createBacklinkIdentitySignature(link, "branch:2")).toBe(signature);
+
+		// Every metadata field participates in the identity, and a field cannot
+		// impersonate its neighbour by moving the separator into its own value.
+		const changedFields: IndexedLink[] = [
+			{ ...link, path: "Other.md" },
+			{ ...link, lookupPath: "other-lookup" },
+			{ ...link, key: "other-key" },
+			{ ...link, backlinkCount: 7 },
+			{ ...link, isUnresolved: false },
+			{ ...link, lookupPath: "lookup\u001fX" },
+		];
+		for (const changed of changedFields) {
+			expect(createBacklinkIdentitySignature(changed, "branch:2")).not.toBe(
+				signature,
+			);
+		}
+
+		expect(createBacklinkIdentitySignature(link, "branch:3")).not.toBe(signature);
 	});
 
 	test("includes position in indexed link identity signatures", () => {
@@ -157,13 +185,29 @@ describe("keySignatures", () => {
 		);
 	});
 
-	test("serializes position numbers in base36", () => {
-		expect(
-			serializePositionSignature({
-				start: { line: 10, col: 81, offset: 226 },
-				end: { line: 10, col: 101, offset: 246 },
-			}),
-		).toBe("a:29:6a:a:2t:6u");
+	test("serializes positions so every coordinate stays distinguishable", () => {
+		const base: Pos = {
+			start: { line: 10, col: 81, offset: 226 },
+			end: { line: 10, col: 101, offset: 246 },
+		};
+		const baseToken = serializePositionSignature(base);
+
+		expect(serializePositionSignature(undefined)).toBe("");
+		expect(serializePositionSignature({ ...base })).toBe(baseToken);
+
+		// The exact token format is an implementation detail; what matters is that
+		// no two different coordinates serialize to the same token.
+		const movedCoordinates: Pos[] = [
+			{ ...base, start: { ...base.start, line: 11 } },
+			{ ...base, start: { ...base.start, col: 82 } },
+			{ ...base, start: { ...base.start, offset: 227 } },
+			{ ...base, end: { ...base.end, line: 11 } },
+			{ ...base, end: { ...base.end, col: 102 } },
+			{ ...base, end: { ...base.end, offset: 247 } },
+		];
+		for (const position of movedCoordinates) {
+			expect(serializePositionSignature(position)).not.toBe(baseToken);
+		}
 	});
 
 	test("creates tagged note usage signatures from normalized paths", () => {

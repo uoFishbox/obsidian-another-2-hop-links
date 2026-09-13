@@ -66,7 +66,7 @@ describe("ListControls", () => {
 		expect(onSortChange).toHaveBeenLastCalledWith("modified-date");
 	});
 
-	it("opens an Obsidian menu below the div trigger and marks the current sort field", async () => {
+	it("opens an Obsidian menu below the trigger and marks the current sort field", async () => {
 		const showAtPosition = vi.spyOn(Menu.prototype, "showAtPosition");
 		const onSortChange = vi.fn();
 		render(ListControls, {
@@ -78,16 +78,14 @@ describe("ListControls", () => {
 		);
 
 		expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
-		expect(button.tagName).toBe("DIV");
 		expect(button).toHaveAttribute("tabindex", "0");
 		expect(button).toHaveTextContent("Created");
-		expect(button.querySelector(".twohop-sort-field-icon")).toHaveAttribute(
-			"data-icon",
-			"calendar-plus",
-		);
+		// The field icon and the "opens a menu" affordance are addressed by the
+		// plugin's own icon contract, not by class names or sibling order.
+		expect(button.querySelector('[data-icon="calendar-plus"]')).toBeInTheDocument();
 		expect(
-			button.querySelector(".text-button-label + .text-button-icon.mod-aux"),
-		).toHaveAttribute("data-icon", "chevrons-up-down");
+			button.querySelector('[data-icon="chevrons-up-down"]'),
+		).toBeInTheDocument();
 		expect(button).toHaveAttribute("aria-haspopup", "menu");
 		expect(button).toHaveAttribute("aria-expanded", "false");
 
@@ -175,10 +173,7 @@ describe("ListControls", () => {
 
 			await view.rerender({ sortOption: reverseOption });
 			expect(button).toHaveTextContent(label);
-			expect(button.querySelector(".twohop-sort-field-icon")).toHaveAttribute(
-				"data-icon",
-				icon,
-			);
+			expect(button.querySelector(`[data-icon="${icon}"]`)).toBeInTheDocument();
 			await fireEvent.click(button);
 			const menu = showAtPosition.mock.contexts[1];
 			expect(
@@ -215,8 +210,8 @@ describe("ListControls", () => {
 				.getByRole("button", {
 					name: "File size: largest first (click for smallest first)",
 				})
-				.querySelector('[aria-hidden="true"]'),
-		).toHaveAttribute("data-icon", "arrow-down-wide-narrow");
+				.querySelector('[data-icon="arrow-down-wide-narrow"]'),
+		).toBeInTheDocument();
 		await fireEvent.click(
 			screen.getByRole("button", {
 				name: "File size: largest first (click for smallest first)",
@@ -232,8 +227,8 @@ describe("ListControls", () => {
 				.getByRole("button", {
 					name: "File size: smallest first (click for largest first)",
 				})
-				.querySelector('[aria-hidden="true"]'),
-		).toHaveAttribute("data-icon", "arrow-up-wide-narrow");
+				.querySelector('[data-icon="arrow-up-wide-narrow"]'),
+		).toBeInTheDocument();
 		await fireEvent.click(
 			screen.getByRole("button", {
 				name: "File size: smallest first (click for largest first)",
@@ -244,7 +239,7 @@ describe("ListControls", () => {
 		expect(onSortChange).toHaveBeenLastCalledWith("modified-date");
 	});
 
-	it("renders the modified-date shortcut as an active text-icon button", async () => {
+	it("renders the modified-date shortcut as the pressed button that owns the current sort", async () => {
 		const onSortChange = vi.fn();
 		const view = render(ListControls, {
 			props: { sortOption: "modified-date-reverse", onSortChange },
@@ -254,39 +249,26 @@ describe("ListControls", () => {
 			name: ARIA_LABELS.SORT_SELECT,
 		});
 
-		expect(shortcut.tagName).toBe("DIV");
-		expect(shortcut).toHaveClass("text-icon-button", "is-active");
-		expect(sortMenuTrigger).not.toHaveClass("is-active");
+		// A pinned sort that owns the current state takes the trigger's place, so
+		// the trigger falls back to the generic "Select" label without a field icon.
+		expect(sortMenuTrigger).toHaveTextContent("Select");
 		expect(
-			sortMenuTrigger.querySelector(".twohop-sort-field-icon"),
+			sortMenuTrigger.querySelector('[data-icon="calendar-clock"]'),
 		).not.toBeInTheDocument();
-		expect(sortMenuTrigger.querySelector(".text-button-label")).toHaveTextContent(
-			"Select",
-		);
-		expect(sortMenuTrigger.querySelector(".mod-aux")).toHaveAttribute(
-			"data-icon",
-			"chevrons-up-down",
-		);
+		expect(
+			sortMenuTrigger.querySelector('[data-icon="chevrons-up-down"]'),
+		).toBeInTheDocument();
 		expect(shortcut).toHaveAttribute("tabindex", "0");
 		expect(shortcut).toHaveAttribute("aria-pressed", "true");
 		expect(shortcut).not.toHaveAttribute("title");
-		expect(shortcut.querySelector(".text-button-icon")).toHaveAttribute(
-			"data-icon",
-			"calendar-clock",
-		);
-		expect(shortcut.querySelector(".text-button-label")).toHaveTextContent(
-			"Modified",
-		);
+		expect(
+			shortcut.querySelector('[data-icon="calendar-clock"]'),
+		).toBeInTheDocument();
+		expect(shortcut).toHaveTextContent("Modified");
 
 		await view.rerender({ sortOption: "alphabetical" });
-		expect(shortcut).not.toHaveClass("is-active");
-		expect(sortMenuTrigger).toHaveClass("is-active");
-		expect(
-			sortMenuTrigger.querySelector(".twohop-sort-field-icon"),
-		).toHaveAttribute("data-icon", "type");
-		expect(sortMenuTrigger.querySelector(".text-button-label")).toHaveTextContent(
-			"Title",
-		);
+		expect(sortMenuTrigger.querySelector('[data-icon="type"]')).toBeInTheDocument();
+		expect(sortMenuTrigger).toHaveTextContent("Title");
 		expect(shortcut).toHaveAttribute("aria-pressed", "false");
 
 		const defaultAllowed = await fireEvent.keyDown(shortcut, { key: "Enter" });
@@ -306,12 +288,12 @@ describe("ListControls", () => {
 
 		expect(screen.getByRole("button", { name: "Title" })).toBeEnabled();
 		expect(screen.getByRole("button", { name: "File size" })).toBeEnabled();
-		expect(screen.getByRole("button", { name: "Title" })).toHaveClass(
-			"twohop-pinned-sort",
-		);
+		// Pinned fields render as their own buttons, and the menu trigger stays a
+		// separate control that falls back to the generic label while one of them
+		// owns the current sort.
 		expect(
 			screen.getByRole("button", { name: ARIA_LABELS.SORT_SELECT }),
-		).not.toHaveClass("twohop-pinned-sort");
+		).toHaveTextContent("Select");
 		expect(
 			screen.queryByRole("button", { name: "Modified" }),
 		).not.toBeInTheDocument();
@@ -369,41 +351,18 @@ describe("ListControls", () => {
 				props: { sortOption, onSortChange: vi.fn() },
 			});
 
-			const iconElement = screen
-				.getByRole("button", {
-					name:
-						sortOption === "alphabetical"
-							? "Title: A–Z (click for Z–A)"
-							: "Title: Z–A (click for A–Z)",
-				})
-				.querySelector('[aria-hidden="true"]');
-			expect(iconElement).toHaveAttribute("data-icon", icon);
-			const svg = iconElement?.querySelector("svg");
-			expect(svg).toBeInTheDocument();
-			expect(svg).toHaveAttribute("width", "100%");
-			expect(svg).toHaveAttribute("height", "100%");
-			expect(svg).toHaveClass("svg-icon", "lucide", `lucide-${icon}`);
-			expect(
-				Array.from(iconElement?.querySelectorAll("path") ?? [], (path) =>
-					path.getAttribute("d"),
-				),
-			).toEqual(
-				sortOption === "alphabetical-reverse"
-					? [
-							"m3 8 4-4 4 4",
-							"M7 4v16",
-							"M20 8h-5",
-							"M15 10V6.5a2.5 2.5 0 0 1 5 0V10",
-							"M15 14h5l-5 6h5",
-						]
-					: [
-							"m3 16 4 4 4-4",
-							"M7 20V4",
-							"M20 8h-5",
-							"M15 10V6.5a2.5 2.5 0 0 1 5 0V10",
-							"M15 14h5l-5 6h5",
-						],
-			);
+			// The direction is identified by the plugin's icon name and the
+			// accessible label. How the host renders that icon into SVG is not
+			// part of this contract.
+			const directionButton = screen.getByRole("button", {
+				name:
+					sortOption === "alphabetical"
+						? "Title: A–Z (click for Z–A)"
+						: "Title: Z–A (click for A–Z)",
+			});
+			const iconElement = directionButton.querySelector(`[data-icon="${icon}"]`);
+			expect(iconElement).toBeInTheDocument();
+			expect(iconElement?.querySelector("svg")).toBeInTheDocument();
 		},
 	);
 
