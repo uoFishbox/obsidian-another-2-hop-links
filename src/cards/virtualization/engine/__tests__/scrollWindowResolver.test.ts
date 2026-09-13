@@ -58,20 +58,19 @@ describe("createVirtualScrollWindowRangeResolver", () => {
 				out.max = mounted.end * 10;
 			},
 		};
-		const resolver = createVirtualScrollWindowRangeResolver({
-			resolveRowModel: () => rowModel,
-			resolveVisibilityPolicy: () => ({
-				bootstrapRows: 1,
-				mountedOverscanPx: 100,
-				previewOverscanPx: 10,
-			}),
-		});
+		const visibilityPolicy = {
+			bootstrapRows: 1,
+			mountedOverscanPx: 100,
+			previewOverscanPx: 10,
+		};
+		const resolver = createVirtualScrollWindowRangeResolver();
 
 		const measurement = resolver.resolveScrollWindowMeasurement(
 			250,
 			120,
 			50,
-			{},
+			rowModel,
+			visibilityPolicy,
 		);
 
 		expect(findVisibleRangesInto).toHaveBeenCalledOnce();
@@ -113,16 +112,26 @@ describe("createVirtualScrollWindowRangeResolver", () => {
 			totalHeight: 10_000,
 			findVisibleRangesInto,
 		};
-		const resolver = createVirtualScrollWindowRangeResolver({
-			resolveRowModel: () => rowModel,
-			resolveVisibilityPolicy: () => ({
-				bootstrapRows: 1,
-				mountedOverscanPx: 100,
-			}),
-		});
+		const visibilityPolicy = {
+			bootstrapRows: 1,
+			mountedOverscanPx: 100,
+		};
+		const resolver = createVirtualScrollWindowRangeResolver();
 
-		const first = resolver.resolveScrollWindowMeasurement(100, 100, 0, {}).ranges;
-		const second = resolver.resolveScrollWindowMeasurement(101, 100, 0, {}).ranges;
+		const first = resolver.resolveScrollWindowMeasurement(
+			100,
+			100,
+			0,
+			rowModel,
+			visibilityPolicy,
+		).ranges;
+		const second = resolver.resolveScrollWindowMeasurement(
+			101,
+			100,
+			0,
+			rowModel,
+			visibilityPolicy,
+		).ranges;
 
 		expect(findVisibleRangesInto).toHaveBeenCalledTimes(2);
 		expect(second).toBe(first);
@@ -130,22 +139,32 @@ describe("createVirtualScrollWindowRangeResolver", () => {
 
 	it("publishes absolute coverage bands for empty ranges outside the section", () => {
 		const rowModel = createEmptyRangeRowModel(10, 1_000);
-		const resolver = createVirtualScrollWindowRangeResolver({
-			resolveRowModel: () => rowModel,
-			resolveVisibilityPolicy: () => ({
-				bootstrapRows: 1,
-				mountedOverscanPx: 0,
-			}),
-		});
+		const visibilityPolicy = {
+			bootstrapRows: 1,
+			mountedOverscanPx: 0,
+		};
+		const resolver = createVirtualScrollWindowRangeResolver();
 
-		const above = resolver.resolveScrollWindowMeasurement(300, 100, 500, {});
+		const above = resolver.resolveScrollWindowMeasurement(
+			300,
+			100,
+			500,
+			rowModel,
+			visibilityPolicy,
+		);
 		expect(above.ranges.mounted).toEqual({ start: 0, end: 0 });
 		expect(above.mountedCoverageScrollTopBand).toEqual({
 			min: Number.NEGATIVE_INFINITY,
 			max: 400,
 		});
 
-		const below = resolver.resolveScrollWindowMeasurement(1_600, 100, 500, {});
+		const below = resolver.resolveScrollWindowMeasurement(
+			1_600,
+			100,
+			500,
+			rowModel,
+			visibilityPolicy,
+		);
 		expect(below.ranges.mounted).toEqual({ start: 0, end: 0 });
 		expect(below.mountedCoverageScrollTopBand).toEqual({
 			min: 1_500,
@@ -155,19 +174,18 @@ describe("createVirtualScrollWindowRangeResolver", () => {
 
 	it("covers every finite scroll position when the row model is empty", () => {
 		const rowModel = createEmptyRangeRowModel(0, 0);
-		const resolver = createVirtualScrollWindowRangeResolver({
-			resolveRowModel: () => rowModel,
-			resolveVisibilityPolicy: () => ({
-				bootstrapRows: 1,
-				mountedOverscanPx: 0,
-			}),
-		});
+		const visibilityPolicy = {
+			bootstrapRows: 1,
+			mountedOverscanPx: 0,
+		};
+		const resolver = createVirtualScrollWindowRangeResolver();
 
 		const measurement = resolver.resolveScrollWindowMeasurement(
 			12_345,
 			100,
 			500,
-			{},
+			rowModel,
+			visibilityPolicy,
 		);
 
 		expect(measurement.mountedCoverageScrollTopBand).toEqual({
@@ -191,25 +209,36 @@ describe("createVirtualScrollWindowRangeResolver", () => {
 				out.previewVisible.end = params.scrollTop + 5;
 			},
 		};
-		const resolver = createVirtualScrollWindowRangeResolver({
-			resolveRowModel: () => rowModel,
-			resolveVisibilityPolicy: () => ({
-				bootstrapRows: 1,
-				mountedOverscanPx: 0,
-				previewOverscanPx: 0,
-			}),
-		});
+		const visibilityPolicy = {
+			bootstrapRows: 1,
+			mountedOverscanPx: 0,
+			previewOverscanPx: 0,
+		};
+		const resolver = createVirtualScrollWindowRangeResolver();
 
-		const first = resolver.resolveScrollWindowMeasurement(10, 100, 0, {}).ranges;
+		const first = resolver.resolveScrollWindowMeasurement(
+			10,
+			100,
+			0,
+			rowModel,
+			visibilityPolicy,
+		).ranges;
 		const unchanged = resolver.resolveScrollWindowMeasurement(
 			10,
 			100,
 			0,
-			{},
+			rowModel,
+			visibilityPolicy,
 		).ranges;
 		expect(unchanged).toBe(first);
 
-		const second = resolver.resolveScrollWindowMeasurement(20, 100, 0, {}).ranges;
+		const second = resolver.resolveScrollWindowMeasurement(
+			20,
+			100,
+			0,
+			rowModel,
+			visibilityPolicy,
+		).ranges;
 		expect(second).not.toBe(first);
 		expect(second).toEqual({
 			mounted: { start: 20, end: 30 },

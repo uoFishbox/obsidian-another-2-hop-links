@@ -170,7 +170,7 @@ const createRoot = (rectOverrides: Partial<DOMRect> = {}): HTMLElement => {
 };
 
 type TestRuntime = ReturnType<
-	typeof useVirtualizer<TestCell, TestRowModel, TestRowModel, TestMountedBuild>
+	typeof useVirtualizer<TestCell, TestRowModel, TestMountedBuild>
 >;
 
 const activeFrameCoordinators = new Set<VirtualFrameCoordinator>();
@@ -181,7 +181,7 @@ const createRuntimeHarness = (
 		previewVisible: { start: 2, end: 8 },
 	},
 	overrides: Partial<
-		UseVirtualizerOptions<TestCell, TestRowModel, TestRowModel, TestMountedBuild>
+		UseVirtualizerOptions<TestCell, TestRowModel, TestMountedBuild>
 	> = {},
 ) => {
 	const rootEl = createRoot();
@@ -190,16 +190,10 @@ const createRuntimeHarness = (
 	const onSnapshotUpdated = vi.fn();
 	const findVisibleRangeInto = vi.spyOn(rowModel, "findVisibleRangeInto");
 	const findVisibleRangesInto = vi.spyOn(rowModel, "findVisibleRangesInto");
-	const options: UseVirtualizerOptions<
-		TestCell,
-		TestRowModel,
-		TestRowModel,
-		TestMountedBuild
-	> = {
+	const options: UseVirtualizerOptions<TestCell, TestRowModel, TestMountedBuild> = {
 		getRootEl: () => rootEl,
-		getContext: () => rowModel,
+		getRowModel: () => rowModel,
 		hasRenderableContent: () => true,
-		resolveRowModel: (model) => model,
 		resolveVisibilityPolicy: () => VISIBILITY_POLICY,
 		buildMountedRows: ({ rowRange }) => ({
 			cells:
@@ -215,7 +209,7 @@ const createRuntimeHarness = (
 		}),
 		onSnapshotUpdated,
 		resolveLayoutMeasurement: (nextMeasurement) => ({
-			context: rowModel,
+			rowModel,
 			measurement: nextMeasurement,
 			isLayoutGeometryStable: true,
 		}),

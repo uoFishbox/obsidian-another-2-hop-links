@@ -138,11 +138,8 @@ function createFixture() {
 	const engine = createVirtualizerEngine<
 		TwoHopVirtualCell,
 		TwoHopRowModel,
-		TwoHopRowModel,
 		MountedTwoHopBuild
 	>({
-		resolveRowModel: (model) => model,
-		resolveVisibilityPolicy: (model) => policy(model.layout.rowStride),
 		buildMountedRows: ({ rowModel: model, ...rest }) =>
 			buildMountedTwoHopRows({ ...rest, rowModel: model }),
 		onSnapshotUpdated: (snapshot) =>
@@ -167,6 +164,7 @@ function createFixture() {
 				source: "scroll",
 			},
 			rowModel,
+			policy(rowModel.layout.rowStride),
 		);
 		frames.drain("post-paint");
 	}

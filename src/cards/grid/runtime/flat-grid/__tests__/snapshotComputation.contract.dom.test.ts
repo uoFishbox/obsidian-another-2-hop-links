@@ -4,19 +4,13 @@ import { createFlatGridCellSource } from "../cellSource";
 import type { FlatGridLogicalCell } from "../logicalCell";
 import { createFlatGridRowModel, type FlatGridRowModel } from "../rowModel";
 import type { VirtualRanges } from "cards/virtualization/public";
-import { computeVirtualRanges } from "cards/virtualization/public";
 import { buildMountedFlatGridRows, type MountedFlatGridBuild } from "../mountedRows";
 import { flattenMountedRowBindings } from "./mountedRowsTestHelpers";
 import {
-	computeVirtualListSnapshot,
-	recomputeVirtualListSnapshot,
-	type VirtualListComputation,
+	createVirtualizerEngine,
+	type VirtualizerEngine,
 	type VirtualListSnapshot,
-} from "cards/virtualization/engine/snapshotComputation";
-import {
-	createResidentRowSlotAllocator,
-	type ResidentRowSlotAllocator,
-} from "cards/virtualization/public";
+} from "cards/virtualization/engine/virtualizer";
 
 interface TestItem {
 	readonly id: string;
@@ -26,11 +20,20 @@ type TestSnapshot = VirtualListSnapshot<
 	FlatGridLogicalCell<TestItem>,
 	MountedFlatGridBuild<TestItem>
 >;
-type TestComputation = VirtualListComputation<
+type TestEngine = VirtualizerEngine<
 	FlatGridLogicalCell<TestItem>,
+	FlatGridRowModel<TestItem>,
 	MountedFlatGridBuild<TestItem>
 >;
-const rowSlotAllocators = new WeakMap<TestSnapshot, ResidentRowSlotAllocator>();
+interface TestComputation {
+	readonly snapshot: TestSnapshot;
+	readonly engine: TestEngine;
+}
+interface TestEngineState {
+	readonly engine: TestEngine;
+	buildMountedRows: typeof buildMountedFlatGridRows<TestItem>;
+}
+const engineStates = new WeakMap<TestSnapshot, TestEngineState>();
 
 const getMountedCells = (build: MountedFlatGridBuild<TestItem>) =>
 	flattenMountedRowBindings(build.rowsInMountedRange);
@@ -66,41 +69,61 @@ const compute = (params: {
 	readonly scrollTop?: number;
 	readonly mountedOverscanPx?: number;
 	readonly buildMountedRows?: typeof buildMountedFlatGridRows<TestItem>;
-	readonly rowSlotAllocator?: ResidentRowSlotAllocator;
 }): TestComputation => {
-	const rowSlotAllocator =
-		params.rowSlotAllocator ??
-		(params.previous ? rowSlotAllocators.get(params.previous) : undefined) ??
-		createResidentRowSlotAllocator();
-	const rangesResult = computeVirtualRanges({
-		rowModel: params.rowModel,
-		scrollTop: params.scrollTop ?? 0,
-		viewportHeight: 100,
-		sectionTop: 0,
-		hasValidScrollMetrics: true,
-		hasPublishedVisibleRange: params.previous !== undefined,
-		currentMountedRange: params.previous?.ranges.mounted ?? {
-			start: 0,
-			end: 0,
-		},
-		bootstrapRows: 3,
-		mountedOverscanPx: params.mountedOverscanPx ?? 0,
-		precomputedRanges: params.ranges,
-	});
-	const result = computeVirtualListSnapshot({
-		rowModel: params.rowModel,
-		rangesResult,
-		previous: params.previous,
-		buildMountedRows: ({ rowModel, rowRange, previousBuild }) =>
-			(params.buildMountedRows ?? buildMountedFlatGridRows)({
-				rowModel: rowModel as FlatGridRowModel<TestItem>,
+	let state = params.previous ? engineStates.get(params.previous) : undefined;
+	if (!state) {
+		const nextState = {} as TestEngineState;
+		const engine = createVirtualizerEngine<
+			FlatGridLogicalCell<TestItem>,
+			FlatGridRowModel<TestItem>,
+			MountedFlatGridBuild<TestItem>
+		>({
+			buildMountedRows: ({
+				rowModel,
 				rowRange,
 				previousBuild,
 				rowSlotAllocator,
-			}),
-	});
-	rowSlotAllocators.set(result.snapshot, rowSlotAllocator);
-	return result;
+			}) =>
+				nextState.buildMountedRows({
+					rowModel,
+					rowRange,
+					previousBuild,
+					rowSlotAllocator,
+				}),
+		});
+		state = Object.assign(nextState, {
+			engine,
+			buildMountedRows: params.buildMountedRows ?? buildMountedFlatGridRows,
+		});
+	} else {
+		state.buildMountedRows = params.buildMountedRows ?? buildMountedFlatGridRows;
+	}
+	state.engine.applyRangeMeasurement(
+		{
+			scrollTop: params.scrollTop ?? 0,
+			viewportHeight: 100,
+			sectionTop: 0,
+			hasValidScrollMetrics: true,
+			isScrollActive: false,
+			scrollGeneration: 0,
+			source: "scroll",
+		},
+		params.rowModel,
+		{
+			bootstrapRows: 3,
+			mountedOverscanPx: params.mountedOverscanPx ?? 0,
+		},
+		params.ranges,
+	);
+	const snapshot = state.engine.getSnapshot();
+	if (!snapshot) {
+		throw new Error("Expected a virtual-list snapshot.");
+	}
+	engineStates.set(snapshot, state);
+	return {
+		snapshot,
+		engine: state.engine,
+	};
 };
 
 describe("VirtualListEngine contract", () => {
@@ -245,25 +268,14 @@ describe("VirtualListEngine contract", () => {
 
 	it("recompute reuses the mounted build when dependencies are unchanged", () => {
 		const rowModel = createRowModel(12);
-		const initialResult = compute({ rowModel });
 		const buildMountedRows = vi.fn(buildMountedFlatGridRows<TestItem>);
-
-		const recomputed = recomputeVirtualListSnapshot({
-			rowModel,
-			previous: initialResult.snapshot,
-			buildMountedRows: ({ rowModel: nextRowModel, rowRange, previousBuild }) =>
-				buildMountedRows({
-					rowModel: nextRowModel as FlatGridRowModel<TestItem>,
-					rowRange,
-					previousBuild,
-					rowSlotAllocator: createResidentRowSlotAllocator(),
-				}),
-		});
+		const initialResult = compute({ rowModel, buildMountedRows });
+		buildMountedRows.mockClear();
+		initialResult.engine.recompute({ rowModel });
+		const recomputed = initialResult.engine.getSnapshot();
 
 		expect(buildMountedRows).not.toHaveBeenCalled();
-		expect(recomputed.snapshot.mountedBuild).toBe(
-			initialResult.snapshot.mountedBuild,
-		);
+		expect(recomputed?.mountedBuild).toBe(initialResult.snapshot.mountedBuild);
 	});
 
 	it("returns an empty snapshot when the row model has no rows", () => {

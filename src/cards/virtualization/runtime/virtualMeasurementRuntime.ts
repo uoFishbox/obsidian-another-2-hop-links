@@ -41,8 +41,8 @@ export interface VirtualizerMeasurementState {
 	scrollContainerEl: HTMLElement | null;
 }
 
-export interface VirtualListLayoutMeasurementResolution<TContext> {
-	readonly context: TContext;
+export interface VirtualListLayoutMeasurementResolution<TRowModel> {
+	readonly rowModel: TRowModel;
 	readonly measurement: VirtualMeasurement;
 	readonly isLayoutGeometryStable: boolean;
 }
@@ -50,26 +50,24 @@ export interface VirtualListLayoutMeasurementResolution<TContext> {
 export interface CreateVirtualMeasurementRuntimeOptions<
 	TCell,
 	TRowModel extends VirtualRowModel<TCell> & VirtualScrollWindowRangeRowModel,
-	TContext,
 	TMountedBuild,
 > {
 	measurement: VirtualizerMeasurementState;
 	getRootEl(): HTMLElement | null;
-	getContext(): TContext;
+	getRowModel(): TRowModel;
 	hasRenderableContent(): boolean;
-	resolveRowModel(context: TContext): TRowModel;
-	resolveVisibilityPolicy(context: TContext): VirtualVisibilityPolicy;
+	resolveVisibilityPolicy(rowModel: TRowModel): VirtualVisibilityPolicy;
 	resolveLayoutMeasurement(
 		measurement: VirtualMeasurement & { readonly sectionRect: DOMRect },
 		rootEl: HTMLElement,
 		runtimeMeasurement: VirtualizerMeasurementState,
-	): VirtualListLayoutMeasurementResolution<TContext>;
+	): VirtualListLayoutMeasurementResolution<TRowModel>;
 	onRangePublished?(context: PublishedVirtualRangeContext): void;
 	onObservedWidthChange?(width: number): void;
 	unstableMeasurementRetryLimit: number;
 	frameCoordinator: VirtualFrameCoordinator;
 	engine: Pick<
-		VirtualizerEngine<TCell, TRowModel, TContext, TMountedBuild>,
+		VirtualizerEngine<TCell, TRowModel, TMountedBuild>,
 		"applyRangeMeasurement" | "hasPublishedVisibleRange"
 	>;
 }
@@ -110,14 +108,12 @@ type MutableVirtualMeasurement = {
 export function createVirtualMeasurementRuntime<
 	TCell,
 	TRowModel extends VirtualRowModel<TCell> & VirtualScrollWindowRangeRowModel,
-	TContext,
 	TMountedBuild,
 >({
 	measurement,
 	getRootEl,
-	getContext,
+	getRowModel,
 	hasRenderableContent,
-	resolveRowModel,
 	resolveVisibilityPolicy,
 	resolveLayoutMeasurement,
 	onRangePublished,
@@ -128,7 +124,6 @@ export function createVirtualMeasurementRuntime<
 }: CreateVirtualMeasurementRuntimeOptions<
 	TCell,
 	TRowModel,
-	TContext,
 	TMountedBuild
 >): VirtualMeasurementRuntime {
 	const publishedRangeContext: PublishedVirtualRangeContext = {
@@ -138,10 +133,7 @@ export function createVirtualMeasurementRuntime<
 		isScrollActive: false,
 		sharedScrollMetrics: undefined,
 	};
-	const rangeResolver = createVirtualScrollWindowRangeResolver<TRowModel, TContext>({
-		resolveRowModel,
-		resolveVisibilityPolicy,
-	});
+	const rangeResolver = createVirtualScrollWindowRangeResolver<TRowModel>();
 	const scrollCoverage = createVirtualScrollCoverageController();
 	const reusableScrollSnapshot: VirtualListScrollSnapshot = {
 		scrollTop: 0,
@@ -191,24 +183,31 @@ export function createVirtualMeasurementRuntime<
 
 	function resolveScrollWindowMeasurement(
 		nextMeasurement: VirtualMeasurement,
-		context: TContext,
+		rowModel: TRowModel,
+		visibilityPolicy: VirtualVisibilityPolicy,
 	): ScrollWindowMeasurement {
 		return rangeResolver.resolveScrollWindowMeasurement(
 			nextMeasurement.scrollTop,
 			nextMeasurement.viewportHeight,
 			nextMeasurement.sectionTop,
-			context,
+			rowModel,
+			visibilityPolicy,
 		);
 	}
 
 	function applyScrollMeasurement(
 		nextMeasurement: VirtualMeasurement,
-		context: TContext,
+		rowModel: TRowModel,
 	): VirtualMeasurementApplicationResult {
+		const visibilityPolicy = resolveVisibilityPolicy(rowModel);
 		let rangeMeasurement: ScrollWindowMeasurement | null = null;
 		let resolvedRanges: VirtualRanges | undefined;
 		if (nextMeasurement.hasValidScrollMetrics) {
-			rangeMeasurement = resolveScrollWindowMeasurement(nextMeasurement, context);
+			rangeMeasurement = resolveScrollWindowMeasurement(
+				nextMeasurement,
+				rowModel,
+				visibilityPolicy,
+			);
 			resolvedRanges = rangeMeasurement.ranges;
 		} else {
 			scrollCoverage.reset();
@@ -216,7 +215,8 @@ export function createVirtualMeasurementRuntime<
 
 		const rangeApplication = engine.applyRangeMeasurement(
 			nextMeasurement,
-			context,
+			rowModel,
+			visibilityPolicy,
 			resolvedRanges,
 		);
 		if (rangeApplication.kind !== "stable") {
@@ -248,18 +248,21 @@ export function createVirtualMeasurementRuntime<
 			measurement,
 		);
 		const effectiveMeasurement = resolution.measurement;
+		const visibilityPolicy = resolveVisibilityPolicy(resolution.rowModel);
 		let rangeMeasurement: ScrollWindowMeasurement | null = null;
 		let resolvedRanges: VirtualRanges | undefined;
 		if (effectiveMeasurement.hasValidScrollMetrics) {
 			rangeMeasurement = resolveScrollWindowMeasurement(
 				effectiveMeasurement,
-				resolution.context,
+				resolution.rowModel,
+				visibilityPolicy,
 			);
 			resolvedRanges = rangeMeasurement.ranges;
 		}
 		const rangeApplication = engine.applyRangeMeasurement(
 			{ ...effectiveMeasurement, isScrollActive: false },
-			resolution.context,
+			resolution.rowModel,
+			visibilityPolicy,
 			resolvedRanges,
 		);
 		if (rangeApplication.kind !== "stable" || !resolution.isLayoutGeometryStable) {
@@ -282,7 +285,7 @@ export function createVirtualMeasurementRuntime<
 	): VirtualMeasurementApplicationResult {
 		return nextMeasurement.source === "layout"
 			? applyLayoutMeasurement(nextMeasurement)
-			: applyScrollMeasurement(nextMeasurement, getContext());
+			: applyScrollMeasurement(nextMeasurement, getRowModel());
 	}
 
 	function publishMeasurement(

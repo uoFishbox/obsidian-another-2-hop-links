@@ -5,16 +5,20 @@ import type {
 	VirtualPreviewSurface,
 } from "card-preview/scheduling/virtualPreviewSurface";
 import type { InteractionDescriptorResolverProvider } from "cards/interactions/interactionRegistry";
-import type { InteractionHandle } from "cards/interactions/interactionTypes";
-import {
-	createVirtualCardInteractionController,
-	type VirtualCardInteractionBinding,
-} from "cards/interactions/virtualCardInteractionController";
+import type {
+	InteractionHandle,
+	ItemInteractionDescriptor,
+} from "cards/interactions/interactionTypes";
+import { createVirtualCardInteractionController } from "cards/interactions/virtualCardInteractionController";
 import type { CardRenderModel } from "cards/rendering/cardRenderModel";
 import type { RowRange } from "cards/virtualization/public";
 import type { VirtualFrameCoordinator } from "shared/ui/scheduling/frameCoordinator";
 import type { TwoHopItemModel } from "two-hop/ui/twoHopSectionModel";
-import type { MountedTwoHopBuild, MountedTwoHopRow } from "./mountedRows";
+import type {
+	MountedTwoHopBuild,
+	MountedTwoHopCell,
+	MountedTwoHopRow,
+} from "./mountedRows";
 import type { TwoHopVirtualCell } from "./rowModel";
 
 const EMPTY_RANGE: Readonly<RowRange> = Object.freeze({ start: 0, end: 0 });
@@ -96,7 +100,6 @@ export function createTwoHopCardRuntime(
 	const demandedKeys = new Set<string>();
 	const foregroundQueue = createHydrationQueue();
 	const backgroundQueue = createHydrationQueue();
-	let cancelDrain: (() => void) | undefined;
 	let scheduledPriority: HydrationPriority | undefined;
 
 	function getMountedRows(): readonly MountedTwoHopRow[] {
@@ -208,21 +211,24 @@ export function createTwoHopCardRuntime(
 			return;
 		}
 		lastInteractionMountedBuild = mountedBuild;
-		const bindings: VirtualCardInteractionBinding[] = [];
-		for (const row of mountedBuild?.rowsInMountedRange ?? EMPTY_MOUNTED_ROWS) {
-			for (const mountedCell of row.bindings) {
-				if (!mountedCell || mountedCell.cell.kind !== "item") continue;
-				bindings.push({
-					slotId: String(mountedCell.physicalCellSlot),
-					descriptor:
-						modelCache.get(mountedCell.cell.logicalKey)?.model
-							?.interactionDescriptor ?? null,
-				});
-			}
-		}
-		if (interactionController.syncCards(bindings)) {
+		if (
+			interactionController.syncMountedRows(
+				mountedBuild?.rowsInMountedRange ?? EMPTY_MOUNTED_ROWS,
+				resolveMountedInteractionDescriptor,
+			)
+		) {
 			options.onInteractionHandlesChanged();
 		}
+	}
+
+	function resolveMountedInteractionDescriptor(
+		mountedCell: MountedTwoHopCell,
+	): ItemInteractionDescriptor | null | undefined {
+		if (mountedCell.cell.kind !== "item") return undefined;
+		return (
+			modelCache.get(mountedCell.cell.logicalKey)?.model.interactionDescriptor ??
+			null
+		);
 	}
 
 	function buildPreviewBindings(
@@ -324,22 +330,24 @@ export function createTwoHopCardRuntime(
 			cancelScheduledDrain();
 			return;
 		}
-		if (cancelDrain && scheduledPriority === priority) return;
+		if (scheduledPriority === priority) return;
 
 		cancelScheduledDrain();
 		scheduledPriority = priority;
-		const lane = priority === "foreground" ? "post-paint" : "idle";
+		const lane = resolveHydrationLane(priority);
 		options.frameCoordinator.schedule(lane, HYDRATION_TASK_KEY, () => {
-			cancelDrain = undefined;
 			scheduledPriority = undefined;
 			if (!disposed) drain(priority);
 		});
-		cancelDrain = () => options.frameCoordinator.cancel(lane, HYDRATION_TASK_KEY);
 	}
 
 	function cancelScheduledDrain(): void {
-		cancelDrain?.();
-		cancelDrain = undefined;
+		if (scheduledPriority) {
+			options.frameCoordinator.cancel(
+				resolveHydrationLane(scheduledPriority),
+				HYDRATION_TASK_KEY,
+			);
+		}
 		scheduledPriority = undefined;
 	}
 
@@ -407,13 +415,17 @@ export function createTwoHopCardRuntime(
 		refreshDemand,
 		registerCardModelConsumer,
 		getInteractionHandle: (physicalCellSlot) =>
-			interactionController.getInteractionHandle(String(physicalCellSlot)),
+			interactionController.getInteractionHandle(physicalCellSlot),
 		dispose,
 	};
 }
 
 function createHydrationQueue(): HydrationQueue {
 	return { entries: [], head: 0 };
+}
+
+function resolveHydrationLane(priority: HydrationPriority): "post-paint" | "idle" {
+	return priority === "foreground" ? "post-paint" : "idle";
 }
 
 function clearHydrationQueue(queue: HydrationQueue): void {

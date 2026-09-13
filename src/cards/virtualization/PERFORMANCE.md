@@ -59,7 +59,7 @@ two-hop surface も同じ不変条件に従う。section margin、header、load-
 
 ### Engine Snapshot Fast Paths
 
-場所: `src/cards/virtualization/engine/snapshotComputation.ts`, `src/cards/virtualization/engine/virtualizer.ts`
+場所: `src/cards/virtualization/engine/virtualizer.ts`
 
 - **目的:** 行モデルの同一性、マウント範囲、全体の高さが再利用を許容する場合、マウントされたセルの再構築をスキップする。
 - **スコープ:** 次のエンジン計算に渡される以前のスナップショット。

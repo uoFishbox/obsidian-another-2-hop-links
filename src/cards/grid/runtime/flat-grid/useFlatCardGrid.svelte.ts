@@ -79,8 +79,8 @@ export function useFlatCardGrid<T>(
 		appContext?.previewRuntime?.createSurface(previewSurfaceOptions) ??
 		DISABLED_PREVIEW_SURFACE;
 	const resolveCardGridVisibilityPolicy = createCardGridVisibilityPolicyResolver();
-	const resolveVisibilityPolicy = (nextLayout: FlatGridLayout) =>
-		resolveCardGridVisibilityPolicy(nextLayout.rowStride);
+	const resolveVisibilityPolicy = () =>
+		resolveCardGridVisibilityPolicy(layout.rowStride);
 	const initialScrollState = props.initialScrollState
 		? {
 				localScrollTop: props.initialScrollState.localScrollTop,
@@ -163,13 +163,11 @@ export function useFlatCardGrid<T>(
 	const virtualList = useVirtualizer<
 		FlatGridLogicalCell<T>,
 		FlatGridRowModel<T>,
-		FlatGridLayout,
 		MountedFlatGridBuild<T>
 	>({
 		getRootEl: () => sectionRootEl,
-		getContext: () => layout,
+		getRowModel: () => rowModel,
 		hasRenderableContent: () => itemCount > 0,
-		resolveRowModel: resolveFlatGridRowModel,
 		resolveVisibilityPolicy,
 		buildMountedRows: ({ rowModel, rowRange, previousBuild, rowSlotAllocator }) =>
 			buildMountedFlatGridRows({
@@ -197,7 +195,7 @@ export function useFlatCardGrid<T>(
 				layout = layoutMeasurement.layout;
 			}
 			return {
-				context: layoutMeasurement.layout,
+				rowModel: resolveFlatGridRowModel(layoutMeasurement.layout),
 				measurement: nextMeasurement,
 				isLayoutGeometryStable: layoutMeasurement.isLayoutGeometryStable,
 			};

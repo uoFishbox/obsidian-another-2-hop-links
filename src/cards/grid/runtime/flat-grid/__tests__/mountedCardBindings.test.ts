@@ -48,29 +48,21 @@ describe("createFlatGridCardBindingsMemo", () => {
 			{ id: "item-2" },
 		]);
 		const resolvePreviewRequest = vi.fn(() => null);
-		const resolveInteractionDescriptor = vi.fn(() => null);
 		const resolveBindings = createFlatGridCardBindingsMemo<TestItem>();
 
 		const first = resolveBindings({
 			mountedBuild,
 			previewCardDimensions: PREVIEW_CARD_DIMENSIONS,
 			resolvePreviewRequest,
-			resolveInteractionDescriptor,
 		});
 		const previewOnlyUpdate = resolveBindings({
 			mountedBuild,
 			previewCardDimensions: PREVIEW_CARD_DIMENSIONS,
 			resolvePreviewRequest,
-			resolveInteractionDescriptor,
 		});
 
-		expect(first.changed).toBe(true);
-		expect(previewOnlyUpdate).toEqual({
-			bindings: first.bindings,
-			changed: false,
-		});
+		expect(previewOnlyUpdate).toBe(first);
 		expect(resolvePreviewRequest).toHaveBeenCalledTimes(3);
-		expect(resolveInteractionDescriptor).toHaveBeenCalledTimes(3);
 	});
 
 	it("rebuilds when a resolver identity or mounted build changes", () => {
@@ -78,55 +70,47 @@ describe("createFlatGridCardBindingsMemo", () => {
 		const nextMountedBuild = { ...mountedBuild };
 		const firstPreviewResolver = vi.fn(() => null);
 		const nextPreviewResolver = vi.fn(() => null);
-		const resolveInteractionDescriptor = vi.fn(() => null);
 		const resolveBindings = createFlatGridCardBindingsMemo<TestItem>();
 
-		resolveBindings({
+		const initial = resolveBindings({
 			mountedBuild,
 			previewCardDimensions: PREVIEW_CARD_DIMENSIONS,
 			resolvePreviewRequest: firstPreviewResolver,
-			resolveInteractionDescriptor,
 		});
 		const resolverUpdate = resolveBindings({
 			mountedBuild,
 			previewCardDimensions: PREVIEW_CARD_DIMENSIONS,
 			resolvePreviewRequest: nextPreviewResolver,
-			resolveInteractionDescriptor,
 		});
 		const buildUpdate = resolveBindings({
 			mountedBuild: nextMountedBuild,
 			previewCardDimensions: PREVIEW_CARD_DIMENSIONS,
 			resolvePreviewRequest: nextPreviewResolver,
-			resolveInteractionDescriptor,
 		});
 
-		expect(resolverUpdate.changed).toBe(true);
-		expect(buildUpdate.changed).toBe(true);
+		expect(resolverUpdate).not.toBe(buildUpdate);
+		expect(resolverUpdate).not.toBe(initial);
 		expect(firstPreviewResolver).toHaveBeenCalledTimes(1);
 		expect(nextPreviewResolver).toHaveBeenCalledTimes(2);
-		expect(resolveInteractionDescriptor).toHaveBeenCalledTimes(3);
 	});
 
 	it("rebuilds bindings when resolved card dimensions change", () => {
 		const mountedBuild = createMountedBuild([{ id: "item-0" }]);
 		const resolvePreviewRequest = vi.fn(() => null);
-		const resolveInteractionDescriptor = vi.fn(() => null);
 		const resolveBindings = createFlatGridCardBindingsMemo<TestItem>();
 
-		resolveBindings({
+		const initial = resolveBindings({
 			mountedBuild,
 			previewCardDimensions: PREVIEW_CARD_DIMENSIONS,
 			resolvePreviewRequest,
-			resolveInteractionDescriptor,
 		});
 		const resized = resolveBindings({
 			mountedBuild,
 			previewCardDimensions: { widthPx: 150, heightPx: 180 },
 			resolvePreviewRequest,
-			resolveInteractionDescriptor,
 		});
 
-		expect(resized.changed).toBe(true);
+		expect(resized).not.toBe(initial);
 		expect(resolvePreviewRequest).toHaveBeenCalledTimes(2);
 	});
 });

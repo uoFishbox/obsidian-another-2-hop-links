@@ -25,8 +25,7 @@ Virtualization code must not import `cards/grid`, `two-hop`,
 ## State ownership
 
 - `model/` contains row-range behavior and immutable virtualization vocabulary.
-- `engine/snapshotComputation.ts` computes snapshots without DOM or Svelte.
-- `engine/virtualizer.ts` owns snapshots.
+- `engine/virtualizer.ts` owns range application and immutable snapshots without DOM or Svelte.
 - `engine/mountedGridRows.ts` owns mounted rows and resident physical row slots.
 - `grid/layout.ts` contains reusable flat and sectioned grid geometry.
 - `runtime/measurementLifecycle.ts` owns measurement types, task scheduling,

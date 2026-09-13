@@ -10,8 +10,6 @@ import type {
 	MountedFlatGridRow,
 } from "./mountedRows";
 import type { FlatGridLogicalCell } from "./logicalCell";
-import type { ItemInteractionDescriptor } from "cards/interactions/interactionTypes";
-import type { VirtualCardInteractionBinding } from "cards/interactions/virtualCardInteractionController";
 
 export type MountedFlatGridItemCell<T> = MountedFlatGridCell<T> & {
 	readonly cell: Extract<FlatGridLogicalCell<T>, { kind: "item" }>;
@@ -20,43 +18,27 @@ export type MountedFlatGridItemCell<T> = MountedFlatGridCell<T> & {
 /** Derived bindings committed with a mounted card-grid snapshot. */
 export interface FlatGridCardBindings {
 	readonly previewBindings: VirtualPreviewBinding[];
-	readonly interactionBindings: VirtualCardInteractionBinding[];
 }
 
 export interface BuildFlatGridCardBindingsParams<T> {
 	rows: readonly MountedFlatGridRow<T>[];
 	previewCardDimensions: PreviewCardDimensions;
 	resolvePreviewRequest?(item: T, index: number): CardPreviewRequest | null;
-	resolveInteractionDescriptor?(
-		item: T,
-		index: number,
-	): ItemInteractionDescriptor | null;
 }
 
 export interface ResolveFlatGridCardBindingsParams<T> {
 	mountedBuild: MountedFlatGridBuild<T> | null;
 	previewCardDimensions: PreviewCardDimensions;
 	resolvePreviewRequest?(item: T, index: number): CardPreviewRequest | null;
-	resolveInteractionDescriptor?(
-		item: T,
-		index: number,
-	): ItemInteractionDescriptor | null;
 }
 
-/** Result of resolving the bindings owned by one mounted-build cache. */
-export interface FlatGridCardBindingsMemoResult {
-	readonly bindings: FlatGridCardBindings;
-	readonly changed: boolean;
-}
-
-/** Resolves cached bindings and reports whether consumers must resynchronize. */
+/** Resolves cached preview bindings for one mounted build. */
 export type FlatGridCardBindingsMemo<T> = (
 	params: ResolveFlatGridCardBindingsParams<T>,
-) => FlatGridCardBindingsMemoResult;
+) => FlatGridCardBindings;
 
 const EMPTY_FLAT_GRID_CARD_BINDINGS: FlatGridCardBindings = {
 	previewBindings: [],
-	interactionBindings: [],
 };
 
 export function isMountedFlatGridItemCell<T>(
@@ -65,15 +47,13 @@ export function isMountedFlatGridItemCell<T>(
 	return mountedCell?.cell.kind === "item";
 }
 
-/** Resolves immutable preview and interaction bindings from mounted card rows. */
+/** Resolves immutable preview bindings from mounted card rows. */
 export function buildFlatGridCardBindings<T>({
 	rows,
 	previewCardDimensions,
 	resolvePreviewRequest,
-	resolveInteractionDescriptor,
 }: BuildFlatGridCardBindingsParams<T>): FlatGridCardBindings {
 	const previewBindings: VirtualPreviewBinding[] = [];
-	const interactionBindings: VirtualCardInteractionBinding[] = [];
 
 	for (const row of rows) {
 		for (const mountedCell of row.bindings) {
@@ -90,30 +70,20 @@ export function buildFlatGridCardBindings<T>({
 					),
 				});
 			}
-
-			const descriptor = resolveInteractionDescriptor?.(item, itemIndex);
-			if (descriptor) {
-				interactionBindings.push({
-					slotId: String(mountedCell.physicalCellSlot),
-					descriptor,
-				});
-			}
 		}
 	}
 
 	return {
 		previewBindings,
-		interactionBindings,
 	};
 }
 
 /**
- * Reuses bindings while the mounted build and both resolver identities are stable.
+ * Reuses bindings while the mounted build and preview inputs are stable.
  */
 export function createFlatGridCardBindingsMemo<T>(): FlatGridCardBindingsMemo<T> {
 	let lastMountedBuild: MountedFlatGridBuild<T> | null | undefined;
 	let lastPreviewResolver: ResolveFlatGridCardBindingsParams<T>["resolvePreviewRequest"];
-	let lastInteractionResolver: ResolveFlatGridCardBindingsParams<T>["resolveInteractionDescriptor"];
 	let lastPreviewWidthPx: number | undefined;
 	let lastPreviewHeightPx: number | undefined;
 	let bindings = EMPTY_FLAT_GRID_CARD_BINDINGS;
@@ -122,30 +92,26 @@ export function createFlatGridCardBindingsMemo<T>(): FlatGridCardBindingsMemo<T>
 		mountedBuild,
 		previewCardDimensions,
 		resolvePreviewRequest,
-		resolveInteractionDescriptor,
-	}): FlatGridCardBindingsMemoResult => {
+	}): FlatGridCardBindings => {
 		if (
 			mountedBuild === lastMountedBuild &&
 			resolvePreviewRequest === lastPreviewResolver &&
-			resolveInteractionDescriptor === lastInteractionResolver &&
 			previewCardDimensions.widthPx === lastPreviewWidthPx &&
 			previewCardDimensions.heightPx === lastPreviewHeightPx
 		) {
-			return { bindings, changed: false };
+			return bindings;
 		}
 
 		bindings = buildFlatGridCardBindings({
 			rows: mountedBuild?.rowsInMountedRange ?? [],
 			previewCardDimensions,
 			resolvePreviewRequest,
-			resolveInteractionDescriptor,
 		});
 		lastMountedBuild = mountedBuild;
 		lastPreviewResolver = resolvePreviewRequest;
-		lastInteractionResolver = resolveInteractionDescriptor;
 		lastPreviewWidthPx = previewCardDimensions.widthPx;
 		lastPreviewHeightPx = previewCardDimensions.heightPx;
 
-		return { bindings, changed: true };
+		return bindings;
 	};
 }

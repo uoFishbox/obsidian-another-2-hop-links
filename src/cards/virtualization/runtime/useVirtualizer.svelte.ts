@@ -1,4 +1,4 @@
-import type { VirtualListSnapshot } from "../engine/snapshotComputation";
+import type { VirtualListSnapshot } from "../engine/virtualizer";
 import type { VirtualScrollWindowRangeRowModel } from "../engine/scrollWindowResolver";
 import type { ResidentRowSlotAllocator } from "../engine/mountedGridRows";
 import type { RowRange } from "../model/ranges";
@@ -34,14 +34,12 @@ export type {
 export interface UseVirtualizerOptions<
 	TCell,
 	TRowModel extends VirtualRowModel<TCell> & VirtualScrollWindowRangeRowModel,
-	TContext,
 	TMountedBuild,
 > {
 	getRootEl(): HTMLElement | null;
-	getContext(): TContext;
+	getRowModel(): TRowModel;
 	hasRenderableContent(): boolean;
-	resolveRowModel(context: TContext): TRowModel;
-	resolveVisibilityPolicy(context: TContext): VirtualVisibilityPolicy;
+	resolveVisibilityPolicy(rowModel: TRowModel): VirtualVisibilityPolicy;
 	buildMountedRows(params: {
 		rowModel: TRowModel;
 		rowRange: RowRange;
@@ -54,7 +52,7 @@ export interface UseVirtualizerOptions<
 		measurement: VirtualMeasurement & { readonly sectionRect: DOMRect },
 		rootEl: HTMLElement,
 		runtimeMeasurement: VirtualizerMeasurementState,
-	): VirtualListLayoutMeasurementResolution<TContext>;
+	): VirtualListLayoutMeasurementResolution<TRowModel>;
 	onRangePublished?(context: PublishedVirtualRangeContext): void;
 	onObservedWidthChange?(width: number): void;
 	/** Maximum retries while layout metrics are temporarily unstable. */
@@ -68,13 +66,11 @@ const DEFAULT_UNSTABLE_MEASUREMENT_RETRY_LIMIT = 6;
 export function useVirtualizer<
 	TCell,
 	TRowModel extends VirtualRowModel<TCell> & VirtualScrollWindowRangeRowModel,
-	TContext,
 	TMountedBuild,
 >({
 	getRootEl,
-	getContext,
+	getRowModel,
 	hasRenderableContent,
-	resolveRowModel,
 	resolveVisibilityPolicy,
 	buildMountedRows,
 	onSnapshotUpdated,
@@ -83,7 +79,7 @@ export function useVirtualizer<
 	onObservedWidthChange,
 	unstableMeasurementRetryLimit = DEFAULT_UNSTABLE_MEASUREMENT_RETRY_LIMIT,
 	frameCoordinator,
-}: UseVirtualizerOptions<TCell, TRowModel, TContext, TMountedBuild>) {
+}: UseVirtualizerOptions<TCell, TRowModel, TMountedBuild>) {
 	const measurement = $state<VirtualizerMeasurementState>({
 		sectionTop: 0,
 		viewportHeight: 0,
@@ -93,9 +89,7 @@ export function useVirtualizer<
 	});
 	let mountedBuildState = $state.raw<TMountedBuild | null>(null);
 	let totalHeightState = $state<number | null>(null);
-	const engine = createVirtualizerEngine<TCell, TRowModel, TContext, TMountedBuild>({
-		resolveRowModel,
-		resolveVisibilityPolicy,
+	const engine = createVirtualizerEngine<TCell, TRowModel, TMountedBuild>({
 		buildMountedRows,
 		onSnapshotUpdated: (nextSnapshot) => {
 			if (mountedBuildState !== nextSnapshot.mountedBuild) {
@@ -112,9 +106,8 @@ export function useVirtualizer<
 	const runtime = createVirtualMeasurementRuntime({
 		measurement,
 		getRootEl,
-		getContext,
+		getRowModel,
 		hasRenderableContent,
-		resolveRowModel,
 		resolveVisibilityPolicy,
 		resolveLayoutMeasurement,
 		onRangePublished,

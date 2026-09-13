@@ -162,13 +162,11 @@ export function useTwoHopVirtualGrid(
 	const virtualizer = useVirtualizer<
 		TwoHopVirtualCell,
 		TwoHopRowModel,
-		TwoHopRowModel,
 		MountedTwoHopBuild
 	>({
 		getRootEl: () => rootEl,
-		getContext: () => rowModel,
+		getRowModel: () => rowModel,
 		hasRenderableContent: () => rowModel.rowCount > 0,
-		resolveRowModel: (model) => model,
 		resolveVisibilityPolicy,
 		buildMountedRows: ({
 			rowModel: nextRowModel,
@@ -235,7 +233,7 @@ export function useTwoHopVirtualGrid(
 		}
 		widthWasZero = false;
 		return {
-			context: rowModel,
+			rowModel,
 			measurement: nextMeasurement,
 			isLayoutGeometryStable: nextMeasurement.hasValidScrollMetrics,
 		};

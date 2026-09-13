@@ -17,6 +17,11 @@ and navigation. `mountedRows.ts` binds only rows entering the resident window
 to physical slots supplied by the shared allocator. `CardGridSurface` publishes
 those immutable bindings into stable row and cell signals.
 
+The feature resolves the current row model before entering the shared
+virtualizer. Range resolution and the engine consume that same model and one
+resolved visibility policy directly; there is no generic context-to-model
+adapter in the measurement path.
+
 Preview and hydration work runs after the mounted snapshot is published.
 `twoHopCardRuntime.ts` rebuilds foreground/background queues in one pass over
 the mounted rows and owns the bounded off-window model cache, preview binding
@@ -54,6 +59,8 @@ and scroller changes, and republishes ranges from the resulting scroll position.
 - Scrolling does not rebuild section geometry or enumerate all section items.
 - Range scans use direct loops over `rowsInMountedRange`; they do not create a
   flattened mounted-cell array, iterators, or chained `map`/`filter` results.
+- Interaction synchronization scans `rowsInMountedRange` directly and does not
+  materialize an intermediate slot/descriptor binding array.
 - A range update rebuilds hydration queues in a single pass over the mounted
   rows; it neither materializes a demand object nor rescans for queue setup.
 - Preview bindings are reused while their inputs are unchanged, so a

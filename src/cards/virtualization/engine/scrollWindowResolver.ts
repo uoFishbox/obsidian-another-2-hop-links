@@ -41,22 +41,10 @@ export type VirtualScrollWindowRangeRowModel = Pick<
 	): void;
 };
 
-export interface CreateVirtualScrollWindowRangeResolverOptions<
-	TRowModel extends VirtualScrollWindowRangeRowModel,
-	TLayout,
-> {
-	resolveRowModel(layout: TLayout): TRowModel;
-	resolveVisibilityPolicy(layout: TLayout): VirtualVisibilityPolicy;
-}
-
 /** Resolves one atomic mounted/preview range measurement and its coverage. */
 export function createVirtualScrollWindowRangeResolver<
 	TRowModel extends VirtualScrollWindowRangeRowModel,
-	TLayout,
->({
-	resolveRowModel,
-	resolveVisibilityPolicy,
-}: CreateVirtualScrollWindowRangeResolverOptions<TRowModel, TLayout>) {
+>() {
 	const rangeParams = {
 		scrollTop: 0,
 		viewportHeight: 0,
@@ -148,17 +136,16 @@ export function createVirtualScrollWindowRangeResolver<
 		scrollTop: number,
 		viewportHeight: number,
 		sectionTop: number,
-		layout: TLayout,
+		rowModel: TRowModel,
+		visibilityPolicy: VirtualVisibilityPolicy,
 	): ScrollWindowMeasurement => {
-		const measurementRowModel = resolveRowModel(layout);
-		const visibilityPolicy = resolveVisibilityPolicy(layout);
 		const localScrollTop = scrollTop - sectionTop;
 
 		rangeParams.scrollTop = localScrollTop;
 		rangeParams.viewportHeight = viewportHeight;
 		rangeParams.mountedOverscanPx = visibilityPolicy.mountedOverscanPx;
 		rangeParams.previewOverscanPx = visibilityPolicy.previewOverscanPx ?? 0;
-		measurementRowModel.findVisibleRangesInto(mutableRangesScratch, rangeParams);
+		rowModel.findVisibleRangesInto(mutableRangesScratch, rangeParams);
 		lastPublishedRanges = publishStableRanges(
 			mutableRangesScratch,
 			lastPublishedRanges,
@@ -167,7 +154,7 @@ export function createVirtualScrollWindowRangeResolver<
 		scrollWindowMeasurement.mountedCoverageScrollTopBand =
 			updateCoverageScrollTopBand(
 				mountedCoverageBandScratch,
-				measurementRowModel,
+				rowModel,
 				sectionTop,
 				localScrollTop,
 				viewportHeight,
@@ -176,7 +163,7 @@ export function createVirtualScrollWindowRangeResolver<
 		scrollWindowMeasurement.previewCoverageScrollTopBand =
 			updateCoverageScrollTopBand(
 				previewCoverageBandScratch,
-				measurementRowModel,
+				rowModel,
 				sectionTop,
 				localScrollTop,
 				viewportHeight,

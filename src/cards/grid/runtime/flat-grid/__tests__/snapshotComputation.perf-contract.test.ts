@@ -1,16 +1,17 @@
 import { describe, expect, it, vi } from "vitest";
 import { createFlatGridCellSource } from "../cellSource";
-import { computeFlatGridLayout } from "cards/virtualization/public";
+import {
+	computeFlatGridLayout,
+	createResidentRowSlotAllocator,
+} from "cards/virtualization/public";
 import type { FlatGridLogicalCell } from "../logicalCell";
-import { computeVirtualRanges } from "cards/virtualization/public";
 import { buildMountedFlatGridRows, type MountedFlatGridBuild } from "../mountedRows";
 import { flattenMountedRowBindings } from "./mountedRowsTestHelpers";
 import { createFlatGridRowModel, type FlatGridRowModel } from "../rowModel";
 import {
-	computeVirtualListSnapshot,
+	createVirtualizerEngine,
 	type VirtualListSnapshot,
-} from "cards/virtualization/engine/snapshotComputation";
-import { createResidentRowSlotAllocator } from "cards/virtualization/public";
+} from "cards/virtualization/engine/virtualizer";
 
 type TestItem = { id: string };
 type TestSnapshot = VirtualListSnapshot<
@@ -61,47 +62,52 @@ const measureWorkload = (cardCount: number) => {
 	let previous: TestSnapshot | null = null;
 	let mountedCellBuilds = 0;
 	let fastPathReuses = 0;
-	const rowSlotAllocator = createResidentRowSlotAllocator();
+	const engine = createVirtualizerEngine<
+		FlatGridLogicalCell<TestItem>,
+		FlatGridRowModel<TestItem>,
+		MountedFlatGridBuild<TestItem>
+	>({
+		buildMountedRows: ({
+			rowModel: nextRowModel,
+			rowRange,
+			previousBuild,
+			rowSlotAllocator,
+		}) => {
+			mountedCellBuilds += 1;
+			return buildMountedFlatGridRows({
+				rowModel: nextRowModel,
+				rowRange,
+				previousBuild,
+				rowSlotAllocator,
+			});
+		},
+	});
 
 	// Count reconciliation builds separately from snapshot computations. Every
 	// replay computes a snapshot, but no-op replays must take the fast path.
 	const applyMeasurement = (): void => {
-		const rangesResult = computeVirtualRanges({
-			rowModel,
-			scrollTop: SCROLL_TOP,
-			viewportHeight: VIEWPORT_HEIGHT,
-			sectionTop: 0,
-			hasValidScrollMetrics: true,
-			hasPublishedVisibleRange: previous !== null,
-			currentMountedRange: previous?.ranges.mounted ?? {
-				start: 0,
-				end: 0,
+		engine.applyRangeMeasurement(
+			{
+				scrollTop: SCROLL_TOP,
+				viewportHeight: VIEWPORT_HEIGHT,
+				sectionTop: 0,
+				hasValidScrollMetrics: true,
+				isScrollActive: false,
+				scrollGeneration: 0,
+				source: "scroll",
 			},
-			bootstrapRows: 3,
-			mountedOverscanPx: MOUNTED_OVERSCAN_PX,
-		});
-		const result = computeVirtualListSnapshot<
-			FlatGridLogicalCell<TestItem>,
-			MountedFlatGridBuild<TestItem>
-		>({
 			rowModel,
-			rangesResult,
-			previous,
-			buildMountedRows: ({ rowModel: nextRowModel, rowRange, previousBuild }) => {
-				mountedCellBuilds += 1;
-				return buildMountedFlatGridRows({
-					rowModel: nextRowModel as FlatGridRowModel<TestItem>,
-					rowRange,
-					previousBuild,
-					rowSlotAllocator,
-				});
+			{
+				bootstrapRows: 3,
+				mountedOverscanPx: MOUNTED_OVERSCAN_PX,
 			},
-		});
+		);
+		const snapshot = engine.getSnapshot();
 
-		if (result.snapshot === previous) {
+		if (snapshot === previous) {
 			fastPathReuses += 1;
 		}
-		previous = result.snapshot;
+		previous = snapshot;
 	};
 
 	// Prime the mounted build once, then replay a sustained no-op workload.

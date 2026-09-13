@@ -8,8 +8,11 @@ import type { InteractionDescriptorResolverProvider } from "cards/interactions/i
 import { createVirtualCardInteractionController } from "cards/interactions/virtualCardInteractionController";
 import type { RowRange } from "cards/virtualization/public";
 import { createPreviewPrefetchRangeTracker } from "card-preview/prefetch/previewPrefetchRange";
-import { createFlatGridCardBindingsMemo } from "./mountedCardBindings";
-import type { MountedFlatGridBuild } from "./mountedRows";
+import {
+	createFlatGridCardBindingsMemo,
+	isMountedFlatGridItemCell,
+} from "./mountedCardBindings";
+import type { MountedFlatGridBuild, MountedFlatGridCell } from "./mountedRows";
 
 export interface FlatGridCardSurfaceRuntimeOptions<T> {
 	readonly previewSurface: VirtualPreviewSurface;
@@ -38,19 +41,35 @@ export function createFlatGridCardSurfaceRuntime<T>(
 	const previewPrefetchRangeTracker = createPreviewPrefetchRangeTracker();
 	const resolveCardBindings = createFlatGridCardBindingsMemo<T>();
 	const interactionController = createVirtualCardInteractionController();
+	let lastInteractionMountedBuild: MountedFlatGridBuild<T> | null | undefined;
+	let lastInteractionResolver:
+		| ((item: T, index: number) => ItemInteractionDescriptor | null)
+		| undefined;
+
+	function resolveInteractionDescriptor(
+		mountedCell: MountedFlatGridCell<T>,
+	): ItemInteractionDescriptor | null | undefined {
+		if (!isMountedFlatGridItemCell(mountedCell)) return undefined;
+		return (
+			lastInteractionResolver?.(
+				mountedCell.cell.item,
+				mountedCell.cell.itemIndex,
+			) ?? null
+		);
+	}
 
 	function publish(
 		mountedBuild: MountedFlatGridBuild<T> | null,
 		visibleRange: RowRange,
 	): void {
-		const bindingsResult = resolveCardBindings({
+		const interactionResolver = options.getInteractionDescriptorResolver();
+		const bindings = resolveCardBindings({
 			mountedBuild,
 			previewCardDimensions: options.getPreviewCardDimensions(),
 			resolvePreviewRequest: options.getPreviewRequestResolver(),
-			resolveInteractionDescriptor: options.getInteractionDescriptorResolver(),
 		});
 		options.previewSurface.publish({
-			bindings: bindingsResult.bindings.previewBindings,
+			bindings: bindings.previewBindings,
 			visibleRange,
 			prefetchRange: previewPrefetchRangeTracker.resolve(
 				visibleRange,
@@ -58,9 +77,15 @@ export function createFlatGridCardSurfaceRuntime<T>(
 			),
 			active: true,
 		});
-		if (bindingsResult.changed) {
-			interactionController.syncCards(
-				bindingsResult.bindings.interactionBindings,
+		if (
+			mountedBuild !== lastInteractionMountedBuild ||
+			interactionResolver !== lastInteractionResolver
+		) {
+			lastInteractionMountedBuild = mountedBuild;
+			lastInteractionResolver = interactionResolver;
+			interactionController.syncMountedRows(
+				mountedBuild?.rowsInMountedRange ?? [],
+				resolveInteractionDescriptor,
 			);
 		}
 	}
@@ -70,7 +95,7 @@ export function createFlatGridCardSurfaceRuntime<T>(
 		interactionDescriptorResolverProvider: interactionController,
 		publish,
 		getInteractionHandle: (physicalCellSlot) =>
-			interactionController.getInteractionHandle(String(physicalCellSlot)),
+			interactionController.getInteractionHandle(physicalCellSlot),
 		dispose(): void {
 			options.previewSurface.dispose();
 			interactionController.clear();

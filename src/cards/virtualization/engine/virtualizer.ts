@@ -1,29 +1,35 @@
 import {
-	computeVirtualListSnapshot,
-	createEmptyVirtualListComputation,
-	recomputeVirtualListSnapshot,
-	type VirtualListComputation,
-	type VirtualListSnapshot,
-} from "./snapshotComputation";
+	clampRange,
+	computeVirtualRanges,
+	sameRange,
+	type ComputeVirtualRangesResult,
+	type RowRange,
+	type VirtualVisibilityPolicy,
+} from "../model/ranges";
+import type { VirtualRanges, VirtualRowModel } from "../model/types";
+import type { VirtualMeasurement } from "../runtime/measurementLifecycle";
+import type { MeasurementUpdateResult } from "../viewport/measurement";
 import {
 	createResidentRowSlotAllocator,
 	type ResidentRowSlotAllocator,
 } from "./mountedGridRows";
-import type { MeasurementUpdateResult } from "../viewport/measurement";
-import type { VirtualMeasurement } from "../runtime/measurementLifecycle";
-import type { RowRange } from "../model/ranges";
-import type { VirtualRanges, VirtualRowModel } from "../model/types";
-import { computeVirtualRanges, type VirtualVisibilityPolicy } from "../model/ranges";
+
+export interface VirtualListSnapshot<TCell, TMountedBuild> {
+	readonly rowModel: VirtualRowModel<TCell>;
+	readonly ranges: VirtualRanges;
+	readonly mountedBuild: TMountedBuild | null;
+	readonly totalHeight: number;
+}
 
 export interface VirtualizerEngine<
 	TCell,
 	TRowModel extends VirtualRowModel<TCell>,
-	TContext,
 	TMountedBuild,
 > {
 	applyRangeMeasurement(
 		measurement: VirtualMeasurement,
-		context: TContext,
+		rowModel: TRowModel,
+		visibilityPolicy: VirtualVisibilityPolicy,
 		precomputedRanges?: VirtualRanges,
 	): MeasurementUpdateResult<RowRange>;
 	recompute(params: { rowModel: TRowModel }): void;
@@ -36,11 +42,8 @@ export interface VirtualizerEngine<
 export interface CreateVirtualizerEngineOptions<
 	TCell,
 	TRowModel extends VirtualRowModel<TCell>,
-	TContext,
 	TMountedBuild,
 > {
-	resolveRowModel(context: TContext): TRowModel;
-	resolveVisibilityPolicy(context: TContext): VirtualVisibilityPolicy;
 	buildMountedRows(params: {
 		rowModel: TRowModel;
 		rowRange: RowRange;
@@ -51,65 +54,107 @@ export interface CreateVirtualizerEngineOptions<
 	onSnapshotUpdated?(snapshot: VirtualListSnapshot<TCell, TMountedBuild>): void;
 }
 
-/**
- * Owns snapshot state, resident physical row slots, range application, and
- * recomputation. It has no DOM or Svelte lifecycle responsibilities.
- */
+const EMPTY_RANGE: RowRange = Object.freeze({ start: 0, end: 0 });
+const EMPTY_VIRTUAL_RANGES: VirtualRanges = Object.freeze({
+	mounted: EMPTY_RANGE,
+	previewVisible: EMPTY_RANGE,
+});
+
+/** Owns range application, immutable snapshots, and resident physical row slots. */
 export function createVirtualizerEngine<
 	TCell,
 	TRowModel extends VirtualRowModel<TCell>,
-	TContext,
 	TMountedBuild,
 >({
-	resolveRowModel,
-	resolveVisibilityPolicy,
 	buildMountedRows,
 	onSnapshotUpdated,
-}: CreateVirtualizerEngineOptions<
+}: CreateVirtualizerEngineOptions<TCell, TRowModel, TMountedBuild>): VirtualizerEngine<
 	TCell,
 	TRowModel,
-	TContext,
 	TMountedBuild
->): VirtualizerEngine<TCell, TRowModel, TContext, TMountedBuild> {
+> {
 	let latestSnapshot: VirtualListSnapshot<TCell, TMountedBuild> | null = null;
 	let hasPublishedVisibleRange = false;
 	const rowSlotAllocator = createResidentRowSlotAllocator();
 
-	const buildMountedRowsForEngine = (params: {
-		rowModel: VirtualRowModel<TCell>;
-		rowRange: RowRange;
-		ranges: VirtualRanges;
-		previousBuild?: TMountedBuild;
-	}): TMountedBuild =>
-		buildMountedRows({
-			rowModel: params.rowModel as TRowModel,
-			rowRange: params.rowRange,
-			ranges: params.ranges,
-			previousBuild: params.previousBuild,
-			rowSlotAllocator,
-		});
-
-	const commitComputation = (
-		result: VirtualListComputation<TCell, TMountedBuild>,
-	): void => {
-		const nextSnapshot = result.snapshot;
-		if (latestSnapshot === nextSnapshot) {
-			return;
-		}
-
+	function commit(nextSnapshot: VirtualListSnapshot<TCell, TMountedBuild>): void {
+		if (latestSnapshot === nextSnapshot) return;
 		latestSnapshot = nextSnapshot;
 		onSnapshotUpdated?.(nextSnapshot);
-	};
+	}
 
-	const applyRangeMeasurement = (
+	function buildSnapshot(
+		rowModel: TRowModel,
+		ranges: VirtualRanges,
+		previousBuild?: TMountedBuild,
+	): VirtualListSnapshot<TCell, TMountedBuild> {
+		const mountedBuild = buildMountedRows({
+			rowModel,
+			rowRange: ranges.mounted,
+			ranges,
+			previousBuild,
+			rowSlotAllocator,
+		});
+		return createSnapshot(rowModel, ranges, mountedBuild);
+	}
+
+	function recomputeSnapshot(
+		rowModel: TRowModel,
+		previous: VirtualListSnapshot<TCell, TMountedBuild>,
+	): VirtualListSnapshot<TCell, TMountedBuild> {
+		if (rowModel.rowCount <= 0) return createEmptySnapshot(rowModel);
+
+		const ranges = clampVirtualRanges(previous.ranges, rowModel.rowCount);
+		if (
+			previous.mountedBuild &&
+			previous.rowModel === rowModel &&
+			sameRange(previous.ranges.mounted, ranges.mounted)
+		) {
+			return createSnapshot(rowModel, ranges, previous.mountedBuild);
+		}
+		return buildSnapshot(rowModel, ranges, previous.mountedBuild ?? undefined);
+	}
+
+	function resolveMeasuredSnapshot(
+		rowModel: TRowModel,
+		rangesResult: Exclude<ComputeVirtualRangesResult, { kind: "skipped" }>,
+	): VirtualListSnapshot<TCell, TMountedBuild> {
+		const previous = latestSnapshot;
+		if (rangesResult.kind === "empty") return createEmptySnapshot(rowModel);
+
+		if (
+			previous &&
+			previous.rowModel === rowModel &&
+			previous.totalHeight === rowModel.totalHeight &&
+			previous.mountedBuild &&
+			sameRange(previous.ranges.mounted, rangesResult.ranges.mounted)
+		) {
+			if (
+				sameRange(
+					previous.ranges.previewVisible,
+					rangesResult.ranges.previewVisible,
+				)
+			) {
+				return previous;
+			}
+			return createSnapshot(rowModel, rangesResult.ranges, previous.mountedBuild);
+		}
+
+		return buildSnapshot(
+			rowModel,
+			rangesResult.ranges,
+			previous?.mountedBuild ?? undefined,
+		);
+	}
+
+	function applyRangeMeasurement(
 		nextMeasurement: VirtualMeasurement,
-		context: TContext,
+		rowModel: TRowModel,
+		visibilityPolicy: VirtualVisibilityPolicy,
 		precomputedRanges?: VirtualRanges,
-	): MeasurementUpdateResult<RowRange> => {
-		const rowModel = resolveRowModel(context);
+	): MeasurementUpdateResult<RowRange> {
 		const previousSnapshot = latestSnapshot;
 		const previousMountedBuild = previousSnapshot?.mountedBuild ?? null;
-		const visibilityPolicy = resolveVisibilityPolicy(context);
 		const rangesResult = computeVirtualRanges({
 			rowModel,
 			scrollTop: nextMeasurement.scrollTop,
@@ -117,40 +162,38 @@ export function createVirtualizerEngine<
 			sectionTop: nextMeasurement.sectionTop,
 			hasValidScrollMetrics: nextMeasurement.hasValidScrollMetrics,
 			hasPublishedVisibleRange,
-			currentMountedRange: previousSnapshot?.ranges.mounted ?? {
-				start: 0,
-				end: 0,
-			},
+			currentMountedRange: previousSnapshot?.ranges.mounted ?? EMPTY_RANGE,
 			bootstrapRows: visibilityPolicy.bootstrapRows,
 			mountedOverscanPx: visibilityPolicy.mountedOverscanPx,
 			previewOverscanPx: visibilityPolicy.previewOverscanPx ?? 0,
 			precomputedRanges,
 		});
-		const result = computeVirtualListSnapshot({
-			rowModel,
-			rangesResult,
-			previous: previousSnapshot,
-			buildMountedRows: buildMountedRowsForEngine,
-		});
-		const nextSnapshot = result.snapshot;
+
+		if (rangesResult.kind === "skipped") {
+			const nextSnapshot =
+				previousSnapshot?.rowModel === rowModel &&
+				previousSnapshot.totalHeight === rowModel.totalHeight
+					? previousSnapshot
+					: previousSnapshot
+						? recomputeSnapshot(rowModel, previousSnapshot)
+						: createEmptySnapshot<TCell, TMountedBuild>(rowModel);
+			if (nextSnapshot.mountedBuild === null && previousMountedBuild) {
+				rowSlotAllocator.reset();
+			}
+			commit(nextSnapshot);
+			return { kind: "skipped", reason: "unstable", updateKind: "skipped" };
+		}
+
+		const nextSnapshot = resolveMeasuredSnapshot(rowModel, rangesResult);
 		if (nextSnapshot.mountedBuild === null && previousMountedBuild) {
 			rowSlotAllocator.reset();
 		}
-		commitComputation(result);
-
-		if (result.measurementKind === "skipped") {
-			return {
-				kind: "skipped",
-				reason: "unstable",
-				updateKind: "skipped",
-			};
-		}
-
+		commit(nextSnapshot);
 		const updateKind =
 			nextSnapshot.mountedBuild === previousMountedBuild
 				? "reused"
 				: "recomputed";
-		if (result.measurementKind === "bootstrapped") {
+		if (rangesResult.kind === "bootstrapped") {
 			return {
 				kind: "bootstrapped",
 				range: nextSnapshot.ranges.mounted,
@@ -164,33 +207,22 @@ export function createVirtualizerEngine<
 			range: nextSnapshot.ranges.mounted,
 			updateKind,
 		};
-	};
+	}
 
-	const recompute = (params: { rowModel: TRowModel }): void => {
+	function recompute(params: { rowModel: TRowModel }): void {
 		const previousSnapshot = latestSnapshot;
-		if (!previousSnapshot) {
-			return;
-		}
-
-		const result = recomputeVirtualListSnapshot({
-			rowModel: params.rowModel,
-			previous: previousSnapshot,
-			buildMountedRows: buildMountedRowsForEngine,
-		});
-		if (result.snapshot.mountedBuild === null && previousSnapshot.mountedBuild) {
+		if (!previousSnapshot) return;
+		const nextSnapshot = recomputeSnapshot(params.rowModel, previousSnapshot);
+		if (nextSnapshot.mountedBuild === null && previousSnapshot.mountedBuild) {
 			rowSlotAllocator.reset();
 		}
-		commitComputation(result);
-	};
+		commit(nextSnapshot);
+	}
 
-	const setEmpty = (params: { rowModel: TRowModel }): void => {
+	function setEmpty(params: { rowModel: TRowModel }): void {
 		rowSlotAllocator.reset();
-		commitComputation(
-			createEmptyVirtualListComputation<TCell, TMountedBuild>({
-				rowModel: params.rowModel,
-			}),
-		);
-	};
+		commit(createEmptySnapshot(params.rowModel));
+	}
 
 	return {
 		applyRangeMeasurement,
@@ -200,4 +232,46 @@ export function createVirtualizerEngine<
 		hasPublishedVisibleRange: () => hasPublishedVisibleRange,
 		dispose: () => rowSlotAllocator.dispose(),
 	};
+}
+
+function freezeVirtualRanges(ranges: VirtualRanges): VirtualRanges {
+	Object.freeze(ranges.mounted);
+	Object.freeze(ranges.previewVisible);
+	return Object.freeze(ranges);
+}
+
+function createSnapshot<TCell, TMountedBuild>(
+	rowModel: VirtualRowModel<TCell>,
+	ranges: VirtualRanges,
+	mountedBuild: TMountedBuild,
+): VirtualListSnapshot<TCell, TMountedBuild> {
+	return Object.freeze({
+		rowModel,
+		ranges: freezeVirtualRanges(ranges),
+		mountedBuild,
+		totalHeight: rowModel.totalHeight,
+	});
+}
+
+function createEmptySnapshot<TCell, TMountedBuild>(
+	rowModel: VirtualRowModel<TCell>,
+): VirtualListSnapshot<TCell, TMountedBuild> {
+	return Object.freeze({
+		rowModel,
+		ranges: EMPTY_VIRTUAL_RANGES,
+		mountedBuild: null,
+		totalHeight: rowModel.totalHeight,
+	});
+}
+
+function clampVirtualRanges(ranges: VirtualRanges, rowCount: number): VirtualRanges {
+	const mounted = clampRange(ranges.mounted, rowCount);
+	const previewVisible = clampRange(ranges.previewVisible, rowCount);
+	if (
+		sameRange(ranges.mounted, mounted) &&
+		sameRange(ranges.previewVisible, previewVisible)
+	) {
+		return ranges;
+	}
+	return { mounted, previewVisible };
 }
